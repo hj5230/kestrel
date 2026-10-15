@@ -1,0 +1,346 @@
+import { useEffect, useState } from "preact/hooks"
+import { ChevronRightIcon, FileJsonIcon, MoreHorizontalIcon, PencilIcon, PlugIcon, PlusIcon, RotateCwIcon, Trash2Icon } from "lucide-react"
+import { toast } from "sonner"
+import type { McpServerConfig } from "@shared/protocol"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Spinner } from "@/components/ui/spinner"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Section } from "./layout"
+import { rpc } from "@/lib/api"
+import { mcpServers } from "@/lib/store"
+import { cn } from "@/lib/utils"
+
+const kvToText = (o: Record<string, string>, sep: string) =>
+  Object.entries(o)
+    .map(([k, v]) => `${k}${sep}${v}`)
+    .join("\n")
+
+function textToKv(t: string, sep: string) {
+  const out: Record<string, string> = {}
+  for (const line of t.split("\n")) {
+    const i = line.indexOf(sep)
+    if (i > 0) out[line.slice(0, i).trim()] = line.slice(i + sep.length).trim()
+  }
+  return out
+}
+
+function splitArgs(s: string): string[] {
+  const out: string[] = []
+  const re = /"([^"]*)"|'([^']*)'|(\S+)/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(s))) out.push(m[1] ?? m[2] ?? m[3])
+  return out
+}
+
+const quote = (a: string) => (/\s/.test(a) ? `"${a}"` : a)
+
+function ServerDialog({ open, server, onClose }: { open: boolean; server: McpServerConfig | null; onClose: () => void }) {
+  const [name, setName] = useState("")
+  const [transport, setTransport] = useState<McpServerConfig["transport"]>("stdio")
+  const [command, setCommand] = useState("")
+  const [env, setEnv] = useState("")
+  const [url, setUrl] = useState("")
+  const [headers, setHeaders] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setName(server?.name ?? "")
+    setTransport(server?.transport ?? "stdio")
+    setCommand(server ? [server.command, ...server.args].filter(Boolean).map(quote).join(" ") : "")
+    setEnv(kvToText(server?.env ?? {}, "="))
+    setUrl(server?.url ?? "")
+    setHeaders(kvToText(server?.headers ?? {}, ": "))
+  }, [open, server])
+
+  const save = async (e: Event) => {
+    e.preventDefault()
+    if (!name.trim()) return toast.error("请填写名称")
+    const parts = splitArgs(command)
+    setSaving(true)
+    try {
+      await rpc("mcp.upsert", {
+        id: server?.id ?? "",
+        name: name.trim(),
+        transport,
+        command: transport === "stdio" ? (parts[0] ?? "") : "",
+        args: transport === "stdio" ? parts.slice(1) : [],
+        env: textToKv(env, "="),
+        url: transport === "stdio" ? "" : url.trim(),
+        headers: textToKv(headers, ":"),
+        enabled: server?.enabled ?? true,
+      })
+      onClose()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <form onSubmit={save} className="grid gap-5">
+          <DialogHeader>
+            <DialogTitle>{server ? "编辑 MCP 服务" : "添加 MCP 服务"}</DialogTitle>
+            <DialogDescription>支持本地 stdio 进程、Streamable HTTP 与 SSE。</DialogDescription>
+          </DialogHeader>
+          <FieldGroup className="gap-4">
+            <Field>
+              <FieldLabel>名称</FieldLabel>
+              <Input value={name} onInput={(e) => setName(e.currentTarget.value)} placeholder="filesystem" />
+            </Field>
+            <Field>
+              <FieldLabel>传输方式</FieldLabel>
+              <ToggleGroup type="single" variant="outline" size="sm" value={transport} onValueChange={(v) => v && setTransport(v as any)} className="justify-start">
+                <ToggleGroupItem value="stdio" className="px-3">stdio</ToggleGroupItem>
+                <ToggleGroupItem value="http" className="px-3">HTTP</ToggleGroupItem>
+                <ToggleGroupItem value="sse" className="px-3">SSE</ToggleGroupItem>
+              </ToggleGroup>
+            </Field>
+            {transport === "stdio" ? (
+              <>
+                <Field>
+                  <FieldLabel>启动命令</FieldLabel>
+                  <Input
+                    value={command}
+                    className="font-mono text-xs"
+                    onInput={(e) => setCommand(e.currentTarget.value)}
+                    placeholder="npx -y @modelcontextprotocol/server-filesystem ~/Documents"
+                  />
+                  <FieldDescription>以登录 shell 的 PATH 解析命令。</FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel>环境变量</FieldLabel>
+                  <Textarea rows={2} value={env} className="font-mono text-xs" onInput={(e) => setEnv(e.currentTarget.value)} placeholder="API_TOKEN=xxx" />
+                </Field>
+              </>
+            ) : (
+              <>
+                <Field>
+                  <FieldLabel>URL</FieldLabel>
+                  <Input value={url} className="font-mono text-xs" onInput={(e) => setUrl(e.currentTarget.value)} placeholder="https://example.com/mcp" />
+                </Field>
+                <Field>
+                  <FieldLabel>请求头</FieldLabel>
+                  <Textarea rows={2} value={headers} className="font-mono text-xs" onInput={(e) => setHeaders(e.currentTarget.value)} placeholder="Authorization: Bearer xxx" />
+                </Field>
+              </>
+            )}
+          </FieldGroup>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              取消
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving && <Spinner />}
+              保存并连接
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [json, setJson] = useState("")
+  const [busy, setBusy] = useState(false)
+  const submit = async () => {
+    setBusy(true)
+    try {
+      const n = await rpc<number>("mcp.import", { json })
+      toast.success(`已导入 ${n} 个服务`)
+      setJson("")
+      onClose()
+    } catch (e: any) {
+      toast.error(`导入失败：${e.message}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>导入 MCP 配置</DialogTitle>
+          <DialogDescription>粘贴 Claude Desktop / Claude Code / Cursor 格式的 JSON（包含 mcpServers 字段）。同名服务会被覆盖。</DialogDescription>
+        </DialogHeader>
+        <Textarea
+          rows={12}
+          value={json}
+          className="font-mono text-xs"
+          onInput={(e) => setJson(e.currentTarget.value)}
+          placeholder={`{\n  "mcpServers": {\n    "fetch": { "command": "uvx", "args": ["mcp-server-fetch"] }\n  }\n}`}
+        />
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button onClick={submit} disabled={!json.trim() || busy}>
+            {busy && <Spinner />}
+            导入
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+const STATE: Record<string, { label: string; cls: string }> = {
+  connected: { label: "已连接", cls: "bg-success" },
+  connecting: { label: "连接中", cls: "bg-warning animate-pulse" },
+  error: { label: "错误", cls: "bg-destructive" },
+  disabled: { label: "已停用", cls: "bg-muted-foreground/40" },
+}
+
+export function McpSettings() {
+  const [configs, setConfigs] = useState<McpServerConfig[]>([])
+  const [editing, setEditing] = useState<McpServerConfig | null>(null)
+  const [dialog, setDialog] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const load = () =>
+    rpc<{ configs: McpServerConfig[]; statuses: any[] }>("mcp.list").then((r) => {
+      setConfigs(r.configs)
+      mcpServers.value = r.statuses
+    })
+  useEffect(() => {
+    load()
+  }, [mcpServers.value.length])
+
+  return (
+    <Section
+      title="MCP 服务"
+      desc="连接 Model Context Protocol 服务，为 Helm 扩展外部工具。工具以 mcp__服务名__工具名 的形式提供给模型。"
+      action={
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+            <FileJsonIcon />
+            导入 JSON
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              setEditing(null)
+              setDialog(true)
+            }}
+          >
+            <PlusIcon />
+            添加服务
+          </Button>
+        </div>
+      }
+    >
+      {configs.length === 0 ? (
+        <Empty className="border border-dashed">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <PlugIcon />
+            </EmptyMedia>
+            <EmptyTitle>还没有 MCP 服务</EmptyTitle>
+            <EmptyDescription>添加服务或直接粘贴现有的 mcpServers 配置。</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <div className="divide-y overflow-hidden rounded-xl border bg-card">
+          {configs.map((cfg) => {
+            const st = mcpServers.value.find((s) => s.id === cfg.id)
+            const state = STATE[st?.state ?? (cfg.enabled ? "connecting" : "disabled")]
+            return (
+              <Collapsible key={cfg.id}>
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <CollapsibleTrigger asChild>
+                    <button type="button" className="group/trig flex min-w-0 flex-1 items-center gap-3 text-left">
+                      <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/trig:rotate-90" />
+                      <span className={cn("size-2 shrink-0 rounded-full", state.cls)} title={state.label} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{cfg.name}</span>
+                          <Badge variant="outline" className="text-[10px]">
+                            {cfg.transport}
+                          </Badge>
+                          {st?.state === "connected" && <span className="text-xs text-muted-foreground">{st.tools.length} 个工具</span>}
+                        </div>
+                        <div className={cn("truncate font-mono text-[11px] text-muted-foreground", st?.state === "error" && "text-destructive")}>
+                          {st?.state === "error" ? st.error : cfg.transport === "stdio" ? [cfg.command, ...cfg.args].join(" ") : cfg.url}
+                        </div>
+                      </div>
+                    </button>
+                  </CollapsibleTrigger>
+                  <Switch
+                    checked={cfg.enabled}
+                    onCheckedChange={async (v) => {
+                      await rpc("mcp.upsert", { ...cfg, enabled: v })
+                      load()
+                    }}
+                  />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon-sm">
+                        <MoreHorizontalIcon />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => rpc("mcp.restart", { id: cfg.id })}>
+                        <RotateCwIcon />
+                        重新连接
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setEditing(cfg)
+                          setDialog(true)
+                        }}
+                      >
+                        <PencilIcon />
+                        编辑
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onSelect={async () => {
+                          await rpc("mcp.delete", { id: cfg.id })
+                          load()
+                        }}
+                      >
+                        <Trash2Icon />
+                        删除
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <CollapsibleContent>
+                  <div className="border-t bg-muted/20 px-4 py-3 pl-14">
+                    {st?.tools.length ? (
+                      <ul className="grid gap-2">
+                        {st.tools.map((t) => (
+                          <li key={t.name}>
+                            <div className="font-mono text-xs font-medium">{t.name}</div>
+                            <div className="line-clamp-2 text-xs text-muted-foreground">{t.description}</div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">{st?.state === "connected" ? "该服务没有提供工具" : "连接成功后显示工具列表"}</div>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )
+          })}
+        </div>
+      )}
+      <ServerDialog open={dialog} server={editing} onClose={() => (setDialog(false), load())} />
+      <ImportDialog open={importOpen} onClose={() => (setImportOpen(false), load())} />
+    </Section>
+  )
+}
