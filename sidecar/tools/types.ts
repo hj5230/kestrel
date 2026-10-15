@@ -4,7 +4,7 @@ import type { AppSettings, Todo } from "../../shared/protocol";
 
 export type ToolCategory = "read" | "edit" | "exec" | "network" | "mcp" | "meta";
 
-export interface HelmTool extends AgentTool<any, any> {
+export interface KestrelTool extends AgentTool<any, any> {
   category: ToolCategory;
 }
 
@@ -25,7 +25,7 @@ export interface ToolContext {
 export const text = (t: string) => [{ type: "text" as const, text: t }];
 
 export function defineTool<T extends TSchema>(
-  tool: Omit<HelmTool, "parameters" | "execute"> & {
+  tool: Omit<KestrelTool, "parameters" | "execute"> & {
     parameters: T;
     execute: (
       toolCallId: string,
@@ -34,6 +34,6 @@ export function defineTool<T extends TSchema>(
       onUpdate?: AgentToolUpdateCallback<any>,
     ) => Promise<AgentToolResult<any>>;
   },
-): HelmTool {
-  return tool as unknown as HelmTool;
+): KestrelTool {
+  return tool as unknown as KestrelTool;
 }

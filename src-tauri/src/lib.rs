@@ -25,7 +25,7 @@ fn backend_info(state: tauri::State<Backend>) -> Option<BackendInfo> {
 }
 
 fn parse_ready(line: &str) -> Option<BackendInfo> {
-    let json = line.trim().strip_prefix("HELM_READY ")?;
+    let json = line.trim().strip_prefix("KESTREL_READY ")?;
     let v: serde_json::Value = serde_json::from_str(json).ok()?;
     Some(BackendInfo {
         port: v.get("port")?.as_u64()? as u16,
@@ -58,7 +58,7 @@ fn spawn_backend(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error
         full.extend(args);
         shell.command("bun").args(full)
     } else {
-        shell.sidecar("helm-agent")?.args(args)
+        shell.sidecar("kestrel-agent")?.args(args)
     };
 
     let (mut rx, child) = command.spawn()?;
@@ -143,7 +143,7 @@ pub fn run() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building Helm");
+        .expect("error while building Kestrel");
 
     app.run(|handle, event| {
         if let RunEvent::Exit = event {

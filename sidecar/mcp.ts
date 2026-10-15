@@ -8,7 +8,7 @@ import { expandHome, getShellEnv } from "./env";
 import { emit } from "./hub";
 import { st } from "./i18n";
 import { proxiedFetch } from "./providers";
-import type { HelmTool } from "./tools/types";
+import type { KestrelTool } from "./tools/types";
 
 interface Conn {
   config: McpServerConfig;
@@ -46,7 +46,7 @@ async function connect(cfg: McpServerConfig) {
   conns.set(cfg.id, conn);
   broadcast();
   try {
-    const client = new Client({ name: "helm", version: "0.1.0" }, { capabilities: {} });
+    const client = new Client({ name: "kestrel", version: "0.1.0" }, { capabilities: {} });
     let transport;
     if (cfg.transport === "stdio") {
       transport = new StdioClientTransport({
@@ -126,8 +126,8 @@ export async function stopAllMcp() {
   await Promise.all([...conns.keys()].map(disconnect));
 }
 
-export function mcpTools(): HelmTool[] {
-  const out: HelmTool[] = [];
+export function mcpTools(): KestrelTool[] {
+  const out: KestrelTool[] = [];
   for (const conn of conns.values()) {
     if (conn.state !== "connected" || !conn.client) continue;
     for (const t of conn.tools) {

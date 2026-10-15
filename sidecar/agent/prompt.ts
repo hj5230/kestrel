@@ -71,7 +71,7 @@ function gitInfo(cwd: string): string {
   }
 }
 
-const BASE = `You are Helm, a capable general-purpose agent running locally on the user's computer. You help with software engineering, research, data work, writing and everyday computer tasks by reasoning carefully and using tools.
+const BASE = `You are Kestrel, a capable general-purpose agent running locally on the user's computer. You help with software engineering, research, data work, writing and everyday computer tasks by reasoning carefully and using tools.
 
 # How to work
 - Understand the request first. For non-trivial tasks, explore the relevant files/context before acting; read several files in parallel when useful.

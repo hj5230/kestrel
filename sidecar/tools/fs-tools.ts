@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import { Type } from "typebox";
 import type { EditDetails } from "../../shared/protocol";
 import { expandHome, getShellEnv, which } from "../env";
-import { text, defineTool, type HelmTool, type ToolContext } from "./types";
+import { text, defineTool, type KestrelTool, type ToolContext } from "./types";
 
 const IGNORED_DIRS = new Set([".git", "node_modules", ".DS_Store", "dist", "target", ".next", ".turbo", ".cache", "__pycache__", ".venv"]);
 const IMAGE_EXT: Record<string, string> = {
@@ -44,7 +44,7 @@ function isBinary(buf: Buffer) {
   return false;
 }
 
-export function createReadTool(ctx: ToolContext): HelmTool {
+export function createReadTool(ctx: ToolContext): KestrelTool {
   return defineTool({
     name: "read",
     label: "Read file",
@@ -109,7 +109,7 @@ function checkFresh(ctx: ToolContext, file: string) {
   if (Math.abs(stat.mtimeMs - seen) > 1) throw new Error(`${file} was modified since you last read it. Read it again before editing.`);
 }
 
-export function createWriteTool(ctx: ToolContext): HelmTool {
+export function createWriteTool(ctx: ToolContext): KestrelTool {
   return defineTool({
     name: "write",
     label: "Write file",
@@ -138,7 +138,7 @@ export function createWriteTool(ctx: ToolContext): HelmTool {
   });
 }
 
-export function createEditTool(ctx: ToolContext): HelmTool {
+export function createEditTool(ctx: ToolContext): KestrelTool {
   return defineTool({
     name: "edit",
     label: "Edit file",
@@ -182,7 +182,7 @@ export function createEditTool(ctx: ToolContext): HelmTool {
   });
 }
 
-export function createLsTool(ctx: ToolContext): HelmTool {
+export function createLsTool(ctx: ToolContext): KestrelTool {
   return defineTool({
     name: "ls",
     label: "List directory",
@@ -214,7 +214,7 @@ export function createLsTool(ctx: ToolContext): HelmTool {
   });
 }
 
-export function createGlobTool(ctx: ToolContext): HelmTool {
+export function createGlobTool(ctx: ToolContext): KestrelTool {
   return defineTool({
     name: "glob",
     label: "Find files",
@@ -277,7 +277,7 @@ function runProcess(cmd: string, args: string[], cwd: string, signal?: AbortSign
   });
 }
 
-export function createGrepTool(ctx: ToolContext): HelmTool {
+export function createGrepTool(ctx: ToolContext): KestrelTool {
   return defineTool({
     name: "grep",
     label: "Search content",

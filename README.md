@@ -1,11 +1,11 @@
-# Helm
+# Kestrel
 
 本地 agent 工作台。Tauri 2 桌面壳 + Bun sidecar（agent 运行时）+ Preact/shadcn 前端。
 
 ## 架构
 
 ```
-Tauri (Rust)                 sidecar (Bun, 单文件二进制 helm-agent)              前端 (Preact + shadcn)
+Tauri (Rust)                 sidecar (Bun, 单文件二进制 kestrel-agent)              前端 (Preact + shadcn)
   启动/守护 sidecar  ──────▶  HTTP RPC + WebSocket 事件 (127.0.0.1:随机端口+token) ◀── fetch / ws
   backend_info 命令           pi-agent-core Agent 循环
   对话框/通知/窗口状态         Vercel AI SDK 适配层 (sidecar/llm/vercel-stream.ts)
@@ -15,7 +15,7 @@ Tauri (Rust)                 sidecar (Bun, 单文件二进制 helm-agent)       
 
 - agent 循环用 `@mariozechner/pi-agent-core`；模型调用通过自定义 `streamFn` 走 Vercel AI SDK v7（`ai` + `@ai-sdk/*`），pi 的模型目录只用于补全上下文窗口与单价。
 - 供应商：Anthropic、OpenAI、Google、DeepSeek、OpenRouter、Ollama、任意 OpenAI 兼容服务。
-- 存储：`~/Library/Application Support/com.zhaoshangqi.helm/helm.db`（开发模式为 `helm-dev.db`），日志 `~/Library/Logs/com.zhaoshangqi.helm/agent.log`。
+- 存储：`~/Library/Application Support/com.zhaoshangqi.kestrel/kestrel.db`（开发模式为 `kestrel-dev.db`），日志 `~/Library/Logs/com.zhaoshangqi.kestrel/agent.log`。
 
 ## 功能
 
@@ -43,4 +43,4 @@ npm run typecheck
 npm run tauri build -- --bundles app
 ```
 
-`beforeBuildCommand` 会先构建前端，再用 `bun build --compile` 生成 `src-tauri/binaries/helm-agent-<target>`，作为 externalBin 打进 `Helm.app`。
+`beforeBuildCommand` 会先构建前端，再用 `bun build --compile` 生成 `src-tauri/binaries/kestrel-agent-<target>`，作为 externalBin 打进 `Kestrel.app`。

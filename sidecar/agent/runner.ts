@@ -26,7 +26,7 @@ import { discoverSkills, expandSlashCommand } from "../skills";
 import { createBashOutputTool, createBashTool, createKillShellTool, killSessionShells } from "../tools/bash";
 import { createEditTool, createGlobTool, createGrepTool, createLsTool, createReadTool, createWriteTool } from "../tools/fs-tools";
 import { createReadSessionTool, createSearchSessionsTool, createSkillTool, createTaskTool, createTodoTool } from "../tools/meta";
-import type { HelmTool, SubagentRequest, ToolContext } from "../tools/types";
+import type { KestrelTool, SubagentRequest, ToolContext } from "../tools/types";
 import { createWebFetchTool, createWebSearchTool } from "../tools/web";
 import { estimateContextTokens, estimateMessageTokens, estimateTextTokens, findCutIndex, summarize, summaryMessage } from "./compaction";
 import { buildSystemPrompt } from "./prompt";
@@ -189,7 +189,7 @@ export class SessionRunner {
     this.compaction = last ? { cutSeq: last.cutSeq, summary: last.summary, at: last.createdAt } : null;
   }
 
-  private buildTools(subagent: boolean): HelmTool[] {
+  private buildTools(subagent: boolean): KestrelTool[] {
     const ctx: ToolContext = {
       sessionId: this.id,
       cwd: () => this.info().cwd,
@@ -201,7 +201,7 @@ export class SessionRunner {
       },
       runSubagent: (req, signal, onProgress) => this.runSubagent(req, signal, onProgress),
     };
-    const tools: HelmTool[] = [
+    const tools: KestrelTool[] = [
       createReadTool(ctx),
       createWriteTool(ctx),
       createEditTool(ctx),
@@ -311,7 +311,7 @@ export class SessionRunner {
   // ---------- permissions ----------
 
   private async beforeToolCall(ctx: { toolCall: any; args: unknown }, signal?: AbortSignal) {
-    const tool = (this.agent.state.tools as HelmTool[]).find((t) => t.name === ctx.toolCall.name);
+    const tool = (this.agent.state.tools as KestrelTool[]).find((t) => t.name === ctx.toolCall.name);
     if (!tool) return undefined;
     const s = this.info();
     const perm = evaluatePermission(tool, ctx.args, s.permissionMode, store.getSettings());

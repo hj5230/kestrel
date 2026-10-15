@@ -33,12 +33,12 @@ export function resolveShellEnv(): Promise<void> {
 async function doResolve(): Promise<void> {
   if (process.platform === "win32") return;
   try {
-    const marker = "__HELM_ENV__";
+    const marker = "__KESTREL_ENV__";
     const proc = Bun.spawn([SHELL, "-ilc", `printf '${marker}'; env -0; printf '${marker}'`], {
       stdin: "ignore",
       stdout: "pipe",
       stderr: "ignore",
-      env: { ...process.env, HELM_RESOLVING_ENV: "1" },
+      env: { ...process.env, KESTREL_RESOLVING_ENV: "1" },
     });
     const timer = setTimeout(() => proc.kill(), 8000);
     const text = await new Response(proc.stdout).text();
@@ -52,7 +52,7 @@ async function doResolve(): Promise<void> {
       const i = entry.indexOf("=");
       if (i > 0) env[entry.slice(0, i)] = entry.slice(i + 1);
     }
-    delete env.HELM_RESOLVING_ENV;
+    delete env.KESTREL_RESOLVING_ENV;
     if (env.PATH) shellEnv = { ...shellEnv, ...env };
   } catch {
     // fall back to inherited environment

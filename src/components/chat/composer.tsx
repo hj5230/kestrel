@@ -75,7 +75,7 @@ export function Composer({
   const [text, setText] = useState(() => {
     if (!draftKey) return ""
     try {
-      return localStorage.getItem(`helm-draft:${draftKey}`) ?? ""
+      return localStorage.getItem(`kestrel-draft:${draftKey}`) ?? ""
     } catch {
       return ""
     }
@@ -110,8 +110,8 @@ export function Composer({
     if (!draftKey) return
     const t = setTimeout(() => {
       try {
-        if (text) localStorage.setItem(`helm-draft:${draftKey}`, text)
-        else localStorage.removeItem(`helm-draft:${draftKey}`)
+        if (text) localStorage.setItem(`kestrel-draft:${draftKey}`, text)
+        else localStorage.removeItem(`kestrel-draft:${draftKey}`)
       } catch {}
     }, 300)
     return () => clearTimeout(t)

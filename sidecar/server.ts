@@ -277,7 +277,7 @@ export function startServer(opts: { port: number; token: string; dataDir: string
 
   const cors = (req: Request) => ({
     "Access-Control-Allow-Origin": req.headers.get("origin") ?? "*",
-    "Access-Control-Allow-Headers": "content-type, x-helm-token",
+    "Access-Control-Allow-Headers": "content-type, x-kestrel-token",
     "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
     "Access-Control-Max-Age": "86400",
   });
@@ -289,7 +289,7 @@ export function startServer(opts: { port: number; token: string; dataDir: string
     async fetch(req, server) {
       const url = new URL(req.url);
       if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(req) });
-      const token = req.headers.get("x-helm-token") ?? url.searchParams.get("token");
+      const token = req.headers.get("x-kestrel-token") ?? url.searchParams.get("token");
       if (token !== opts.token) return new Response("unauthorized", { status: 401, headers: cors(req) });
 
       if (url.pathname === "/events") {

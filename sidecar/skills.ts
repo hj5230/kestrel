@@ -27,7 +27,7 @@ export function parseFrontmatter(src: string): { attrs: Record<string, string>; 
 }
 
 function projectDirs(cwd: string, kind: "skills" | "commands") {
-  return [path.join(cwd, ".helm", kind), path.join(cwd, ".claude", kind), path.join(cwd, ".agents", kind)];
+  return [path.join(cwd, ".kestrel", kind), path.join(cwd, ".claude", kind), path.join(cwd, ".agents", kind)];
 }
 
 let skillCache: { key: string; at: number; skills: SkillInfo[] } | null = null;

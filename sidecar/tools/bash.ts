@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { Type } from "typebox";
 import type { BashDetails } from "../../shared/protocol";
 import { getShellEnv, SHELL } from "../env";
-import { text, defineTool, type HelmTool, type ToolContext } from "./types";
+import { text, defineTool, type KestrelTool, type ToolContext } from "./types";
 
 const MAX_OUTPUT = 30_000;
 
@@ -56,7 +56,7 @@ export function killAllShells() {
   for (const sh of background.values()) if (!sh.done) killTree(sh.child);
 }
 
-export function createBashTool(ctx: ToolContext): HelmTool {
+export function createBashTool(ctx: ToolContext): KestrelTool {
   return defineTool({
     name: "bash",
     label: "Run command",
@@ -167,7 +167,7 @@ export function createBashTool(ctx: ToolContext): HelmTool {
   });
 }
 
-export function createBashOutputTool(ctx: ToolContext): HelmTool {
+export function createBashOutputTool(ctx: ToolContext): KestrelTool {
   return defineTool({
     name: "bash_output",
     label: "Read background output",
@@ -198,7 +198,7 @@ export function createBashOutputTool(ctx: ToolContext): HelmTool {
   });
 }
 
-export function createKillShellTool(ctx: ToolContext): HelmTool {
+export function createKillShellTool(ctx: ToolContext): KestrelTool {
   return defineTool({
     name: "kill_shell",
     label: "Stop background command",

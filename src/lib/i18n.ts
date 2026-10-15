@@ -8,7 +8,7 @@ const dicts: Record<Lang, Record<MessageKey, string>> = { en, "zh-CN": zhCN }
 
 function initialLang(): Lang {
   try {
-    const v = localStorage.getItem("helm-lang")
+    const v = localStorage.getItem("kestrel-lang")
     if (v === "en" || v === "zh-CN") return v
   } catch {}
   return "en"
@@ -20,7 +20,7 @@ export function setLang(l: Lang) {
   lang.value = l
   document.documentElement.lang = l
   try {
-    localStorage.setItem("helm-lang", l)
+    localStorage.setItem("kestrel-lang", l)
   } catch {}
 }
 

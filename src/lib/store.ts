@@ -24,7 +24,7 @@ export interface DetailState extends SessionDetail {
 
 function initialRoute(): Route {
   try {
-    const r = JSON.parse(sessionStorage.getItem("helm-route") ?? "null")
+    const r = JSON.parse(sessionStorage.getItem("kestrel-route") ?? "null")
     if (r && typeof r.name === "string") return r
   } catch {}
   return { name: "home" }
@@ -33,7 +33,7 @@ function initialRoute(): Route {
 export const route = signal<Route>(initialRoute())
 route.subscribe((r) => {
   try {
-    sessionStorage.setItem("helm-route", JSON.stringify(r))
+    sessionStorage.setItem("kestrel-route", JSON.stringify(r))
   } catch {}
 })
 export const sessions = signal<SessionInfo[]>([])
@@ -111,7 +111,7 @@ export function applyTheme() {
   if (s && s.accent !== "neutral") root.dataset.accent = s.accent
   else delete root.dataset.accent
   try {
-    localStorage.setItem("helm-theme", JSON.stringify({ dark, accent: s?.accent ?? "neutral" }))
+    localStorage.setItem("kestrel-theme", JSON.stringify({ dark, accent: s?.accent ?? "neutral" }))
   } catch {}
 }
 
