@@ -5,6 +5,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { CommandPalette } from "@/components/command-palette"
 import { BootScreen } from "@/components/boot-screen"
+import { ErrorBoundary } from "@/components/error-boundary"
 import { ChatView } from "@/components/chat/chat-view"
 import { HomeView } from "@/pages/home"
 import { UsagePage } from "@/pages/usage"
@@ -50,10 +51,14 @@ export default function App() {
       <SidebarProvider style={{ "--sidebar-width": "17rem" } as any} className="h-full min-h-0">
         <AppSidebar />
         <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
-          <Main />
+          <ErrorBoundary resetKey={JSON.stringify(route.value)}>
+            <Main />
+          </ErrorBoundary>
         </SidebarInset>
       </SidebarProvider>
-      <CommandPalette />
+      <ErrorBoundary compact resetKey={paletteOpen.value}>
+        <CommandPalette />
+      </ErrorBoundary>
       <Toaster theme={dark ? "dark" : "light"} position="bottom-right" />
     </TooltipProvider>
   )

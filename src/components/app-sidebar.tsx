@@ -52,7 +52,9 @@ import { rpc } from "@/lib/api"
 import { basename, dayBucket, relativeTime, shortPath } from "@/lib/format"
 import { appInfo, connected, paletteOpen, route, sessions, enabledModels } from "@/lib/store"
 import { downloadText } from "@/lib/download"
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { lang, t } from "@/lib/i18n"
 
 type GroupMode = "time" | "project"
 
@@ -79,10 +81,10 @@ function SessionItem({ s, active, onRename, onDelete }: { s: SessionInfo; active
         isActive={active}
         onClick={() => (route.value = { name: "chat", sessionId: s.id })}
         className="h-8 gap-2 pr-8"
-        title={`${s.title || "新会话"}\n${shortPath(s.cwd, appInfo.value?.home)}`}
+        title={`${s.title || t("common.untitled")}\n${shortPath(s.cwd, appInfo.value?.home)}`}
       >
         {status && <span className="flex size-4 shrink-0 items-center justify-center">{status}</span>}
-        <span className={cn("truncate", !s.title && "text-muted-foreground")}>{s.title || "新会话"}</span>
+        <span className={cn("truncate", !s.title && "text-muted-foreground")}>{s.title || t("common.untitled")}</span>
         <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/70 tabular-nums group-hover/menu-item:opacity-0">
           {relativeTime(s.updatedAt)}
         </span>
@@ -96,11 +98,11 @@ function SessionItem({ s, active, onRename, onDelete }: { s: SessionInfo; active
         <DropdownMenuContent side="right" align="start" className="w-48">
           <DropdownMenuItem onSelect={onRename}>
             <PencilIcon />
-            重命名
+            {t("common.rename")}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => rpc("sessions.update", { id: s.id, patch: { pinned: !s.pinned } })}>
             {s.pinned ? <PinOffIcon /> : <PinIcon />}
-            {s.pinned ? "取消置顶" : "置顶"}
+            {s.pinned ? t("sidebar.unpin") : t("sidebar.pin")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={async () => {
@@ -109,20 +111,26 @@ function SessionItem({ s, active, onRename, onDelete }: { s: SessionInfo; active
             }}
           >
             <DownloadIcon />
-            导出 Markdown
+            {t("sidebar.exportMd")}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => rpc("app.open", { path: s.cwd })}>
             <FolderOpenIcon />
-            打开工作目录
+            {t("sidebar.openFolder")}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => rpc("sessions.update", { id: s.id, patch: { archived: true } })}>
+          <DropdownMenuItem
+            onSelect={async () => {
+              await rpc("sessions.update", { id: s.id, patch: { archived: true } })
+              if (route.value.name === "chat" && route.value.sessionId === s.id) route.value = { name: "home" }
+              toast.success(t("sidebar.archivedToast"))
+            }}
+          >
             <ArchiveIcon />
-            归档
+            {t("sidebar.archive")}
           </DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onSelect={onDelete}>
             <Trash2Icon />
-            删除
+            {t("common.delete")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -143,7 +151,7 @@ export function AppSidebar() {
     const pinned = list.filter((s) => s.pinned)
     const rest = list.filter((s) => !s.pinned)
     const out: { label: string; items: SessionInfo[] }[] = []
-    if (pinned.length) out.push({ label: "置顶", items: pinned })
+    if (pinned.length) out.push({ label: t("sidebar.pinned"), items: pinned })
     const map = new Map<string, SessionInfo[]>()
     for (const s of rest) {
       const key = groupMode === "time" ? dayBucket(s.updatedAt) : s.cwd
@@ -154,7 +162,7 @@ export function AppSidebar() {
       out.push({ label: groupMode === "time" ? key : basename(key), items })
     }
     return out
-  }, [list, groupMode])
+  }, [list, groupMode, lang.value])
 
   const setMode = (m: GroupMode) => {
     setGroupMode(m)
@@ -164,9 +172,9 @@ export function AppSidebar() {
   }
 
   const nav = [
-    { key: "home", label: "新会话", icon: SquarePenIcon, kbd: "⌘N", onClick: () => (route.value = { name: "home" }) },
-    { key: "usage", label: "用量统计", icon: BarChart3Icon, onClick: () => (route.value = { name: "usage" }) },
-    { key: "settings", label: "设置", icon: Settings2Icon, kbd: "⌘,", onClick: () => (route.value = { name: "settings" }) },
+    { key: "home", label: t("nav.newSession"), icon: SquarePenIcon, kbd: "⌘N", onClick: () => (route.value = { name: "home" }) },
+    { key: "usage", label: t("nav.usage"), icon: BarChart3Icon, onClick: () => (route.value = { name: "usage" }) },
+    { key: "settings", label: t("nav.settings"), icon: Settings2Icon, kbd: "⌘,", onClick: () => (route.value = { name: "settings" }) },
   ]
 
   return (
@@ -186,7 +194,7 @@ export function AppSidebar() {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                搜索 <Kbd>⌘K</Kbd>
+                {t("nav.search")} <Kbd>⌘K</Kbd>
               </TooltipContent>
             </Tooltip>
           </div>
@@ -205,7 +213,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent className="gap-0">
         {list.length === 0 && (
-          <div className="px-4 py-8 text-center text-xs text-muted-foreground">还没有会话</div>
+          <div className="px-4 py-8 text-center text-xs text-muted-foreground">{t("sidebar.empty")}</div>
         )}
         {groups.map((g, i) => (
           <SidebarGroup key={g.label + i} className="py-1">
@@ -215,20 +223,20 @@ export function AppSidebar() {
             {i === 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <SidebarGroupAction title="分组方式">
+                  <SidebarGroupAction title={t("sidebar.grouping")}>
                     <FolderTreeIcon />
                   </SidebarGroupAction>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuLabel>会话分组</DropdownMenuLabel>
+                  <DropdownMenuLabel>{t("sidebar.groupSessions")}</DropdownMenuLabel>
                   <DropdownMenuRadioGroup value={groupMode} onValueChange={(v) => setMode(v as GroupMode)}>
-                    <DropdownMenuRadioItem value="time">按时间</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="project">按项目目录</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="time">{t("sidebar.byTime")}</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="project">{t("sidebar.byProject")}</DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => setArchivedOpen(true)}>
                     <ArchiveRestoreIcon />
-                    已归档会话
+                    {t("sidebar.archived")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -246,10 +254,10 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground">
           <span className={cn("size-1.5 rounded-full", connected.value ? "bg-success" : "bg-destructive")} />
-          <span>{connected.value ? "已连接" : "连接中…"}</span>
+          <span>{connected.value ? t("sidebar.connected") : t("sidebar.connecting")}</span>
           <span className="ml-auto flex items-center gap-1">
             <HistoryIcon className="size-3" />
-            {list.length} 会话 · {enabledModels.value.length} 模型
+            {t("sidebar.stats", { sessions: list.length, models: enabledModels.value.length })}
           </span>
         </div>
       </SidebarFooter>

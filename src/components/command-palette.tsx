@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks"
 import { BarChart3Icon, MessageSquareIcon, MoonIcon, PlugIcon, Settings2Icon, SquarePenIcon, SunIcon, TextSearchIcon, CpuIcon } from "lucide-react"
 import type { SearchHit } from "@shared/protocol"
 import {
+  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,
@@ -14,6 +15,7 @@ import {
 import { rpc } from "@/lib/api"
 import { basename, relativeTime } from "@/lib/format"
 import { openSession, paletteOpen, route, sessions, settings, updateSettings } from "@/lib/store"
+import { t } from "@/lib/i18n"
 
 export function CommandPalette() {
   const open = paletteOpen.value
@@ -42,44 +44,45 @@ export function CommandPalette() {
   const dark = settings.value?.theme === "dark" || (settings.value?.theme === "system" && document.documentElement.classList.contains("dark"))
 
   return (
-    <CommandDialog open={open} onOpenChange={(o) => (paletteOpen.value = o)} title="搜索" description="搜索会话、消息与操作" className="sm:max-w-xl">
-      <CommandInput placeholder="搜索会话、消息内容或操作…" value={query} onValueChange={setQuery} />
+    <CommandDialog open={open} onOpenChange={(o) => (paletteOpen.value = o)} title={t("palette.title")} description={t("palette.desc")} className="sm:max-w-xl">
+      <Command shouldFilter={true}>
+      <CommandInput placeholder={t("palette.placeholder")} value={query} onValueChange={setQuery} />
       <CommandList className="max-h-[60vh]">
-        <CommandEmpty>没有匹配的结果</CommandEmpty>
-        <CommandGroup heading="操作">
+        <CommandEmpty>{t("palette.empty")}</CommandEmpty>
+        <CommandGroup heading={t("palette.actions")}>
           <CommandItem onSelect={() => go(() => (route.value = { name: "home" }))}>
             <SquarePenIcon />
-            新会话
+            {t("nav.newSession")}
             <CommandShortcut>⌘N</CommandShortcut>
           </CommandItem>
           <CommandItem onSelect={() => go(() => (route.value = { name: "usage" }))}>
             <BarChart3Icon />
-            用量统计
+            {t("nav.usage")}
           </CommandItem>
           <CommandItem onSelect={() => go(() => (route.value = { name: "settings" }))}>
             <Settings2Icon />
-            设置
+            {t("nav.settings")}
             <CommandShortcut>⌘,</CommandShortcut>
           </CommandItem>
           <CommandItem onSelect={() => go(() => (route.value = { name: "settings", tab: "models" }))}>
             <CpuIcon />
-            管理模型供应商
+            {t("palette.manageModels")}
           </CommandItem>
           <CommandItem onSelect={() => go(() => (route.value = { name: "settings", tab: "mcp" }))}>
             <PlugIcon />
-            管理 MCP 服务
+            {t("palette.manageMcp")}
           </CommandItem>
           <CommandItem onSelect={() => go(() => updateSettings({ theme: dark ? "light" : "dark" }))}>
             {dark ? <SunIcon /> : <MoonIcon />}
-            切换到{dark ? "浅色" : "深色"}主题
+            {dark ? t("palette.toLight") : t("palette.toDark")}
           </CommandItem>
         </CommandGroup>
         <CommandSeparator />
-        <CommandGroup heading="会话">
+        <CommandGroup heading={t("palette.sessions")}>
           {sessions.value.slice(0, query ? 50 : 8).map((s) => (
             <CommandItem key={s.id} value={`${s.title} ${s.cwd} ${s.id}`} onSelect={() => go(() => openSession(s.id))}>
               <MessageSquareIcon />
-              <span className="truncate">{s.title || "新会话"}</span>
+              <span className="truncate">{s.title || t("common.untitled")}</span>
               <span className="ml-auto shrink-0 text-xs text-muted-foreground">
                 {basename(s.cwd)} · {relativeTime(s.updatedAt)}
               </span>
@@ -89,13 +92,26 @@ export function CommandPalette() {
         {hits.length > 0 && (
           <>
             <CommandSeparator />
-            <CommandGroup heading="消息内容">
+            <CommandGroup heading={t("palette.messages")}>
               {hits.map((h, i) => (
                 <CommandItem key={`${h.sessionId}-${h.seq}-${i}`} value={`hit ${query} ${h.sessionId} ${h.seq} ${i}`} onSelect={() => go(() => openSession(h.sessionId))}>
                   <TextSearchIcon />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-xs text-muted-foreground">{h.title || "新会话"}</div>
-                    <div className="truncate">{h.snippet.replace(/\s+/g, " ")}</div>
+                    <div className="truncate text-xs text-muted-foreground">{h.title || t("common.untitled")}</div>
+                    <div className="truncate">
+                      {h.snippet
+                        .replace(/\s+/g, " ")
+                        .split(/(«[^»]*»)/)
+                        .map((part, j) =>
+                          part.startsWith("«") ? (
+                            <mark key={j} className="rounded bg-primary/15 px-0.5 text-foreground">
+                              {part.slice(1, -1)}
+                            </mark>
+                          ) : (
+                            part
+                          ),
+                        )}
+                    </div>
                   </div>
                 </CommandItem>
               ))}
@@ -103,6 +119,7 @@ export function CommandPalette() {
           </>
         )}
       </CommandList>
+      </Command>
     </CommandDialog>
   )
 }

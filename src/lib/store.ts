@@ -10,6 +10,7 @@ import type {
   SessionInfo,
 } from "@shared/protocol"
 import { connectEvents, isTauri, onConnection, onServerEvent, rpc } from "./api"
+import { setLang, t } from "./i18n"
 
 export type Route =
   | { name: "home" }
@@ -94,6 +95,7 @@ export async function refreshProviders() {
 
 export async function updateSettings(patch: Partial<AppSettings>) {
   settings.value = await rpc<AppSettings>("settings.update", patch)
+  setLang(settings.value.language)
   applyTheme()
 }
 
@@ -129,6 +131,10 @@ export async function createSession(input: Partial<SessionInfo> = {}) {
 function upsertSession(s: SessionInfo) {
   if (s.kind !== "main") return
   const list = sessions.value.filter((x) => x.id !== s.id)
+  if (s.archived) {
+    sessions.value = list
+    return
+  }
   list.push(s)
   list.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt)
   sessions.value = list
@@ -200,7 +206,7 @@ function handleEvents() {
         break
       case "approval_request":
         patchDetail(e.request.sessionId, (d) => ({ ...d, approvals: [...d.approvals.filter((a) => a.id !== e.request.id), e.request] }))
-        notify("需要你确认", e.request.title)
+        notify(t("notify.approval"), e.request.kind === "bash" ? e.request.detail.slice(0, 120) : e.request.path ?? e.request.toolName)
         break
       case "approval_resolved":
         patchDetail(e.sessionId, (d) => ({ ...d, approvals: d.approvals.filter((a) => a.id !== e.id) }))
@@ -220,7 +226,7 @@ function handleEvents() {
         else toast.info(e.text)
         break
       case "run_finished":
-        if (settings.value?.notifyOnFinish) notify(e.ok ? "任务完成" : "任务出错", e.title)
+        if (settings.value?.notifyOnFinish) notify(e.ok ? t("notify.done") : t("notify.failed"), e.title)
         break
     }
   })
@@ -232,6 +238,7 @@ export async function boot() {
     const [info, s] = await Promise.all([rpc<AppInfo>("app.info"), rpc<AppSettings>("settings.get")])
     appInfo.value = info
     settings.value = s
+    setLang(s.language)
     applyTheme()
     await Promise.all([refreshSessions(), refreshProviders()])
     const r = route.value
