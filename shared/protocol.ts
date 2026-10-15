@@ -1,0 +1,323 @@
+export type ProviderKind =
+  | "anthropic"
+  | "openai"
+  | "openai-compatible"
+  | "google"
+  | "deepseek"
+  | "openrouter"
+  | "ollama";
+
+export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+
+export type PermissionMode = "default" | "acceptEdits" | "bypass" | "plan";
+
+export interface ProviderConfig {
+  id: string;
+  kind: ProviderKind;
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+  headers: Record<string, string>;
+  enabled: boolean;
+  createdAt: number;
+}
+
+export interface ModelConfig {
+  providerId: string;
+  id: string;
+  name: string;
+  contextWindow: number;
+  maxTokens: number;
+  reasoning: boolean;
+  vision: boolean;
+  cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  enabled: boolean;
+}
+
+export interface RemoteModel {
+  id: string;
+  name: string;
+  contextWindow?: number;
+  cost?: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  known: boolean;
+}
+
+export interface Todo {
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+  activeForm?: string;
+}
+
+export type SessionStatus = "idle" | "running" | "waiting" | "error";
+
+export interface SessionUsage {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cost: number;
+  contextTokens: number;
+}
+
+export interface SessionInfo {
+  id: string;
+  title: string;
+  cwd: string;
+  providerId: string;
+  modelId: string;
+  thinking: ThinkingLevel;
+  permissionMode: PermissionMode;
+  pinned: boolean;
+  archived: boolean;
+  kind: "main" | "subagent";
+  parentId: string | null;
+  createdAt: number;
+  updatedAt: number;
+  status: SessionStatus;
+  todos: Todo[];
+  usage: SessionUsage;
+  lastError: string | null;
+  messageCount: number;
+}
+
+export interface TextBlock {
+  type: "text";
+  text: string;
+  textSignature?: string;
+}
+export interface ThinkingBlock {
+  type: "thinking";
+  thinking: string;
+  thinkingSignature?: string;
+  redacted?: boolean;
+}
+export interface ImageBlock {
+  type: "image";
+  data: string;
+  mimeType: string;
+}
+export interface ToolCallBlock {
+  type: "toolCall";
+  id: string;
+  name: string;
+  arguments: Record<string, any>;
+  thoughtSignature?: string;
+}
+
+export interface UsageData {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  totalTokens: number;
+  cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
+}
+
+export interface UserMsg {
+  role: "user";
+  content: string | (TextBlock | ImageBlock)[];
+  timestamp: number;
+}
+export interface AssistantMsg {
+  role: "assistant";
+  content: (TextBlock | ThinkingBlock | ToolCallBlock)[];
+  provider: string;
+  model: string;
+  usage: UsageData;
+  stopReason: "stop" | "length" | "toolUse" | "error" | "aborted";
+  errorMessage?: string;
+  timestamp: number;
+}
+export interface ToolResultMsg {
+  role: "toolResult";
+  toolCallId: string;
+  toolName: string;
+  content: (TextBlock | ImageBlock)[];
+  details?: any;
+  isError: boolean;
+  timestamp: number;
+}
+export type ChatMessage = UserMsg | AssistantMsg | ToolResultMsg;
+
+export interface StoredMessage {
+  seq: number;
+  message: ChatMessage;
+}
+
+export interface CompactionInfo {
+  id: number;
+  cutSeq: number;
+  summary: string;
+  tokensBefore: number;
+  createdAt: number;
+  auto: boolean;
+}
+
+export interface ApprovalRequest {
+  id: string;
+  sessionId: string;
+  toolCallId: string;
+  toolName: string;
+  args: any;
+  title: string;
+  detail: string;
+  ruleSuggestion: string | null;
+  createdAt: number;
+}
+
+export type ApprovalDecision = "allow_once" | "allow_session" | "allow_always" | "deny";
+
+export interface SessionDetail {
+  session: SessionInfo;
+  messages: StoredMessage[];
+  compactions: CompactionInfo[];
+  approvals: ApprovalRequest[];
+  streaming: AssistantMsg | null;
+  runningTools: Record<string, { toolName: string; args: any; partial: any; startedAt: number }>;
+  queued: QueuedMessage[];
+}
+
+export interface QueuedMessage {
+  id: string;
+  text: string;
+  mode: "steer" | "followUp";
+}
+
+export interface McpServerConfig {
+  id: string;
+  name: string;
+  transport: "stdio" | "http" | "sse";
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  url: string;
+  headers: Record<string, string>;
+  enabled: boolean;
+}
+
+export interface McpServerStatus {
+  id: string;
+  name: string;
+  state: "disabled" | "connecting" | "connected" | "error";
+  error: string | null;
+  tools: { name: string; description: string }[];
+}
+
+export interface SkillInfo {
+  name: string;
+  description: string;
+  path: string;
+  source: string;
+}
+
+export interface SlashCommandInfo {
+  name: string;
+  description: string;
+  kind: "builtin" | "prompt" | "skill";
+  source?: string;
+}
+
+export interface PermissionRule {
+  id: number;
+  tool: string;
+  pattern: string;
+  decision: "allow" | "deny";
+  scope: string;
+  createdAt: number;
+}
+
+export interface AppSettings {
+  theme: "system" | "light" | "dark";
+  accent: "neutral" | "blue" | "violet" | "emerald" | "orange" | "rose";
+  defaultCwd: string;
+  defaultProviderId: string;
+  defaultModelId: string;
+  defaultThinking: ThinkingLevel;
+  defaultPermissionMode: PermissionMode;
+  titleModel: string;
+  autoCompact: boolean;
+  compactThreshold: number;
+  keepRecentTokens: number;
+  systemPromptAppend: string;
+  instructionFiles: string[];
+  loadProjectInstructions: boolean;
+  skillDirs: string[];
+  disabledSkills: string[];
+  commandDirs: string[];
+  proxyMode: "env" | "none" | "custom";
+  proxyUrl: string;
+  bashTimeoutSec: number;
+  notifyOnFinish: boolean;
+  sendKey: "enter" | "mod-enter";
+}
+
+export interface UsageSummary {
+  totals: { cost: number; input: number; output: number; cacheRead: number; cacheWrite: number; requests: number; sessions: number; toolCalls: number; toolErrors: number };
+  daily: { day: string; model: string; cost: number; tokens: number }[];
+  byModel: { model: string; provider: string; cost: number; tokens: number; requests: number }[];
+  byTool: { tool: string; count: number; errors: number; avgMs: number }[];
+  byHour: { weekday: number; hour: number; count: number }[];
+  topSessions: { id: string; title: string; cost: number; tokens: number; updatedAt: number }[];
+}
+
+export interface SearchHit {
+  sessionId: string;
+  title: string;
+  seq: number;
+  role: string;
+  snippet: string;
+  updatedAt: number;
+}
+
+export interface AppInfo {
+  version: string;
+  dataDir: string;
+  dbPath: string;
+  home: string;
+  platform: string;
+  dev: boolean;
+  ripgrep: boolean;
+  shell: string;
+}
+
+export type ServerEvent =
+  | { type: "session_updated"; session: SessionInfo }
+  | { type: "session_deleted"; id: string }
+  | { type: "message_appended"; sessionId: string; stored: StoredMessage }
+  | { type: "messages_reset"; sessionId: string }
+  | { type: "stream"; sessionId: string; message: AssistantMsg | null }
+  | { type: "tool_start"; sessionId: string; toolCallId: string; toolName: string; args: any }
+  | { type: "tool_update"; sessionId: string; toolCallId: string; partial: any }
+  | { type: "tool_end"; sessionId: string; toolCallId: string }
+  | { type: "queue"; sessionId: string; queued: QueuedMessage[] }
+  | { type: "approval_request"; request: ApprovalRequest }
+  | { type: "approval_resolved"; sessionId: string; id: string }
+  | { type: "compaction"; sessionId: string; compaction: CompactionInfo }
+  | { type: "compacting"; sessionId: string; active: boolean }
+  | { type: "mcp_status"; servers: McpServerStatus[] }
+  | { type: "notice"; sessionId?: string; level: "info" | "warn" | "error"; text: string }
+  | { type: "run_finished"; sessionId: string; title: string; ok: boolean };
+
+export interface BashDetails {
+  command: string;
+  output: string;
+  exitCode: number | null;
+  durationMs: number;
+  timedOut?: boolean;
+  background?: string;
+}
+
+export interface EditDetails {
+  path: string;
+  diff: string;
+  added: number;
+  removed: number;
+  created?: boolean;
+}
+
+export interface SubagentDetails {
+  sessionId: string;
+  status: "running" | "done" | "error";
+  lastActivity: string;
+  toolCalls: number;
+}
