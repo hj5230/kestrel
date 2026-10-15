@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks"
-import { ArrowRightIcon, KeyRoundIcon, ShipWheelIcon } from "lucide-react"
+import { ArrowRightIcon, KeyRoundIcon } from "lucide-react"
+import { Logo } from "@/components/logo"
 import type { PermissionMode, SessionInfo, ThinkingLevel } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
@@ -54,9 +55,7 @@ export function HomeView() {
       <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6">
         <div className="flex w-full max-w-3xl flex-1 flex-col justify-center pb-[12vh]">
           <div className="mb-8 flex flex-col items-center gap-3 text-center">
-            <div className="flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md">
-              <ShipWheelIcon className="size-6" />
-            </div>
+            <Logo className="size-14" />
             <h1 className="text-2xl font-semibold tracking-tight">{t("home.headline", { greeting: greeting() })}</h1>
             <p className="text-sm text-muted-foreground">{t("home.sub")}</p>
           </div>
