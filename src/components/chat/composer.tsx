@@ -106,16 +106,24 @@ export function Composer({
     }
   }, [initial?.nonce])
 
+  const latestText = useRef(text)
+  latestText.current = text
+
+  const persistDraft = (value: string) => {
+    if (!draftKey) return
+    try {
+      if (value) localStorage.setItem(`kestrel-draft:${draftKey}`, value)
+      else localStorage.removeItem(`kestrel-draft:${draftKey}`)
+    } catch {}
+  }
+
   useEffect(() => {
     if (!draftKey) return
-    const t = setTimeout(() => {
-      try {
-        if (text) localStorage.setItem(`kestrel-draft:${draftKey}`, text)
-        else localStorage.removeItem(`kestrel-draft:${draftKey}`)
-      } catch {}
-    }, 300)
+    const t = setTimeout(() => persistDraft(text), 300)
     return () => clearTimeout(t)
   }, [text, draftKey])
+
+  useEffect(() => () => persistDraft(latestText.current), [draftKey])
 
   useLayoutEffect(() => {
     const el = ta.current
@@ -189,22 +197,27 @@ export function Composer({
     const builtin = /^\/(\S+)\s*([\s\S]*)$/.exec(value)
     if (builtin && onBuiltin && onBuiltin(builtin[1], builtin[2])) {
       setText("")
+      persistDraft("")
       return
     }
     const prevText = text
     const prevImages = images
     setText("")
+    latestText.current = ""
+    persistDraft("")
     setImages([])
     setHistIdx(-1)
     try {
       const ok = await onSubmit(value, prevImages)
       if (ok === false) {
         setText(prevText)
+        persistDraft(prevText)
         setImages(prevImages)
       }
     } catch (e: any) {
       toast.error(e?.message ?? String(e))
       setText(prevText)
+      persistDraft(prevText)
       setImages(prevImages)
     }
   }
