@@ -13,6 +13,8 @@ export type PermissionMode = "manual" | "acceptEdits" | "whitelist" | "bypass";
 
 export type Language = "en" | "zh-CN";
 
+export type TranscriptView = "answer" | "compact" | "detailed" | "verbose";
+
 export interface ProviderConfig {
   id: string;
   kind: ProviderKind;
@@ -247,6 +249,7 @@ export interface AppSettings {
   toolWhitelist: string[];
   notifyOnFinish: boolean;
   sendKey: "enter" | "mod-enter";
+  transcriptView: TranscriptView;
 }
 
 export interface UsageSummary {

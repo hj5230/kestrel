@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks"
+import { useEffect, useMemo, useState } from "preact/hooks"
 import {
   ArrowDownIcon,
   DownloadIcon,
@@ -12,7 +12,7 @@ import {
   XIcon,
 } from "lucide-react"
 import { toast } from "sonner"
-import type { AssistantMsg, SessionInfo, ThinkingLevel, PermissionMode } from "@shared/protocol"
+import type { SessionInfo, ThinkingLevel, PermissionMode } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
 import {
@@ -28,108 +28,19 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { ConfirmDeleteDialog, RenameDialog } from "@/components/session-dialogs"
 import { Composer, type Attachment } from "./composer"
 import { ApprovalCard } from "./approval-card"
-import { AssistantMessage, CompactionDivider, ErrorCard, UserMessage, userText, useToolResults, type ToolRuntime } from "./messages"
+import { userText } from "./messages"
+import { Transcript } from "./transcript"
+import { ViewPicker } from "./view-picker"
 import { CwdPicker, ModelPicker, PermissionPicker, ThinkingPicker } from "./pickers"
 import { ContextMeter } from "./context-meter"
 import { TodoList } from "./tool-call"
 import { rpc } from "@/lib/api"
 import { downloadText } from "@/lib/download"
 import { shortPath } from "@/lib/format"
-import { appInfo, createSession, detailSignal, enabledModels, findModel, loadDetail, openSession, type DetailState } from "@/lib/store"
+import { appInfo, createSession, detailSignal, enabledModels, findModel, loadDetail, openSession, settings } from "@/lib/store"
+import { useStickToBottom } from "@/hooks/use-stick-to-bottom"
 import { cn } from "@/lib/utils"
 import { t } from "@/lib/i18n"
-
-function useStickToBottom(deps: unknown[]) {
-  const ref = useRef<HTMLDivElement>(null)
-  const atBottom = useRef(true)
-  const [showJump, setShowJump] = useState(false)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const onScroll = () => {
-      const near = el.scrollHeight - el.scrollTop - el.clientHeight < 120
-      atBottom.current = near
-      setShowJump(!near)
-    }
-    el.addEventListener("scroll", onScroll, { passive: true })
-    return () => el.removeEventListener("scroll", onScroll)
-  }, [])
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (el && atBottom.current) el.scrollTop = el.scrollHeight
-  }, deps)
-  const jump = () => {
-    const el = ref.current
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
-  }
-  return { ref, showJump, jump }
-}
-
-function Transcript({ d, readOnly, onOpenSubagent, onEdit, onFork, onRetry }: {
-  d: DetailState
-  readOnly?: boolean
-  onOpenSubagent?: (id: string) => void
-  onEdit?: (seq: number, text: string) => void
-  onFork?: (seq: number) => void
-  onRetry?: () => void
-}) {
-  const results = useToolResults(d.messages)
-  const running = d.session.status === "running" || d.session.status === "waiting"
-  const rt: ToolRuntime = { results, running: d.runningTools, runActive: running }
-  const compactionsAt = useMemo(() => {
-    const m = new Map<number, typeof d.compactions>()
-    for (const c of d.compactions) m.set(c.cutSeq, [...(m.get(c.cutSeq) ?? []), c])
-    return m
-  }, [d.compactions])
-  const last = d.messages[d.messages.length - 1]
-  const lastAssistantError = !running && last?.message.role === "assistant" && last.message.stopReason === "error" ? (last.message as AssistantMsg) : null
-  const configError = !running && d.session.status === "error" && !lastAssistantError && d.session.lastError
-  const streamingVisible = !!d.streaming?.content.some((c) => (c.type === "text" && c.text.trim()) || (c.type === "thinking" && c.thinking.trim()) || c.type === "toolCall")
-  const busyIdle = running && !streamingVisible && Object.keys(d.runningTools).length === 0 && d.approvals.length === 0
-  const maxSeq = last?.seq ?? -1
-
-  return (
-    <div className="flex flex-col gap-6">
-      {d.messages.map((s) => {
-        const divs = compactionsAt.get(s.seq)?.map((c) => <CompactionDivider key={`c${c.id}`} c={c} />) ?? null
-        const m = s.message
-        let body = null
-        if (m.role === "user") {
-          body = (
-            <UserMessage
-              stored={s}
-              canEdit={!readOnly && !running}
-              onEdit={(seq, text) => onEdit?.(seq, text)}
-              onFork={(seq) => onFork?.(seq)}
-            />
-          )
-        } else if (m.role === "assistant") {
-          const hasContent = m.content.some((c) => (c.type === "text" && c.text.trim()) || c.type === "toolCall" || (c.type === "thinking" && c.thinking.trim()))
-          if (hasContent) body = <AssistantMessage msg={m} rt={rt} onOpenSubagent={onOpenSubagent} showMeta={m.stopReason !== "toolUse"} />
-        }
-        if (!divs && !body) return null
-        return (
-          <div key={s.seq} className="flex flex-col gap-6">
-            {divs}
-            {body}
-          </div>
-        )
-      })}
-      {d.compactions.filter((c) => c.cutSeq > maxSeq).map((c) => (
-        <CompactionDivider key={`c${c.id}`} c={c} />
-      ))}
-      {d.streaming && streamingVisible && <AssistantMessage msg={d.streaming} rt={rt} streaming onOpenSubagent={onOpenSubagent} />}
-      {(busyIdle || d.compacting) && (
-        <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-          <Spinner className="size-3.5" />
-          <span className="text-shimmer">{d.compacting ? t("chat.compacting") : t("chat.thinking")}</span>
-        </div>
-      )}
-      {lastAssistantError && <ErrorCard message={lastAssistantError.errorMessage ?? t("common.unknownError")} onRetry={readOnly ? undefined : onRetry} />}
-      {configError && <ErrorCard message={d.session.lastError!} onRetry={readOnly || last?.message.role !== "user" ? undefined : onRetry} />}
-    </div>
-  )
-}
 
 function SubagentSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
   const sig = id ? detailSignal(id) : null
@@ -144,7 +55,7 @@ function SubagentSheet({ id, onClose }: { id: string | null; onClose: () => void
           <SheetTitle>{d?.session.title ?? t("chat.subagent")}</SheetTitle>
           <SheetDescription>{t("chat.subagentDesc")}</SheetDescription>
         </SheetHeader>
-        <div className="flex-1 overflow-y-auto px-6 py-5">{d ? <Transcript d={d} readOnly /> : <Spinner />}</div>
+        <div className="flex-1 overflow-y-auto px-6 py-5">{d ? <Transcript d={d} view={settings.value?.transcriptView ?? "compact"} readOnly /> : <Spinner />}</div>
       </SheetContent>
     </Sheet>
   )
@@ -164,7 +75,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
     loadDetail(sessionId).catch((e) => toast.error(e.message))
   }, [sessionId])
 
-  const { ref, showJump, jump } = useStickToBottom([d?.messages.length, d?.streaming, d?.runningTools, d?.approvals.length, d?.compacting])
+  const { ref, detached, jump, follow } = useStickToBottom([d?.messages.length, d?.streaming, d?.runningTools, d?.approvals.length, d?.compacting])
 
   const history = useMemo(
     () => (d?.messages ?? []).filter((m) => m.message.role === "user").map((m) => userText(m.message as any)).filter(Boolean),
@@ -187,6 +98,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
 
   const send = async (text: string, images: Attachment[]) => {
     const imgs = images.map(({ data, mimeType }) => ({ type: "image", data, mimeType }))
+    follow()
     if (editing) {
       await rpc("chat.edit", { sessionId: s.id, seq: editing.seq, text, images: imgs })
       setEditing(null)
@@ -265,6 +177,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
           <TooltipContent>{t("chat.openInFinder")}</TooltipContent>
         </Tooltip>
         <div className="ml-auto flex items-center gap-1">
+          <ViewPicker />
           <ContextMeter session={s} model={model} onCompact={() => compact()} compacting={d.compacting} />
           {s.todos.length > 0 && (
             <Tooltip>
@@ -317,6 +230,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
                 <div className="py-16 text-center text-sm text-muted-foreground">{t("chat.empty")}</div>
               ) : (
                 <Transcript
+                  view={settings.value?.transcriptView ?? "compact"}
                   d={d}
                   onOpenSubagent={setSubagent}
                   onEdit={(seq, text) => setEditing({ seq, text, nonce: Date.now() })}
@@ -326,7 +240,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
               )}
             </div>
           </div>
-          {showJump && (
+          {detached && (
             <Button variant="outline" size="icon-sm" onClick={jump} className="absolute bottom-40 left-1/2 z-10 -translate-x-1/2 rounded-full shadow-md">
               <ArrowDownIcon />
             </Button>

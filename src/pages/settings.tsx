@@ -16,6 +16,7 @@ import { Panel, Row, Section } from "@/components/settings/layout"
 import { ModelsSettings } from "@/components/settings/models"
 import { McpSettings } from "@/components/settings/mcp"
 import { CwdPicker, ModelPicker, PermissionPicker, ThinkingPicker, permissionModes } from "@/components/chat/pickers"
+import { VIEWS } from "@/components/chat/view-picker"
 import { rpc } from "@/lib/api"
 import { shortPath } from "@/lib/format"
 import { t, type MessageKey } from "@/lib/i18n"
@@ -144,6 +145,20 @@ function General({ s }: { s: AppSettings }) {
               <SelectContent>
                 <SelectItem value="enter">{t("settings.sendEnter")}</SelectItem>
                 <SelectItem value="mod-enter">{t("settings.sendMod")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </Row>
+          <Row label={t("settings.transcriptView")} desc={t("settings.transcriptViewDesc")}>
+            <Select value={s.transcriptView} onValueChange={(v) => save({ transcriptView: v as AppSettings["transcriptView"] })}>
+              <SelectTrigger size="sm" className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {VIEWS.map((v) => (
+                  <SelectItem key={v.value} value={v.value}>
+                    {t(`view.${v.value}` as MessageKey)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </Row>

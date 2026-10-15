@@ -164,6 +164,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   toolWhitelist: [],
   notifyOnFinish: true,
   sendKey: "enter",
+  transcriptView: "compact",
 };
 
 export let db: Database;
