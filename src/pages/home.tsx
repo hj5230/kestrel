@@ -49,7 +49,7 @@ export function HomeView() {
 
   return (
     <div className="flex h-full flex-col">
-      <header data-tauri-drag-region className={cn("drag-region flex h-12 shrink-0 items-center px-3", sidebarState === "collapsed" && "pl-20")}>
+      <header data-tauri-drag-region className={cn("flex h-12 shrink-0 items-center px-3", sidebarState === "collapsed" && "pl-20")}>
         <SidebarTrigger className="text-muted-foreground" />
       </header>
       <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6">

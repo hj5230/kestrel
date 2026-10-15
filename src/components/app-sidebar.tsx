@@ -180,7 +180,7 @@ export function AppSidebar() {
   return (
     <Sidebar variant="sidebar" collapsible="offcanvas">
       <SidebarHeader className="gap-3 pt-0">
-        <div data-tauri-drag-region className="drag-region h-9 shrink-0" />
+        <div data-tauri-drag-region className="h-9 shrink-0" />
         <div className="flex items-center gap-2 px-1.5">
           <Logo className="size-7" />
           <span className="font-semibold tracking-tight">Kestrel</span>

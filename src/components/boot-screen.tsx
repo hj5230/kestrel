@@ -14,7 +14,7 @@ export function BootScreen({ error }: { error: string | null }) {
               <TriangleAlertIcon />
             </EmptyMedia>
             <EmptyTitle>{t("boot.failed")}</EmptyTitle>
-            <EmptyDescription className="font-mono text-xs">{error}</EmptyDescription>
+            <EmptyDescription className="font-mono text-xs select-text">{error}</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
             <Button variant="outline" onClick={() => location.reload()}>

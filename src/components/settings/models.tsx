@@ -452,7 +452,7 @@ export function ModelsSettings() {
                   </Badge>
                   {!p.apiKey && presets?.[p.kind]?.needsKey && <Badge variant="destructive" className="text-[10px]">{t("models.missingKey")}</Badge>}
                 </div>
-                <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{p.baseUrl || presets?.[p.kind]?.baseUrl}</div>
+                <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground select-text">{p.baseUrl || presets?.[p.kind]?.baseUrl}</div>
               </div>
               <Button variant="outline" size="sm" onClick={() => setFetchFor(p)}>
                 <CloudDownloadIcon />
@@ -507,7 +507,7 @@ export function ModelsSettings() {
                         {m.reasoning && <BrainIcon className="size-3.5 text-muted-foreground" />}
                         {m.vision && <ImageIcon className="size-3.5 text-muted-foreground" />}
                       </div>
-                      <div className="truncate font-mono text-[11px] text-muted-foreground">
+                      <div className="truncate font-mono text-[11px] text-muted-foreground select-text">
                         {m.id} · {t("models.contextN", { n: formatTokens(m.contextWindow) })}
                         {m.cost.input || m.cost.output ? t("models.perM", { in: +m.cost.input.toFixed(3), out: +m.cost.output.toFixed(3) }) : ""}
                       </div>

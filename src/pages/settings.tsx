@@ -381,7 +381,7 @@ function About() {
     <Section title={t("settings.aboutTitle")} desc={t("settings.aboutDesc")}>
       <Panel>
         {rows.map(([k, v]) => (
-          <Row key={k} label={k} desc={<span className="font-mono">{v}</span>} />
+          <Row key={k} label={k} desc={<span className="font-mono select-text">{v}</span>} />
         ))}
       </Panel>
       <div>
@@ -400,7 +400,7 @@ export function SettingsPage({ tab }: { tab?: string }) {
   const { state: sidebarState } = useSidebar()
   return (
     <div className="flex h-full flex-col">
-      <header data-tauri-drag-region className={cn("drag-region flex h-12 shrink-0 items-center gap-2 border-b px-3", sidebarState === "collapsed" && "pl-20")}>
+      <header data-tauri-drag-region className={cn("flex h-12 shrink-0 items-center gap-2 border-b px-3", sidebarState === "collapsed" && "pl-20")}>
         <SidebarTrigger className="text-muted-foreground" />
         <span className="text-sm font-medium">{t("settings.title")}</span>
       </header>

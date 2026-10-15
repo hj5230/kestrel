@@ -91,7 +91,7 @@ export function UserMessage({
       {text && (
         <div
           className={cn(
-            "max-w-[85%] rounded-2xl bg-muted px-4 py-2.5 text-[0.94rem] leading-relaxed whitespace-pre-wrap break-words",
+            "max-w-[85%] rounded-2xl bg-muted px-4 py-2.5 text-[0.94rem] leading-relaxed whitespace-pre-wrap break-words select-text",
             isCommand && "font-mono text-[13px]",
           )}
         >
@@ -146,7 +146,7 @@ function Thinking({ text, streaming }: { text: string; streaming: boolean }) {
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="mt-1 ml-1.5 border-l-2 pl-4 text-[13px] leading-relaxed whitespace-pre-wrap text-muted-foreground">{text}</div>
+        <div className="mt-1 ml-1.5 border-l-2 pl-4 text-[13px] leading-relaxed whitespace-pre-wrap text-muted-foreground select-text">{text}</div>
       </CollapsibleContent>
     </Collapsible>
   )
@@ -261,7 +261,7 @@ export function ErrorCard({ message, onRetry }: { message: string; onRetry?: () 
       <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-destructive" />
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium text-destructive">{t("msg.failed")}</div>
-        <div className="mt-0.5 text-xs break-words whitespace-pre-wrap text-muted-foreground">{message}</div>
+        <div className="mt-0.5 text-xs break-words whitespace-pre-wrap text-muted-foreground select-text">{message}</div>
       </div>
       {onRetry && (
         <Button variant="outline" size="sm" onClick={onRetry}>

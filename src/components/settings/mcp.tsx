@@ -273,7 +273,7 @@ export function McpSettings() {
                           </Badge>
                           {st?.state === "connected" && <span className="text-xs text-muted-foreground">{t("mcp.toolsN", { n: st.tools.length })}</span>}
                         </div>
-                        <div className={cn("truncate font-mono text-[11px] text-muted-foreground", st?.state === "error" && "text-destructive")}>
+                        <div className={cn("truncate font-mono text-[11px] text-muted-foreground select-text", st?.state === "error" && "text-destructive")}>
                           {st?.state === "error" ? st.error : cfg.transport === "stdio" ? [cfg.command, ...cfg.args].join(" ") : cfg.url}
                         </div>
                       </div>

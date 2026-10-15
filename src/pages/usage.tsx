@@ -253,7 +253,7 @@ export function UsagePage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header data-tauri-drag-region className={cn("drag-region flex h-12 shrink-0 items-center gap-2 border-b px-3", sidebarState === "collapsed" && "pl-20")}>
+      <header data-tauri-drag-region className={cn("flex h-12 shrink-0 items-center gap-2 border-b px-3", sidebarState === "collapsed" && "pl-20")}>
         <SidebarTrigger className="text-muted-foreground" />
         <span className="text-sm font-medium">{tr("usage.title")}</span>
         <ToggleGroup type="single" variant="outline" size="sm" value={range} onValueChange={(v) => v && setRange(v)} className="ml-auto">

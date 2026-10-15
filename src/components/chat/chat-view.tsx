@@ -244,7 +244,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
     <div className="flex h-full min-h-0 flex-col">
       <header
         data-tauri-drag-region
-        className={cn("drag-region flex h-12 shrink-0 items-center gap-2 border-b px-3", sidebarState === "collapsed" && "pl-20")}
+        className={cn("flex h-12 shrink-0 items-center gap-2 border-b px-3", sidebarState === "collapsed" && "pl-20")}
       >
         <SidebarTrigger className="text-muted-foreground" />
         <button type="button" onClick={() => setRenaming(s)} className="group/title flex min-w-0 max-w-[55%] shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-muted">

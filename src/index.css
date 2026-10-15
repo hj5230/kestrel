@@ -335,7 +335,27 @@ body {
 .hljs-meta, .hljs-selector-class, .hljs-selector-id, .hljs-tag { color: var(--hl-meta); }
 .hljs-deletion { color: var(--destructive); }
 
-.drag-region { -webkit-user-select: none; user-select: none; }
+body {
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: default;
+}
+
+input,
+textarea,
+[contenteditable]:not([contenteditable="false"]),
+.markdown,
+pre,
+[data-sonner-toast] [data-title],
+[data-sonner-toast] [data-description] {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+.markdown pre .code-head {
+    -webkit-user-select: none;
+    user-select: none;
+}
 
 @keyframes caret-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 .streaming-caret::after, .markdown.is-streaming > :last-child:not(pre):not(ul):not(ol)::after {
