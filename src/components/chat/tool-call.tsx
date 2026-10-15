@@ -37,6 +37,7 @@ import { formatDuration, shortPath } from "@/lib/format"
 import { highlight, languageFromPath } from "@/lib/markdown"
 import { appInfo } from "@/lib/store"
 import { cn } from "@/lib/utils"
+import { t, type MessageKey } from "@/lib/i18n"
 
 export type ToolState = "running" | "pending" | "done" | "error" | "denied" | "interrupted"
 
@@ -59,24 +60,6 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   skill: SparklesIcon,
 }
 
-const LABELS: Record<string, string> = {
-  read: "读取",
-  write: "写入",
-  edit: "编辑",
-  ls: "列目录",
-  glob: "查找文件",
-  grep: "搜索",
-  bash: "命令",
-  bash_output: "后台输出",
-  kill_shell: "结束后台命令",
-  web_fetch: "抓取网页",
-  web_search: "网页搜索",
-  todo_write: "更新计划",
-  task: "子代理",
-  search_sessions: "检索历史会话",
-  read_session: "读取历史会话",
-  skill: "加载技能",
-}
 
 const p = (v: unknown) => shortPath(String(v ?? ""), appInfo.value?.home)
 
@@ -118,7 +101,7 @@ function summary(call: ToolCallBlock): string {
 }
 
 function resultText(r?: ToolResultMsg): string {
-  return r?.content.map((c) => (c.type === "text" ? c.text : "[图片]")).join("\n") ?? ""
+  return r?.content.map((c) => (c.type === "text" ? c.text : t("tool.imagePlaceholder"))).join("\n") ?? ""
 }
 
 function mcpLabel(name: string) {
@@ -148,7 +131,7 @@ function TodoList({ todos }: { todos: Todo[] }) {
 }
 
 function OutputBlock({ text, className, language }: { text: string; className?: string; language?: string }) {
-  if (!text) return <div className="px-3 py-2 text-xs text-muted-foreground">（无输出）</div>
+  if (!text) return <div className="px-3 py-2 text-xs text-muted-foreground">{t("tool.noOutput")}</div>
   return (
     <pre className={cn("max-h-80 overflow-auto px-3 py-2 font-mono text-[12px] leading-[1.55] whitespace-pre-wrap break-all", className)}>
       {language ? <code className="hljs" dangerouslySetInnerHTML={{ __html: highlight(text, language) }} /> : text}
@@ -184,7 +167,7 @@ function Body({ call, result, partial, state }: { call: ToolCallBlock; result?: 
           <div className="flex items-center gap-2 border-t border-border/60 px-3 py-1 text-[11px] text-muted-foreground">
             <span className={cn(d.exitCode === 0 ? "text-success" : "text-destructive")}>exit {d.exitCode}</span>
             <span>{formatDuration(d.durationMs)}</span>
-            {d.timedOut && <span className="text-destructive">已超时</span>}
+            {d.timedOut && <span className="text-destructive">{t("tool.timedOut")}</span>}
           </div>
         )}
       </div>
@@ -240,16 +223,16 @@ function SubagentCard({ call, result, partial, state, onOpen }: { call: ToolCall
           {state === "running" ? <Spinner className="size-3.5" /> : <BotIcon className="size-4" />}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-medium">{call.arguments?.description ?? "子代理"}</div>
+          <div className="truncate text-[13px] font-medium">{call.arguments?.description ?? t("tool.task")}</div>
           <div className={cn("truncate text-xs text-muted-foreground", state === "running" && "text-shimmer")}>
-            {state === "running" ? (d?.lastActivity ?? "启动中") : state === "error" ? "执行失败" : state === "done" ? "已完成" : "已中断"}
-            {d?.toolCalls ? ` · ${d.toolCalls} 次工具调用` : ""}
+            {state === "running" ? d?.lastActivity || t("tool.starting") : state === "error" ? t("tool.failed") : state === "done" ? t("tool.done") : t("tool.interrupted")}
+            {d?.toolCalls ? t("tool.calls", { n: d.toolCalls }) : ""}
           </div>
         </div>
         {d?.sessionId && onOpen && (
           <Button variant="ghost" size="xs" onClick={() => onOpen(d.sessionId)}>
             <ExternalLinkIcon />
-            查看过程
+            {t("tool.viewRun")}
           </Button>
         )}
         {result && (
@@ -286,7 +269,7 @@ export function ToolCallView({
       <div className="rounded-xl border bg-card px-3 py-2">
         <div className="mb-0.5 flex items-center gap-2 text-xs font-medium text-muted-foreground">
           <ListChecksIcon className="size-3.5" />
-          计划
+          {t("chat.plan")}
         </div>
         <TodoList todos={call.arguments?.todos ?? []} />
       </div>
@@ -295,7 +278,7 @@ export function ToolCallView({
 
   const mcp = call.name.startsWith("mcp__") ? mcpLabel(call.name) : null
   const Icon = mcp ? PlugIcon : (ICONS[call.name] ?? WrenchIcon)
-  const label = mcp ? `${mcp.server} · ${mcp.tool}` : (LABELS[call.name] ?? call.name)
+  const label = mcp ? `${mcp.server} · ${mcp.tool}` : ICONS[call.name] ? t(`tool.${call.name}` as MessageKey) : call.name
   const d = result?.details as any
   const isEditDetails = isEdit && d && typeof d.added === "number"
 

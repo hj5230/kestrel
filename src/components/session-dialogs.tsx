@@ -18,6 +18,7 @@ import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { rpc } from "@/lib/api"
 import { relativeTime, shortPath } from "@/lib/format"
 import { appInfo, refreshSessions } from "@/lib/store"
+import { t } from "@/lib/i18n"
 
 export function RenameDialog({ session, onClose }: { session: SessionInfo | null; onClose: () => void }) {
   const [title, setTitle] = useState("")
@@ -33,14 +34,14 @@ export function RenameDialog({ session, onClose }: { session: SessionInfo | null
       <DialogContent className="sm:max-w-md">
         <form onSubmit={submit} className="grid gap-4">
           <DialogHeader>
-            <DialogTitle>重命名会话</DialogTitle>
+            <DialogTitle>{t("dialog.renameTitle")}</DialogTitle>
           </DialogHeader>
-          <Input autoFocus value={title} onInput={(e) => setTitle(e.currentTarget.value)} placeholder="会话标题" />
+          <Input autoFocus value={title} onInput={(e) => setTitle(e.currentTarget.value)} placeholder={t("dialog.renamePlaceholder")} />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
-              取消
+              {t("common.cancel")}
             </Button>
-            <Button type="submit">保存</Button>
+            <Button type="submit">{t("common.save")}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -53,13 +54,13 @@ export function ConfirmDeleteDialog({ session, onClose }: { session: SessionInfo
     <AlertDialog open={!!session} onOpenChange={(o) => !o && onClose()}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>删除会话？</AlertDialogTitle>
+          <AlertDialogTitle>{t("dialog.deleteTitle")}</AlertDialogTitle>
           <AlertDialogDescription>
-            「{session?.title || "新会话"}」及其全部消息和子代理记录将被永久删除，无法恢复。工作目录中的文件不受影响。
+            {t("dialog.deleteBody", { title: session?.title || t("common.untitled") })}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
+          <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             onClick={async () => {
@@ -67,7 +68,7 @@ export function ConfirmDeleteDialog({ session, onClose }: { session: SessionInfo
               onClose()
             }}
           >
-            删除
+            {t("common.delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -85,21 +86,21 @@ export function ArchivedDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>已归档会话</DialogTitle>
-          <DialogDescription>归档的会话不会出现在侧边栏，可随时恢复。</DialogDescription>
+          <DialogTitle>{t("dialog.archivedTitle")}</DialogTitle>
+          <DialogDescription>{t("dialog.archivedDesc")}</DialogDescription>
         </DialogHeader>
         <div className="-mx-2 max-h-[50vh] overflow-y-auto">
           {items.length === 0 ? (
             <Empty className="py-8">
               <EmptyHeader>
-                <EmptyTitle className="text-sm">没有归档的会话</EmptyTitle>
+                <EmptyTitle className="text-sm">{t("dialog.archivedEmpty")}</EmptyTitle>
               </EmptyHeader>
             </Empty>
           ) : (
             items.map((s) => (
               <div key={s.id} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/60">
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm">{s.title || "新会话"}</div>
+                  <div className="truncate text-sm">{s.title || t("common.untitled")}</div>
                   <div className="truncate text-xs text-muted-foreground">
                     {shortPath(s.cwd, appInfo.value?.home)} · {relativeTime(s.updatedAt)}
                   </div>
@@ -107,7 +108,7 @@ export function ArchivedDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  title="恢复"
+                  title={t("common.restore")}
                   onClick={async () => {
                     await rpc("sessions.update", { id: s.id, patch: { archived: false } })
                     await Promise.all([load(), refreshSessions()])
@@ -118,7 +119,7 @@ export function ArchivedDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  title="删除"
+                  title={t("common.delete")}
                   onClick={async () => {
                     await rpc("sessions.delete", { id: s.id })
                     load()

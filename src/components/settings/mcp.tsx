@@ -18,6 +18,7 @@ import { Section } from "./layout"
 import { rpc } from "@/lib/api"
 import { mcpServers } from "@/lib/store"
 import { cn } from "@/lib/utils"
+import { t, type MessageKey } from "@/lib/i18n"
 
 const kvToText = (o: Record<string, string>, sep: string) =>
   Object.entries(o)
@@ -64,7 +65,7 @@ function ServerDialog({ open, server, onClose }: { open: boolean; server: McpSer
 
   const save = async (e: Event) => {
     e.preventDefault()
-    if (!name.trim()) return toast.error("请填写名称")
+    if (!name.trim()) return toast.error(t("mcp.nameRequired"))
     const parts = splitArgs(command)
     setSaving(true)
     try {
@@ -92,16 +93,16 @@ function ServerDialog({ open, server, onClose }: { open: boolean; server: McpSer
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={save} className="grid gap-5">
           <DialogHeader>
-            <DialogTitle>{server ? "编辑 MCP 服务" : "添加 MCP 服务"}</DialogTitle>
-            <DialogDescription>支持本地 stdio 进程、Streamable HTTP 与 SSE。</DialogDescription>
+            <DialogTitle>{server ? t("mcp.edit") : t("mcp.add")}</DialogTitle>
+            <DialogDescription>{t("mcp.dialogDesc")}</DialogDescription>
           </DialogHeader>
           <FieldGroup className="gap-4">
             <Field>
-              <FieldLabel>名称</FieldLabel>
+              <FieldLabel>{t("common.name")}</FieldLabel>
               <Input value={name} onInput={(e) => setName(e.currentTarget.value)} placeholder="filesystem" />
             </Field>
             <Field>
-              <FieldLabel>传输方式</FieldLabel>
+              <FieldLabel>{t("mcp.transport")}</FieldLabel>
               <ToggleGroup type="single" variant="outline" size="sm" value={transport} onValueChange={(v) => v && setTransport(v as any)} className="justify-start">
                 <ToggleGroupItem value="stdio" className="px-3">stdio</ToggleGroupItem>
                 <ToggleGroupItem value="http" className="px-3">HTTP</ToggleGroupItem>
@@ -111,17 +112,17 @@ function ServerDialog({ open, server, onClose }: { open: boolean; server: McpSer
             {transport === "stdio" ? (
               <>
                 <Field>
-                  <FieldLabel>启动命令</FieldLabel>
+                  <FieldLabel>{t("mcp.command")}</FieldLabel>
                   <Input
                     value={command}
                     className="font-mono text-xs"
                     onInput={(e) => setCommand(e.currentTarget.value)}
                     placeholder="npx -y @modelcontextprotocol/server-filesystem ~/Documents"
                   />
-                  <FieldDescription>以登录 shell 的 PATH 解析命令。</FieldDescription>
+                  <FieldDescription>{t("mcp.commandDesc")}</FieldDescription>
                 </Field>
                 <Field>
-                  <FieldLabel>环境变量</FieldLabel>
+                  <FieldLabel>{t("mcp.env")}</FieldLabel>
                   <Textarea rows={2} value={env} className="font-mono text-xs" onInput={(e) => setEnv(e.currentTarget.value)} placeholder="API_TOKEN=xxx" />
                 </Field>
               </>
@@ -132,7 +133,7 @@ function ServerDialog({ open, server, onClose }: { open: boolean; server: McpSer
                   <Input value={url} className="font-mono text-xs" onInput={(e) => setUrl(e.currentTarget.value)} placeholder="https://example.com/mcp" />
                 </Field>
                 <Field>
-                  <FieldLabel>请求头</FieldLabel>
+                  <FieldLabel>{t("mcp.headers")}</FieldLabel>
                   <Textarea rows={2} value={headers} className="font-mono text-xs" onInput={(e) => setHeaders(e.currentTarget.value)} placeholder="Authorization: Bearer xxx" />
                 </Field>
               </>
@@ -140,11 +141,11 @@ function ServerDialog({ open, server, onClose }: { open: boolean; server: McpSer
           </FieldGroup>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
-              取消
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={saving}>
               {saving && <Spinner />}
-              保存并连接
+              {t("mcp.saveConnect")}
             </Button>
           </DialogFooter>
         </form>
@@ -160,11 +161,11 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
     setBusy(true)
     try {
       const n = await rpc<number>("mcp.import", { json })
-      toast.success(`已导入 ${n} 个服务`)
+      toast.success(t("mcp.imported", { n }))
       setJson("")
       onClose()
     } catch (e: any) {
-      toast.error(`导入失败：${e.message}`)
+      toast.error(t("mcp.importFailed", { msg: e.message }))
     } finally {
       setBusy(false)
     }
@@ -173,8 +174,8 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>导入 MCP 配置</DialogTitle>
-          <DialogDescription>粘贴 Claude Desktop / Claude Code / Cursor 格式的 JSON（包含 mcpServers 字段）。同名服务会被覆盖。</DialogDescription>
+          <DialogTitle>{t("mcp.importTitle")}</DialogTitle>
+          <DialogDescription>{t("mcp.importDesc")}</DialogDescription>
         </DialogHeader>
         <Textarea
           rows={12}
@@ -185,11 +186,11 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
         />
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            取消
+            {t("common.cancel")}
           </Button>
           <Button onClick={submit} disabled={!json.trim() || busy}>
             {busy && <Spinner />}
-            导入
+            {t("common.import")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -197,11 +198,11 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
   )
 }
 
-const STATE: Record<string, { label: string; cls: string }> = {
-  connected: { label: "已连接", cls: "bg-success" },
-  connecting: { label: "连接中", cls: "bg-warning animate-pulse" },
-  error: { label: "错误", cls: "bg-destructive" },
-  disabled: { label: "已停用", cls: "bg-muted-foreground/40" },
+const STATE: Record<string, string> = {
+  connected: "bg-success",
+  connecting: "bg-warning animate-pulse",
+  error: "bg-destructive",
+  disabled: "bg-muted-foreground/40",
 }
 
 export function McpSettings() {
@@ -220,13 +221,13 @@ export function McpSettings() {
 
   return (
     <Section
-      title="MCP 服务"
-      desc="连接 Model Context Protocol 服务，为 Helm 扩展外部工具。工具以 mcp__服务名__工具名 的形式提供给模型。"
+      title={t("mcp.title")}
+      desc={t("mcp.desc")}
       action={
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
             <FileJsonIcon />
-            导入 JSON
+            {t("mcp.importJson")}
           </Button>
           <Button
             size="sm"
@@ -236,7 +237,7 @@ export function McpSettings() {
             }}
           >
             <PlusIcon />
-            添加服务
+            {t("mcp.addServer")}
           </Button>
         </div>
       }
@@ -247,15 +248,16 @@ export function McpSettings() {
             <EmptyMedia variant="icon">
               <PlugIcon />
             </EmptyMedia>
-            <EmptyTitle>还没有 MCP 服务</EmptyTitle>
-            <EmptyDescription>添加服务或直接粘贴现有的 mcpServers 配置。</EmptyDescription>
+            <EmptyTitle>{t("mcp.emptyTitle")}</EmptyTitle>
+            <EmptyDescription>{t("mcp.emptyDesc")}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
         <div className="divide-y overflow-hidden rounded-xl border bg-card">
           {configs.map((cfg) => {
             const st = mcpServers.value.find((s) => s.id === cfg.id)
-            const state = STATE[st?.state ?? (cfg.enabled ? "connecting" : "disabled")]
+            const stateKey = st?.state ?? (cfg.enabled ? "connecting" : "disabled")
+            const state = { cls: STATE[stateKey], label: t(`mcp.state.${stateKey}` as MessageKey) }
             return (
               <Collapsible key={cfg.id}>
                 <div className="flex items-center gap-3 px-4 py-3">
@@ -269,7 +271,7 @@ export function McpSettings() {
                           <Badge variant="outline" className="text-[10px]">
                             {cfg.transport}
                           </Badge>
-                          {st?.state === "connected" && <span className="text-xs text-muted-foreground">{st.tools.length} 个工具</span>}
+                          {st?.state === "connected" && <span className="text-xs text-muted-foreground">{t("mcp.toolsN", { n: st.tools.length })}</span>}
                         </div>
                         <div className={cn("truncate font-mono text-[11px] text-muted-foreground", st?.state === "error" && "text-destructive")}>
                           {st?.state === "error" ? st.error : cfg.transport === "stdio" ? [cfg.command, ...cfg.args].join(" ") : cfg.url}
@@ -293,7 +295,7 @@ export function McpSettings() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onSelect={() => rpc("mcp.restart", { id: cfg.id })}>
                         <RotateCwIcon />
-                        重新连接
+                        {t("mcp.reconnect")}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() => {
@@ -302,7 +304,7 @@ export function McpSettings() {
                         }}
                       >
                         <PencilIcon />
-                        编辑
+                        {t("common.edit")}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
@@ -313,7 +315,7 @@ export function McpSettings() {
                         }}
                       >
                         <Trash2Icon />
-                        删除
+                        {t("common.delete")}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -330,7 +332,7 @@ export function McpSettings() {
                         ))}
                       </ul>
                     ) : (
-                      <div className="text-xs text-muted-foreground">{st?.state === "connected" ? "该服务没有提供工具" : "连接成功后显示工具列表"}</div>
+                      <div className="text-xs text-muted-foreground">{st?.state === "connected" ? t("mcp.noTools") : t("mcp.toolsAfterConnect")}</div>
                     )}
                   </div>
                 </CollapsibleContent>

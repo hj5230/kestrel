@@ -59,7 +59,7 @@ export function killAllShells() {
 export function createBashTool(ctx: ToolContext): HelmTool {
   return defineTool({
     name: "bash",
-    label: "执行命令",
+    label: "Run command",
     category: "exec",
     executionMode: "sequential",
     description:
@@ -170,7 +170,7 @@ export function createBashTool(ctx: ToolContext): HelmTool {
 export function createBashOutputTool(ctx: ToolContext): HelmTool {
   return defineTool({
     name: "bash_output",
-    label: "读取后台输出",
+    label: "Read background output",
     category: "read",
     description: "Read new output from a background shell started with run_in_background, and whether it is still running.",
     parameters: Type.Object({
@@ -201,7 +201,7 @@ export function createBashOutputTool(ctx: ToolContext): HelmTool {
 export function createKillShellTool(ctx: ToolContext): HelmTool {
   return defineTool({
     name: "kill_shell",
-    label: "结束后台命令",
+    label: "Stop background command",
     category: "exec",
     description: "Terminate a background shell by id.",
     parameters: Type.Object({ shell_id: Type.String() }),

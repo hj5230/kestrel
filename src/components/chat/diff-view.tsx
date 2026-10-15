@@ -1,5 +1,6 @@
 import { useMemo } from "preact/hooks"
 import { cn } from "@/lib/utils"
+import { t } from "@/lib/i18n"
 
 interface Row {
   kind: "add" | "del" | "ctx" | "hunk"
@@ -39,7 +40,7 @@ export function simpleDiff(oldStr: string, newStr: string): string {
 
 export function DiffView({ diff, maxHeight = 360 }: { diff: string; maxHeight?: number }) {
   const rows = useMemo(() => parse(diff), [diff])
-  if (!rows.length) return <div className="px-3 py-2 text-xs text-muted-foreground">无变更</div>
+  if (!rows.length) return <div className="px-3 py-2 text-xs text-muted-foreground">{t("diff.none")}</div>
   return (
     <div className="overflow-auto font-mono text-[12px] leading-[1.55]" style={{ maxHeight }}>
       <table className="w-full border-collapse">

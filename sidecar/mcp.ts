@@ -6,6 +6,7 @@ import type { McpServerConfig, McpServerStatus } from "../shared/protocol";
 import * as store from "./db";
 import { expandHome, getShellEnv } from "./env";
 import { emit } from "./hub";
+import { st } from "./i18n";
 import { proxiedFetch } from "./providers";
 import type { HelmTool } from "./tools/types";
 
@@ -68,7 +69,7 @@ async function connect(cfg: McpServerConfig) {
     }
     await Promise.race([
       client.connect(transport),
-      new Promise((_, rej) => setTimeout(() => rej(new Error("连接超时（30 秒）")), 30000)),
+      new Promise((_, rej) => setTimeout(() => rej(new Error(st("mcpTimeout"))), 30000)),
     ]);
     const tools: Conn["tools"] = [];
     let cursor: string | undefined;
@@ -87,7 +88,7 @@ async function connect(cfg: McpServerConfig) {
     client.onclose = () => {
       if (conns.get(cfg.id) === conn && conn.state === "connected") {
         conn.state = "error";
-        conn.error = "连接已断开";
+        conn.error = st("mcpClosed");
         conn.client = null;
         broadcast();
       }

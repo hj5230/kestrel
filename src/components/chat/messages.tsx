@@ -19,6 +19,7 @@ import { Markdown } from "./markdown"
 import { ToolCallView, type ToolState } from "./tool-call"
 import { formatCost, formatTokens, clockTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
+import { t } from "@/lib/i18n"
 
 function CopyButton({ text }: { text: string }) {
   const [done, setDone] = useState(false)
@@ -37,7 +38,7 @@ function CopyButton({ text }: { text: string }) {
           {done ? <CheckIcon /> : <CopyIcon />}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>复制</TooltipContent>
+      <TooltipContent>{t("common.copy")}</TooltipContent>
     </Tooltip>
   )
 }
@@ -107,7 +108,7 @@ export function UserMessage({
                 <PencilIcon />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>编辑并重新发送</TooltipContent>
+            <TooltipContent>{t("msg.editResend")}</TooltipContent>
           </Tooltip>
         )}
         <Tooltip>
@@ -116,13 +117,13 @@ export function UserMessage({
               <GitBranchIcon />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>从这里分叉新会话</TooltipContent>
+          <TooltipContent>{t("msg.fork")}</TooltipContent>
         </Tooltip>
       </div>
       <Dialog open={!!preview} onOpenChange={(o) => !o && setPreview(null)}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>图片</DialogTitle>
+            <DialogTitle>{t("common.image")}</DialogTitle>
           </DialogHeader>
           {preview && <img src={preview} className="max-h-[75vh] w-full rounded-lg object-contain" />}
         </DialogContent>
@@ -139,7 +140,7 @@ function Thinking({ text, streaming }: { text: string; streaming: boolean }) {
       <CollapsibleTrigger asChild>
         <button type="button" className="flex max-w-full items-center gap-1.5 rounded-md py-0.5 text-[13px] text-muted-foreground hover:text-foreground">
           <BrainIcon className="size-3.5 shrink-0" />
-          <span className={cn("shrink-0", streaming && "text-shimmer")}>{streaming ? "思考中" : "思考过程"}</span>
+          <span className={cn("shrink-0", streaming && "text-shimmer")}>{streaming ? t("msg.thinking") : t("msg.thoughts")}</span>
           {!open && streaming && <span className="truncate text-xs opacity-70">{firstLine}</span>}
           <ChevronRightIcon className={cn("size-3.5 shrink-0 transition-transform", open && "rotate-90")} />
         </button>
@@ -214,12 +215,12 @@ export function AssistantMessage({
         }
         return null
       })}
-      {msg.stopReason === "aborted" && <div className="text-xs text-muted-foreground">— 已停止 —</div>}
+      {msg.stopReason === "aborted" && <div className="text-xs text-muted-foreground">{t("msg.stopped")}</div>}
       {showMeta && !streaming && text && (
         <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/assistant:opacity-100">
           <CopyButton text={text} />
           <span className="ml-1 text-[11px] text-muted-foreground tabular-nums">
-            {msg.model} · {formatTokens(msg.usage.input + msg.usage.cacheRead + msg.usage.cacheWrite)} 入 / {formatTokens(msg.usage.output)} 出
+            {t("msg.usage", { model: msg.model, input: formatTokens(msg.usage.input + msg.usage.cacheRead + msg.usage.cacheWrite), output: formatTokens(msg.usage.output) })}
             {msg.usage.cost.total > 0 && ` · ${formatCost(msg.usage.cost.total)}`} · {clockTime(msg.timestamp)}
           </span>
         </div>
@@ -236,14 +237,14 @@ export function CompactionDivider({ c }: { c: CompactionInfo }) {
         <div className="h-px flex-1 bg-border" />
         <button type="button" onClick={() => setOpen(true)} className="flex items-center gap-1.5 rounded-full border px-3 py-1 hover:bg-muted">
           <ShrinkIcon className="size-3" />
-          {c.auto ? "已自动压缩上下文" : "已压缩上下文"} · 原约 {formatTokens(c.tokensBefore)} tokens
+          {c.auto ? t("msg.autoCompacted") : t("msg.compacted")} · {t("msg.compactedFrom", { n: formatTokens(c.tokensBefore) })}
         </button>
         <div className="h-px flex-1 bg-border" />
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>上下文摘要</DialogTitle>
+            <DialogTitle>{t("msg.summary")}</DialogTitle>
           </DialogHeader>
           <div className="max-h-[65vh] overflow-y-auto pr-2">
             <Markdown text={c.summary} />
@@ -259,13 +260,13 @@ export function ErrorCard({ message, onRetry }: { message: string; onRetry?: () 
     <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
       <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-destructive" />
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium text-destructive">请求失败</div>
+        <div className="text-sm font-medium text-destructive">{t("msg.failed")}</div>
         <div className="mt-0.5 text-xs break-words whitespace-pre-wrap text-muted-foreground">{message}</div>
       </div>
       {onRetry && (
         <Button variant="outline" size="sm" onClick={onRetry}>
           <RotateCcwIcon />
-          重试
+          {t("common.retry")}
         </Button>
       )}
     </div>

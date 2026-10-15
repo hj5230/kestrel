@@ -2,6 +2,7 @@ import { RefreshCwIcon, TriangleAlertIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Spinner } from "@/components/ui/spinner"
+import { t } from "@/lib/i18n"
 
 export function BootScreen({ error }: { error: string | null }) {
   return (
@@ -12,20 +13,20 @@ export function BootScreen({ error }: { error: string | null }) {
             <EmptyMedia variant="icon">
               <TriangleAlertIcon />
             </EmptyMedia>
-            <EmptyTitle>无法连接后台服务</EmptyTitle>
+            <EmptyTitle>{t("boot.failed")}</EmptyTitle>
             <EmptyDescription className="font-mono text-xs">{error}</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
             <Button variant="outline" onClick={() => location.reload()}>
               <RefreshCwIcon />
-              重新加载
+              {t("boot.reload")}
             </Button>
           </EmptyContent>
         </Empty>
       ) : (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Spinner />
-          正在启动…
+          {t("boot.starting")}
         </div>
       )}
     </div>

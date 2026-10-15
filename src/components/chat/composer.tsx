@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { rpc } from "@/lib/api"
 import { settings } from "@/lib/store"
 import { cn } from "@/lib/utils"
+import { t, type MessageKey } from "@/lib/i18n"
 import { toast } from "sonner"
 
 export interface Attachment {
@@ -25,11 +26,11 @@ interface MenuItem {
 }
 
 const KIND_ICON = { builtin: TerminalSquareIcon, prompt: ZapIcon, skill: SparklesIcon, file: FileIcon }
-const KIND_LABEL = { builtin: "命令", prompt: "自定义", skill: "技能", file: "文件" }
+
 
 function readImage(file: File): Promise<Attachment> {
   return new Promise((resolve, reject) => {
-    if (file.size > 10 * 1024 * 1024) return reject(new Error("图片不能超过 10MB"))
+    if (file.size > 10 * 1024 * 1024) return reject(new Error(t("composer.imageTooLarge")))
     const reader = new FileReader()
     reader.onload = () => {
       const s = String(reader.result)
@@ -297,7 +298,7 @@ export function Composer({
                 <Icon className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className={cn("shrink-0", item.kind === "file" ? "truncate font-mono text-xs" : "font-medium")}>{item.label}</span>
                 {item.detail && <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{item.detail}</span>}
-                <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/70">{KIND_LABEL[item.kind]}</span>
+                <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/70">{t(`composer.kind.${item.kind}` as MessageKey)}</span>
               </button>
             )
           })}
@@ -341,7 +342,7 @@ export function Composer({
           ref={ta}
           rows={1}
           value={text}
-          placeholder={placeholder ?? "给 Helm 布置任务…  / 调用命令与技能，@ 引用文件"}
+          placeholder={placeholder ?? t("composer.placeholder")}
           className="block max-h-80 min-h-[52px] w-full resize-none bg-transparent px-4 pt-3.5 pb-1 text-[0.94rem] leading-relaxed outline-none placeholder:text-muted-foreground/70"
           onInput={(e) => {
             setText(e.currentTarget.value)
@@ -369,7 +370,7 @@ export function Composer({
                 <ImagePlusIcon />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>添加图片（也可粘贴或拖入）</TooltipContent>
+            <TooltipContent>{t("composer.addImage")}</TooltipContent>
           </Tooltip>
           <input
             ref={fileInput}
@@ -392,7 +393,7 @@ export function Composer({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  停止 <Kbd>Esc</Kbd>
+                  {t("composer.stop")} <Kbd>Esc</Kbd>
                 </TooltipContent>
               </Tooltip>
             )}
@@ -404,7 +405,7 @@ export function Composer({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {running ? "插话：在当前步骤后加入" : "发送"} <Kbd>{sendKey === "enter" ? "↵" : "⌘↵"}</Kbd>
+                  {running ? t("composer.steer") : t("composer.send")} <Kbd>{sendKey === "enter" ? "↵" : "⌘↵"}</Kbd>
                 </TooltipContent>
               </Tooltip>
             )}

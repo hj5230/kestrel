@@ -8,11 +8,12 @@ import type { LanguageModel } from "ai";
 import type { ModelConfig, ProviderConfig, ProviderKind, RemoteModel } from "../shared/protocol";
 import * as store from "./db";
 import { getShellEnv } from "./env";
+import { st } from "./i18n";
 
 export const PROVIDER_PRESETS: Record<ProviderKind, { name: string; baseUrl: string; needsKey: boolean }> = {
   anthropic: { name: "Anthropic", baseUrl: "https://api.anthropic.com/v1", needsKey: true },
   openai: { name: "OpenAI", baseUrl: "https://api.openai.com/v1", needsKey: true },
-  "openai-compatible": { name: "OpenAI 兼容", baseUrl: "http://127.0.0.1:8000/v1", needsKey: false },
+  "openai-compatible": { name: "OpenAI-compatible", baseUrl: "http://127.0.0.1:8000/v1", needsKey: false },
   google: { name: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta", needsKey: true },
   deepseek: { name: "DeepSeek", baseUrl: "https://api.deepseek.com/v1", needsKey: true },
   openrouter: { name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", needsKey: true },
@@ -101,7 +102,7 @@ const cache = new Map<string, { sig: string; make: (id: string) => LanguageModel
 
 export function languageModel(providerId: string, modelId: string): LanguageModel {
   const p = store.getProvider(providerId);
-  if (!p) throw new Error(`模型供应商不存在：${providerId}`);
+  if (!p) throw new Error(st("providerNotFound", { id: providerId }));
   const sig = JSON.stringify([p.kind, p.baseUrl, p.apiKey, p.headers]);
   let entry = cache.get(providerId);
   if (!entry || entry.sig !== sig) {
@@ -234,6 +235,6 @@ export function resolveModel(providerId: string, modelId: string): ModelConfig {
   const m = store.getModel(providerId, modelId);
   if (m) return m;
   const p = store.getProvider(providerId);
-  if (!p) throw new Error("请先在设置中配置模型供应商");
+  if (!p) throw new Error(st("configureProvider"));
   return { providerId, ...modelDefaults(p.kind, modelId) };
 }

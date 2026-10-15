@@ -18,7 +18,7 @@ async function resolveBackend() {
       }
       await new Promise((r) => setTimeout(r, 100))
     }
-    throw new Error("后台服务启动超时")
+    throw new Error("Background service start-up timed out")
   }
   const params = new URLSearchParams(location.search)
   base = params.get("backend") ?? import.meta.env.VITE_HELM_BACKEND ?? "http://127.0.0.1:47821"
