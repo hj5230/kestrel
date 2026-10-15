@@ -1,4 +1,4 @@
-import { useMemo, useState } from "preact/hooks"
+import { useState } from "preact/hooks"
 import {
   BrainIcon,
   ChevronRightIcon,
@@ -10,13 +10,12 @@ import {
   TriangleAlertIcon,
   CheckIcon,
 } from "lucide-react"
-import type { AssistantMsg, CompactionInfo, StoredMessage, ToolResultMsg, UserMsg } from "@shared/protocol"
+import type { AssistantMsg, CompactionInfo, StoredMessage, UserMsg } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Markdown } from "./markdown"
-import { ToolCallView, type ToolState } from "./tool-call"
 import { formatCost, formatTokens, clockTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { t } from "@/lib/i18n"
@@ -132,8 +131,8 @@ export function UserMessage({
   )
 }
 
-function Thinking({ text, streaming }: { text: string; streaming: boolean }) {
-  const [open, setOpen] = useState(false)
+export function Thinking({ text, streaming, defaultOpen = false }: { text: string; streaming: boolean; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen)
   const firstLine = text.trim().split("\n").filter(Boolean).pop()?.slice(0, 120) ?? ""
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -152,79 +151,22 @@ function Thinking({ text, streaming }: { text: string; streaming: boolean }) {
   )
 }
 
-export interface ToolRuntime {
-  results: Map<string, ToolResultMsg>
-  running: Record<string, { partial: any; startedAt: number }>
-  runActive: boolean
-}
-
-function toolState(id: string, rt: ToolRuntime, msg: AssistantMsg): ToolState {
-  const r = rt.results.get(id)
-  if (r) {
-    const t = r.content.map((c) => (c.type === "text" ? c.text : "")).join("")
-    if (r.isError && /^The user denied|^Operation aborted/.test(t)) return "denied"
-    return r.isError ? "error" : "done"
-  }
-  if (rt.running[id]) return "running"
-  if (rt.runActive && msg.stopReason === "toolUse") return "pending"
-  return "interrupted"
-}
-
-export function AssistantMessage({
-  msg,
-  rt,
-  streaming,
-  onOpenSubagent,
-  showMeta,
-}: {
-  msg: AssistantMsg
-  rt: ToolRuntime
-  streaming?: boolean
-  onOpenSubagent?: (id: string) => void
-  showMeta?: boolean
-}) {
+export function AssistantMeta({ msg, hover }: { msg: AssistantMsg; hover?: boolean }) {
   const text = msg.content
     .filter((c) => c.type === "text")
     .map((c: any) => c.text)
     .join("\n\n")
-  const lastIdx = msg.content.length - 1
   return (
-    <div className="group/assistant flex flex-col gap-1.5">
-      {msg.content.map((c, i) => {
-        if (c.type === "thinking") {
-          if (!c.thinking.trim()) return null
-          return <Thinking key={i} text={c.thinking} streaming={!!streaming && i === lastIdx} />
-        }
-        if (c.type === "text") {
-          if (!c.text.trim()) return null
-          return <Markdown key={i} text={c.text} streaming={!!streaming && i === lastIdx} />
-        }
-        if (c.type === "toolCall") {
-          const running = rt.running[c.id]
-          const state = streaming ? "running" : toolState(c.id, rt, msg)
-          return (
-            <ToolCallView
-              key={c.id || i}
-              call={c}
-              result={rt.results.get(c.id)}
-              partial={running?.partial}
-              state={streaming && !running ? "pending" : state}
-              onOpenSubagent={onOpenSubagent}
-            />
-          )
-        }
-        return null
-      })}
-      {msg.stopReason === "aborted" && <div className="text-xs text-muted-foreground">{t("msg.stopped")}</div>}
-      {showMeta && !streaming && text && (
-        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/assistant:opacity-100">
-          <CopyButton text={text} />
-          <span className="ml-1 text-[11px] text-muted-foreground tabular-nums">
-            {t("msg.usage", { model: msg.model, input: formatTokens(msg.usage.input + msg.usage.cacheRead + msg.usage.cacheWrite), output: formatTokens(msg.usage.output) })}
-            {msg.usage.cost.total > 0 && ` · ${formatCost(msg.usage.cost.total)}`} · {clockTime(msg.timestamp)}
-          </span>
-        </div>
-      )}
+    <div className={cn("mt-1 flex items-center gap-0.5", hover && "opacity-0 transition-opacity group-hover/assistant:opacity-100")}>
+      <CopyButton text={text} />
+      <span className="ml-1 text-[11px] text-muted-foreground tabular-nums">
+        {t("msg.usage", {
+          model: msg.model,
+          input: formatTokens(msg.usage.input + msg.usage.cacheRead + msg.usage.cacheWrite),
+          output: formatTokens(msg.usage.output),
+        })}
+        {msg.usage.cost.total > 0 && ` · ${formatCost(msg.usage.cost.total)}`} · {clockTime(msg.timestamp)}
+      </span>
     </div>
   )
 }
@@ -271,12 +213,4 @@ export function ErrorCard({ message, onRetry }: { message: string; onRetry?: () 
       )}
     </div>
   )
-}
-
-export function useToolResults(messages: StoredMessage[]) {
-  return useMemo(() => {
-    const map = new Map<string, ToolResultMsg>()
-    for (const s of messages) if (s.message.role === "toolResult") map.set(s.message.toolCallId, s.message)
-    return map
-  }, [messages])
 }

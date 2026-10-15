@@ -63,7 +63,20 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
 
 const p = (v: unknown) => shortPath(String(v ?? ""), appInfo.value?.home)
 
-function summary(call: ToolCallBlock): string {
+export function toolIcon(name: string): ComponentType<{ className?: string }> {
+  if (name.startsWith("mcp__")) return PlugIcon
+  return ICONS[name] ?? WrenchIcon
+}
+
+export function toolLabel(name: string): string {
+  if (name.startsWith("mcp__")) {
+    const { server, tool } = mcpLabel(name)
+    return `${server} · ${tool}`
+  }
+  return ICONS[name] ? t(`tool.${name}` as MessageKey) : name
+}
+
+export function summary(call: ToolCallBlock): string {
   const a = call.arguments ?? {}
   switch (call.name) {
     case "read":
@@ -212,9 +225,23 @@ function Body({ call, result, partial, state }: { call: ToolCallBlock; result?: 
   )
 }
 
-function SubagentCard({ call, result, partial, state, onOpen }: { call: ToolCallBlock; result?: ToolResultMsg; partial?: any; state: ToolState; onOpen?: (id: string) => void }) {
+function SubagentCard({
+  call,
+  result,
+  partial,
+  state,
+  onOpen,
+  expand,
+}: {
+  call: ToolCallBlock
+  result?: ToolResultMsg
+  partial?: any
+  state: ToolState
+  onOpen?: (id: string) => void
+  expand?: boolean
+}) {
   const d = (partial ?? result?.details) as SubagentDetails | undefined
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(!!expand)
   const text = resultText(result)
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
@@ -252,18 +279,22 @@ export function ToolCallView({
   partial,
   state,
   onOpenSubagent,
+  expand,
 }: {
   call: ToolCallBlock
   result?: ToolResultMsg
   partial?: any
   state: ToolState
   onOpenSubagent?: (id: string) => void
+  expand?: boolean
 }) {
   const isEdit = call.name === "edit" || call.name === "write"
   const editLines = isEdit ? ((result?.details as EditDetails | undefined)?.added ?? 0) + ((result?.details as EditDetails | undefined)?.removed ?? 0) : 0
-  const [open, setOpen] = useState(state === "running" && call.name === "bash" ? true : isEdit && state === "done" && editLines > 0 && editLines <= 30)
+  const [open, setOpen] = useState(
+    expand || (state === "running" && call.name === "bash") || (isEdit && state === "done" && editLines > 0 && editLines <= 30),
+  )
 
-  if (call.name === "task") return <SubagentCard call={call} result={result} partial={partial} state={state} onOpen={onOpenSubagent} />
+  if (call.name === "task") return <SubagentCard call={call} result={result} partial={partial} state={state} onOpen={onOpenSubagent} expand={expand} />
   if (call.name === "todo_write") {
     return (
       <div className="rounded-xl border bg-card px-3 py-2">
@@ -276,9 +307,8 @@ export function ToolCallView({
     )
   }
 
-  const mcp = call.name.startsWith("mcp__") ? mcpLabel(call.name) : null
-  const Icon = mcp ? PlugIcon : (ICONS[call.name] ?? WrenchIcon)
-  const label = mcp ? `${mcp.server} · ${mcp.tool}` : ICONS[call.name] ? t(`tool.${call.name}` as MessageKey) : call.name
+  const Icon = toolIcon(call.name)
+  const label = toolLabel(call.name)
   const d = result?.details as any
   const isEditDetails = isEdit && d && typeof d.added === "number"
 
