@@ -157,7 +157,7 @@ function Body({ call, result, partial, state }: { call: ToolCallBlock; result?: 
     return (
       <div className="bg-code">
         {call.name === "bash" && (
-          <div className="border-b border-border/60 px-3 py-2 font-mono text-[12px] whitespace-pre-wrap break-all">
+          <div className="border-b border-border/60 px-3 py-2 font-mono text-[12px] whitespace-pre-wrap break-all select-text">
             <span className="select-none text-muted-foreground">$ </span>
             {a.command}
           </div>
@@ -190,7 +190,7 @@ function Body({ call, result, partial, state }: { call: ToolCallBlock; result?: 
   }
   if (call.name === "web_search" && details?.results) {
     return (
-      <ul className="grid gap-2 px-3 py-2">
+      <ul className="grid gap-2 px-3 py-2 select-text">
         {details.results.map((r: any, i: number) => (
           <li key={i} className="text-[13px]">
             <a href={r.url} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">

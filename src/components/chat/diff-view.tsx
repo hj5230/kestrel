@@ -42,13 +42,13 @@ export function DiffView({ diff, maxHeight = 360 }: { diff: string; maxHeight?: 
   const rows = useMemo(() => parse(diff), [diff])
   if (!rows.length) return <div className="px-3 py-2 text-xs text-muted-foreground">{t("diff.none")}</div>
   return (
-    <div className="overflow-auto font-mono text-[12px] leading-[1.55]" style={{ maxHeight }}>
+    <div className="overflow-auto font-mono text-[12px] leading-[1.55] select-text" style={{ maxHeight }}>
       <table className="w-full border-collapse">
         <tbody>
           {rows.map((r, i) =>
             r.kind === "hunk" ? (
               <tr key={i} className="bg-muted/50 text-muted-foreground">
-                <td colSpan={3} className="px-3 py-0.5 text-[11px]">
+                <td colSpan={3} className="px-3 py-0.5 text-[11px] select-none">
                   {r.text}
                 </td>
               </tr>
