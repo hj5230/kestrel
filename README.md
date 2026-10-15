@@ -22,7 +22,8 @@ Tauri (Rust)                 sidecar (Bun, 单文件二进制 helm-agent)       
 - 会话：按时间/项目分组、置顶、归档、重命名、分叉、编辑重发、导出 Markdown、全文检索（⌘K）
 - 对话：流式输出、推理过程、工具调用卡片（命令输出、diff、子代理进度）、图片输入、插话/排队、停止、重试
 - 工具：read / write / edit / ls / glob / grep(ripgrep) / bash（含后台进程）/ web_fetch / web_search / todo_write / task（子代理）/ search_sessions / read_session / skill / MCP
-- 权限：逐项确认 / 自动编辑 / 只读规划 / 完全放行；审批支持本次、本会话、此项目始终允许、拒绝附原因；只读命令自动放行
+- 权限：Manual / Accept edits / White list / Bypass 四种模式；bash 白名单（默认内置低风险命令前缀，可在设置里编辑），审批时可一键把命令前缀或 MCP 工具加入白名单，拒绝可附原因
+- 界面中英双语，默认英文
 - 上下文：AGENTS.md / CLAUDE.md 逐级载入、全局指令文件、技能（SKILL.md）与自定义 `/` 命令、自动压缩与上下文溢出重试
 - 用量统计：费用、token、缓存命中、模型排行、工具调用、活跃时段（ECharts）
 

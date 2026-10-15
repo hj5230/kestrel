@@ -96,7 +96,7 @@ const BASE = `You are Helm, a capable general-purpose agent running locally on t
 export function buildSystemPrompt(opts: { cwd: string; permissionMode: PermissionMode; modelName: string; subagent?: boolean; mcpServers: string[] }): string {
   const settings = store.getSettings();
   const now = new Date();
-  const date = now.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "long" });
+  const date = now.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
   const parts: string[] = [BASE];
 
   parts.push(
@@ -110,12 +110,6 @@ export function buildSystemPrompt(opts: { cwd: string; permissionMode: Permissio
 - Model: ${opts.modelName}`,
   );
 
-  if (opts.permissionMode === "plan") {
-    parts.push(
-      `# Plan mode (read-only)
-The user has enabled plan mode. Do NOT modify files or run commands with side effects. Investigate with read-only tools, then present a concrete step-by-step plan and wait for the user to approve and switch modes.`,
-    );
-  }
 
   if (opts.subagent) {
     parts.push(

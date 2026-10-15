@@ -9,7 +9,9 @@ export type ProviderKind =
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
-export type PermissionMode = "default" | "acceptEdits" | "bypass" | "plan";
+export type PermissionMode = "manual" | "acceptEdits" | "whitelist" | "bypass";
+
+export type Language = "en" | "zh-CN";
 
 export interface ProviderConfig {
   id: string;
@@ -159,13 +161,15 @@ export interface ApprovalRequest {
   toolCallId: string;
   toolName: string;
   args: any;
-  title: string;
+  kind: "bash" | "edit" | "tool";
+  path: string | null;
   detail: string;
-  ruleSuggestion: string | null;
+  subagent: boolean;
+  whitelistSuggestion: string | null;
   createdAt: number;
 }
 
-export type ApprovalDecision = "allow_once" | "allow_session" | "allow_always" | "deny";
+export type ApprovalDecision = "allow_once" | "allow_always" | "deny";
 
 export interface SessionDetail {
   session: SessionInfo;
@@ -217,16 +221,8 @@ export interface SlashCommandInfo {
   source?: string;
 }
 
-export interface PermissionRule {
-  id: number;
-  tool: string;
-  pattern: string;
-  decision: "allow" | "deny";
-  scope: string;
-  createdAt: number;
-}
-
 export interface AppSettings {
+  language: Language;
   theme: "system" | "light" | "dark";
   accent: "neutral" | "blue" | "violet" | "emerald" | "orange" | "rose";
   defaultCwd: string;
@@ -247,6 +243,8 @@ export interface AppSettings {
   proxyMode: "env" | "none" | "custom";
   proxyUrl: string;
   bashTimeoutSec: number;
+  bashWhitelist: string[];
+  toolWhitelist: string[];
   notifyOnFinish: boolean;
   sendKey: "enter" | "mod-enter";
 }

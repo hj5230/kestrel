@@ -18,6 +18,7 @@ import { shellEnvReady } from "../env";
 import { emit } from "../hub";
 import { createVercelStreamFn } from "../llm/vercel-stream";
 import { mcpStatuses, mcpTools } from "../mcp";
+import { st } from "../i18n";
 import { evaluatePermission } from "../permissions";
 import { languageModel, resolveModel, toPiModel } from "../providers";
 import { createSession, newId } from "../sessions";
@@ -34,7 +35,7 @@ const runners = new Map<string, SessionRunner>();
 
 interface PendingApproval {
   request: ApprovalRequest;
-  resolve: (d: { decision: ApprovalDecision; reason?: string }) => void;
+  resolve: (d: { decision: ApprovalDecision; reason?: string; pattern?: string }) => void;
   owner: SessionRunner;
 }
 const approvals = new Map<string, PendingApproval>();
@@ -43,7 +44,7 @@ export function getRunner(id: string): SessionRunner {
   let r = runners.get(id);
   if (!r) {
     const info = store.getSession(id);
-    if (!info) throw new Error("会话不存在");
+    if (!info) throw new Error(st("sessionNotFound"));
     r = new SessionRunner(info, null);
     runners.set(id, r);
   }
@@ -62,15 +63,15 @@ export function dropRunner(id: string) {
   }
 }
 
-export function respondApproval(id: string, decision: ApprovalDecision, reason?: string) {
+export function respondApproval(id: string, decision: ApprovalDecision, reason?: string, pattern?: string) {
   const p = approvals.get(id);
-  if (!p) throw new Error("该确认请求已失效");
-  p.resolve({ decision, reason });
+  if (!p) throw new Error(st("approvalExpired"));
+  p.resolve({ decision, reason, pattern });
 }
 
 export function sessionDetail(id: string): SessionDetail {
   const info = store.getSession(id);
-  if (!info) throw new Error("会话不存在");
+  if (!info) throw new Error(st("sessionNotFound"));
   const r = runners.get(id);
   return {
     session: info,
@@ -114,7 +115,6 @@ export class SessionRunner {
   readonly parent: SessionRunner | null;
   readonly rootId: string;
   readFiles = new Map<string, number>();
-  sessionAllows: { tool: string; pattern: string }[] = [];
   queued: (QueuedMessage & { ts: number; msg: AgentMessage })[] = [];
   streaming: AssistantMsg | null = null;
   runningTools: SessionDetail["runningTools"] = {};
@@ -166,7 +166,7 @@ export class SessionRunner {
 
   info(): SessionInfo {
     const s = store.getSession(this.id);
-    if (!s) throw new Error("会话不存在");
+    if (!s) throw new Error(st("sessionNotFound"));
     return s;
   }
 
@@ -224,8 +224,8 @@ export class SessionRunner {
 
   private prepare() {
     const s = this.info();
-    if (!s.providerId || !s.modelId) throw new Error("尚未选择模型。请先在「设置 → 模型」中添加供应商和模型。");
-    if (!fs.existsSync(s.cwd)) throw new Error(`工作目录不存在：${s.cwd}`);
+    if (!s.providerId || !s.modelId) throw new Error(st("noModel"));
+    if (!fs.existsSync(s.cwd)) throw new Error(st("cwdMissing", { path: s.cwd }));
     const cfg = resolveModel(s.providerId, s.modelId);
     const model = toPiModel(cfg);
     this.agent.state.model = model;
@@ -255,7 +255,7 @@ export class SessionRunner {
           : estimateContextTokens(messages, null, 0, estimateTextTokens(this.agent.state.systemPrompt));
         if (est > model.contextWindow * settings.compactThreshold) {
           await this.compact({ auto: true, messages, signal }).catch((e) => {
-            emit({ type: "notice", sessionId: this.rootId, level: "warn", text: `自动压缩失败：${e?.message ?? e}` });
+            emit({ type: "notice", sessionId: this.rootId, level: "warn", text: st("autoCompactFailed", { msg: e?.message ?? String(e) }) });
           });
         }
       }
@@ -272,7 +272,7 @@ export class SessionRunner {
     const settings = store.getSettings();
     const cut = opts.full ? messages.length : findCutIndex(messages, start, settings.keepRecentTokens);
     if (cut <= start) {
-      if (!opts.auto) throw new Error("没有可以压缩的内容");
+      if (!opts.auto) throw new Error(st("nothingToCompact"));
       return;
     }
     const s = this.info();
@@ -290,7 +290,7 @@ export class SessionRunner {
         instructions: opts.instructions,
         signal: opts.signal,
       });
-      if (!summary) throw new Error("模型没有返回摘要");
+      if (!summary) throw new Error(st("emptySummary"));
       const info = store.addCompaction(this.id, cut, summary, tokensBefore, opts.auto);
       this.compaction = { cutSeq: cut, summary, at: info.createdAt };
       const cost =
@@ -314,7 +314,7 @@ export class SessionRunner {
     const tool = (this.agent.state.tools as HelmTool[]).find((t) => t.name === ctx.toolCall.name);
     if (!tool) return undefined;
     const s = this.info();
-    const perm = evaluatePermission(tool, ctx.args, s.permissionMode, s.cwd, this.sessionAllows);
+    const perm = evaluatePermission(tool, ctx.args, s.permissionMode, store.getSettings());
     if (perm.action === "allow") return undefined;
     if (perm.action === "deny") return { block: true, reason: perm.reason };
 
@@ -324,12 +324,14 @@ export class SessionRunner {
       toolCallId: ctx.toolCall.id,
       toolName: tool.name,
       args: ctx.args,
-      title: this.parent ? `[子代理] ${perm.title}` : perm.title,
+      kind: perm.kind,
+      path: perm.path,
       detail: perm.detail,
-      ruleSuggestion: perm.suggestion ? `${perm.suggestion.tool}(${perm.suggestion.pattern})` : null,
+      subagent: !!this.parent,
+      whitelistSuggestion: perm.suggestion,
       createdAt: Date.now(),
     };
-    const decision = await new Promise<{ decision: ApprovalDecision; reason?: string }>((resolve) => {
+    const decision = await new Promise<{ decision: ApprovalDecision; reason?: string; pattern?: string }>((resolve) => {
       const onAbort = () => resolve({ decision: "deny", reason: "aborted" });
       signal?.addEventListener("abort", onAbort, { once: true });
       approvals.set(request.id, {
@@ -361,12 +363,11 @@ export class SessionRunner {
         reason: `The user denied this tool call.${decision.reason ? ` User's note: ${decision.reason}` : ""} Do not retry the same call; adjust your approach or ask the user how to proceed.`,
       };
     }
-    if (perm.suggestion) {
-      if (decision.decision === "allow_session") this.sessionAllows.push(perm.suggestion);
-      if (decision.decision === "allow_always") {
-        store.addRule({ tool: perm.suggestion.tool, pattern: perm.suggestion.pattern, decision: "allow", scope: s.cwd });
-        this.sessionAllows.push(perm.suggestion);
-      }
+    const pattern = (decision.pattern ?? perm.suggestion ?? "").trim();
+    if (decision.decision === "allow_always" && pattern) {
+      const settings = store.getSettings();
+      const key = perm.kind === "bash" ? "bashWhitelist" : "toolWhitelist";
+      if (!settings[key].includes(pattern)) store.saveSettings({ [key]: [...settings[key], pattern] });
     }
     return undefined;
   }
@@ -463,7 +464,7 @@ export class SessionRunner {
     const text: string =
       firstUser.display ??
       (typeof firstUser.content === "string" ? firstUser.content : firstUser.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n"));
-    const fallback = text.replace(/\s+/g, " ").trim().slice(0, 40) || "新会话";
+    const fallback = text.replace(/\s+/g, " ").trim().slice(0, 40) || st("untitled");
     this.titlePending = true;
     const settings = store.getSettings();
     const [pid, mid] = settings.titleModel ? settings.titleModel.split("::") : [s.providerId, s.modelId];
@@ -512,14 +513,14 @@ export class SessionRunner {
       ) {
         this.overflowRetried = true;
         this.dropTrailingFailure();
-        emit({ type: "notice", sessionId: this.rootId, level: "info", text: "上下文超出模型窗口，正在压缩后重试…" });
+        emit({ type: "notice", sessionId: this.rootId, level: "info", text: st("overflowRetry") });
         await this.compact({ auto: true, full: false });
         await this.agent.continue();
       }
       const final = this.agent.state.messages[this.agent.state.messages.length - 1] as any;
       if (final?.role === "assistant" && final.stopReason === "error") {
         ok = false;
-        store.updateSession(this.id, { status: "error", lastError: final.errorMessage ?? "未知错误" });
+        store.updateSession(this.id, { status: "error", lastError: final.errorMessage ?? "Unknown error" });
       } else {
         store.updateSession(this.id, { status: "idle", lastError: null });
       }
@@ -536,7 +537,7 @@ export class SessionRunner {
       }
       this.emitSession();
       const s = store.getSession(this.id);
-      if (s?.kind === "main") emit({ type: "run_finished", sessionId: this.id, title: s.title || "会话", ok });
+      if (s?.kind === "main") emit({ type: "run_finished", sessionId: this.id, title: s.title || st("sessionFallback"), ok });
     }
   }
 
@@ -607,14 +608,14 @@ export class SessionRunner {
   }
 
   async retry() {
-    if (this.busy) throw new Error("会话正在运行");
+    if (this.busy) throw new Error(st("sessionBusy"));
     this.dropTrailingFailure();
     const msgs = this.agent.state.messages;
     const last = msgs[msgs.length - 1] as any;
-    if (!last) throw new Error("没有可以重试的内容");
+    if (!last) throw new Error(st("nothingToRetry"));
     if (last.role === "assistant") {
       const prevUser = [...msgs].reverse().findIndex((m: any) => m.role === "user");
-      if (prevUser < 0) throw new Error("没有可以重试的内容");
+      if (prevUser < 0) throw new Error(st("nothingToRetry"));
       const idx = msgs.length - 1 - prevUser;
       store.truncateMessages(this.id, idx + 1);
       this.agent.state.messages = msgs.slice(0, idx + 1);
@@ -625,9 +626,9 @@ export class SessionRunner {
   }
 
   async editAndResend(seq: number, text: string, images: ImageContent[] = []) {
-    if (this.busy) throw new Error("会话正在运行");
+    if (this.busy) throw new Error(st("sessionBusy"));
     const msgs = this.agent.state.messages;
-    if (seq < 0 || seq >= msgs.length || (msgs[seq] as any).role !== "user") throw new Error("只能编辑用户消息");
+    if (seq < 0 || seq >= msgs.length || (msgs[seq] as any).role !== "user") throw new Error(st("onlyUserEdit"));
     store.truncateMessages(this.id, seq);
     this.agent.state.messages = msgs.slice(0, seq);
     this.loadCompaction();
@@ -636,7 +637,7 @@ export class SessionRunner {
   }
 
   async manualCompact(instructions?: string) {
-    if (this.busy) throw new Error("会话正在运行，请稍后再压缩");
+    if (this.busy) throw new Error(st("sessionBusyCompact"));
     this.prepare();
     await this.compact({ auto: false, instructions, full: true });
   }
@@ -662,10 +663,9 @@ export class SessionRunner {
       permissionMode: parent.permissionMode,
     });
     const child = new SessionRunner(childInfo, this);
-    child.sessionAllows = this.sessionAllows;
     runners.set(childInfo.id, child);
     let toolCalls = 0;
-    let last = "启动中";
+    let last = "";
     const report = (status: SubagentDetails["status"]) => onProgress({ sessionId: childInfo.id, status, lastActivity: last, toolCalls });
     report("running");
     const unsub = child.agent.subscribe((e: any) => {

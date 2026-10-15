@@ -1,145 +1,172 @@
-import path from "node:path";
-import type { PermissionMode } from "../shared/protocol";
-import * as store from "./db";
+import type { AppSettings, PermissionMode } from "../shared/protocol";
 import type { HelmTool } from "./tools/types";
+
+export const DEFAULT_BASH_WHITELIST = [
+  "ls",
+  "pwd",
+  "cat",
+  "head",
+  "tail",
+  "wc",
+  "echo",
+  "printf",
+  "which",
+  "whereis",
+  "type",
+  "whoami",
+  "id",
+  "date",
+  "uname",
+  "sw_vers",
+  "hostname",
+  "uptime",
+  "printenv",
+  "file",
+  "stat",
+  "du",
+  "df",
+  "tree",
+  "basename",
+  "dirname",
+  "realpath",
+  "readlink",
+  "sort",
+  "uniq",
+  "cut",
+  "tr",
+  "diff",
+  "cmp",
+  "md5",
+  "shasum",
+  "jq",
+  "rg",
+  "grep",
+  "egrep",
+  "fgrep",
+  "find",
+  "fd",
+  "ps",
+  "lsof",
+  "git status",
+  "git log",
+  "git diff",
+  "git show",
+  "git branch --show-current",
+  "git branch -a",
+  "git branch --list",
+  "git remote -v",
+  "git rev-parse",
+  "git ls-files",
+  "git blame",
+  "git describe",
+  "git stash list",
+  "git shortlog",
+  "git reflog",
+  "git config --get",
+  "node --version",
+  "node -v",
+  "npm --version",
+  "npm -v",
+  "npm ls",
+  "npm list",
+  "npm view",
+  "npm outdated",
+  "pnpm --version",
+  "pnpm ls",
+  "bun --version",
+  "python3 --version",
+  "python --version",
+  "cargo --version",
+  "rustc --version",
+  "go version",
+  "tsc --version",
+];
 
 export interface PermissionResult {
   action: "allow" | "deny" | "ask";
   reason?: string;
-  title: string;
+  kind: "bash" | "edit" | "tool";
+  path: string | null;
   detail: string;
-  suggestion: { tool: string; pattern: string } | null;
+  suggestion: string | null;
 }
 
-const MULTI_WORD = new Set(["git", "npm", "pnpm", "yarn", "bun", "npx", "cargo", "go", "docker", "kubectl", "brew", "uv", "pip", "pip3", "emo", "make", "gh", "lark-cli", "python", "python3", "node"]);
+const MULTI_WORD = new Set(["git", "npm", "pnpm", "yarn", "bun", "npx", "cargo", "go", "docker", "kubectl", "brew", "uv", "pip", "pip3", "emo", "make", "gh", "lark-cli", "python", "python3", "node", "deno"]);
+const RUN_WORD = new Set(["run", "exec", "x"]);
 
-const SAFE_COMMANDS = [
-  /^(ls|pwd|whoami|date|which|type|echo|printf|cat|head|tail|wc|sort|uniq|cut|tr|file|stat|du|df|tree|basename|dirname|realpath|env|printenv|uname|sw_vers|id|true|false)(\s|$)/,
-  /^(rg|grep|egrep|fgrep|ag)\s/,
-  /^find\s(?!.*(-exec|-delete|-ok|-fprint))/,
-  /^git\s+(status|log|diff|show|branch|remote|rev-parse|ls-files|blame|describe|tag|stash list|config --get|reflog|shortlog)(\s|$)/,
-  /^(node|bun|python3?|npm|pnpm|cargo|rustc|go|java|tsc)\s+(-v|--version|version)$/,
-  /^(npm|pnpm)\s+(ls|list|view|outdated)(\s|$)/,
-];
-
-function splitCommand(cmd: string): string[] {
+export function splitCommand(cmd: string): string[] {
   return cmd
     .split(/&&|\|\||;|\||\n/)
-    .map((s) => s.trim())
+    .map((s) => s.trim().replace(/^(\w+=\S*\s+)+/, ""))
     .filter(Boolean);
 }
 
-function hasWriteRedirect(cmd: string) {
-  return /(^|[^0-9&])>(?!&)|>>|\btee\b/.test(cmd.replace(/2>&1|2>\/dev\/null|>\/dev\/null/g, ""));
+function hasUnsafeSyntax(cmd: string): boolean {
+  const stripped = cmd.replace(/2>&1|[12]?>\s*\/dev\/null/g, "");
+  return /\$\(|`|<\(|>|\btee\b/.test(stripped);
 }
 
-export function isSafeCommand(cmd: string): boolean {
-  if (/[`$]\(|`/.test(cmd) || hasWriteRedirect(cmd)) return false;
+function hasDangerousFlags(segment: string): boolean {
+  return /^find\s/.test(segment) && /\s-(exec|execdir|delete|ok|fprint|fls)\b/.test(segment);
+}
+
+function normalizeEntry(e: string): string {
+  return e.trim().replace(/(:\*|\s\*)$/, "").trim();
+}
+
+function segmentMatches(segment: string, entry: string): boolean {
+  const e = normalizeEntry(entry);
+  if (!e) return false;
+  return segment === e || segment.startsWith(e + " ");
+}
+
+export function bashWhitelisted(cmd: string, whitelist: string[]): boolean {
+  if (!cmd.trim() || hasUnsafeSyntax(cmd)) return false;
   const parts = splitCommand(cmd);
-  return parts.length > 0 && parts.every((p) => SAFE_COMMANDS.some((re) => re.test(p)));
+  return parts.length > 0 && parts.every((p) => !hasDangerousFlags(p) && whitelist.some((e) => segmentMatches(p, e)));
 }
 
-export function suggestBashPattern(cmd: string): string {
-  const first = splitCommand(cmd)[0] ?? cmd;
-  const words = first.split(/\s+/).filter((w) => !/^[A-Z_]+=/.test(w));
-  if (!words.length) return cmd;
-  if (MULTI_WORD.has(words[0]) && words[1] && !words[1].startsWith("-")) return `${words[0]} ${words[1]}:*`;
-  return `${words[0]}:*`;
+export function toolWhitelisted(name: string, whitelist: string[]): boolean {
+  return whitelist.some((e) => {
+    const v = e.trim();
+    if (!v) return false;
+    if (v.endsWith("*")) return name.startsWith(v.slice(0, -1));
+    return v === name;
+  });
 }
 
-function bashMatches(pattern: string, cmd: string): boolean {
-  const parts = splitCommand(cmd);
-  const matchOne = (c: string) => {
-    if (pattern === "*") return true;
-    if (pattern.endsWith(":*")) {
-      const prefix = pattern.slice(0, -2);
-      return c === prefix || c.startsWith(prefix + " ");
-    }
-    return c === pattern;
-  };
-  return parts.length > 0 && parts.every(matchOne);
-}
-
-function globToRegExp(glob: string): RegExp {
-  let re = "";
-  for (let i = 0; i < glob.length; i++) {
-    const ch = glob[i];
-    if (ch === "*") {
-      if (glob[i + 1] === "*") {
-        re += ".*";
-        i++;
-        if (glob[i + 1] === "/") i++;
-      } else re += "[^/]*";
-    } else if (ch === "?") re += "[^/]";
-    else re += ch.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+export function suggestBashPrefix(cmd: string): string {
+  const first = splitCommand(cmd)[0] ?? cmd.trim();
+  const words = first.split(/\s+/);
+  if (!words.length) return first;
+  if (MULTI_WORD.has(words[0]) && words[1] && !words[1].startsWith("-")) {
+    if (RUN_WORD.has(words[1]) && words[2] && !words[2].startsWith("-")) return words.slice(0, 3).join(" ");
+    return words.slice(0, 2).join(" ");
   }
-  return new RegExp(`^${re}$`);
+  return words[0];
 }
 
-function pathMatches(pattern: string, file: string, scope: string): boolean {
-  const abs = path.resolve(scope === "global" ? "/" : scope, file);
-  const base = scope === "global" ? "/" : scope;
-  const rel = path.relative(base, abs);
-  if (rel.startsWith("..")) return false;
-  return globToRegExp(pattern).test(rel || ".");
-}
-
-function ruleMatches(tool: HelmTool, args: any, rule: { tool: string; pattern: string; scope: string }, cwd: string): boolean {
-  if (rule.scope !== "global" && !(cwd === rule.scope || cwd.startsWith(rule.scope + path.sep))) return false;
-  if (rule.tool !== tool.name) {
-    if (!(rule.tool === "edit" && tool.name === "write")) return false;
-  }
-  if (tool.name === "bash") return bashMatches(rule.pattern, String(args?.command ?? ""));
-  if (tool.category === "edit") return pathMatches(rule.pattern, String(args?.path ?? ""), rule.scope === "global" ? cwd : rule.scope);
-  return rule.pattern === "*" || rule.pattern === tool.name;
-}
-
-function describe(tool: HelmTool, args: any): { title: string; detail: string; suggestion: PermissionResult["suggestion"] } {
+export function evaluatePermission(tool: HelmTool, args: any, mode: PermissionMode, settings: AppSettings): PermissionResult {
+  const base = (kind: PermissionResult["kind"], detail: string, suggestion: string | null, path: string | null = null) => ({ kind, detail, suggestion, path });
+  let info: Omit<PermissionResult, "action" | "reason">;
   if (tool.name === "bash") {
     const cmd = String(args?.command ?? "");
-    return {
-      title: args?.description ? `执行命令：${args.description}` : "执行命令",
-      detail: cmd,
-      suggestion: { tool: "bash", pattern: suggestBashPattern(cmd) },
-    };
+    info = base("bash", cmd, suggestBashPrefix(cmd));
+  } else if (tool.category === "edit") {
+    const detail = tool.name === "write" ? String(args?.content ?? "").slice(0, 6000) : "";
+    info = base("edit", detail, null, String(args?.path ?? ""));
+  } else {
+    info = base("tool", JSON.stringify(args ?? {}, null, 2).slice(0, 4000), tool.category === "mcp" ? tool.name : null);
   }
-  if (tool.name === "kill_shell") return { title: "结束后台命令", detail: String(args?.shell_id), suggestion: { tool: "kill_shell", pattern: "*" } };
-  if (tool.category === "edit") {
-    return {
-      title: `${tool.name === "write" ? "写入" : "编辑"} ${args?.path ?? ""}`,
-      detail: tool.name === "write" ? String(args?.content ?? "").slice(0, 4000) : `- ${String(args?.old_string ?? "").slice(0, 2000)}\n+ ${String(args?.new_string ?? "").slice(0, 2000)}`,
-      suggestion: { tool: "edit", pattern: "**" },
-    };
-  }
-  return {
-    title: `调用 ${tool.label}`,
-    detail: JSON.stringify(args ?? {}, null, 2).slice(0, 4000),
-    suggestion: { tool: tool.name, pattern: tool.name },
-  };
-}
+  const res = (action: PermissionResult["action"], reason?: string): PermissionResult => ({ action, reason, ...info });
 
-export function evaluatePermission(
-  tool: HelmTool,
-  args: any,
-  mode: PermissionMode,
-  cwd: string,
-  sessionAllows: { tool: string; pattern: string }[],
-): PermissionResult {
-  const d = describe(tool, args);
-  const res = (action: PermissionResult["action"], reason?: string): PermissionResult => ({ action, reason, ...d });
   if (tool.category === "read" || tool.category === "meta" || tool.category === "network") return res("allow");
-
-  const rules = store.listRules();
-  for (const r of rules.filter((r) => r.decision === "deny")) {
-    if (ruleMatches(tool, args, r, cwd)) return res("deny", `被权限规则拒绝：${r.tool}(${r.pattern})`);
-  }
-  if (mode === "plan" && tool.category === "edit") {
-    return res("deny", "当前处于只读规划模式，不允许修改文件。请先给出计划，等用户切换模式后再执行修改。");
-  }
   if (mode === "bypass") return res("allow");
-  if (mode === "acceptEdits" && tool.category === "edit") return res("allow");
-  if (tool.name === "bash" && mode !== "plan" && isSafeCommand(String(args?.command ?? ""))) return res("allow");
-  for (const r of sessionAllows) if (ruleMatches(tool, args, { ...r, scope: "global" }, cwd)) return res("allow");
-  for (const r of rules.filter((r) => r.decision === "allow")) if (ruleMatches(tool, args, r, cwd)) return res("allow");
+  if (tool.category === "edit") return mode === "manual" ? res("ask") : res("allow");
+  if (mode === "whitelist") {
+    if (tool.name === "bash" && bashWhitelisted(String(args?.command ?? ""), settings.bashWhitelist)) return res("allow");
+    if (tool.name === "kill_shell") return res("allow");
+    if (tool.category === "mcp" && toolWhitelisted(tool.name, settings.toolWhitelist)) return res("allow");
+  }
   return res("ask");
 }
