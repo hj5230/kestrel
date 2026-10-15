@@ -7,7 +7,9 @@ import { collectInstructions } from "./agent/prompt";
 import * as store from "./db";
 import { collapseHome, expandHome, HOME, SHELL, which } from "./env";
 import { emit, subscribe } from "./hub";
+import { st } from "./i18n";
 import { mcpStatuses, removeMcp, restartMcp } from "./mcp";
+import { DEFAULT_BASH_WHITELIST } from "./permissions";
 import { fetchRemoteModels, modelDefaults, PROVIDER_PRESETS } from "./providers";
 import { createSession, exportMarkdown, forkSession, newId } from "./sessions";
 import { discoverSkills, listSlashCommands } from "./skills";
@@ -77,7 +79,7 @@ const handlers: Record<string, Handler> = {
   "providers.delete": ({ id }) => store.deleteProvider(id),
   "providers.remoteModels": async ({ id, draft }: { id?: string; draft?: ProviderConfig }) => {
     const p = draft ?? store.getProvider(id!);
-    if (!p) throw new Error("供应商不存在");
+    if (!p) throw new Error(st("providerNotFound", { id: id ?? "" }));
     return fetchRemoteModels(p);
   },
   "providers.test": async ({ providerId, modelId }) => {
@@ -94,7 +96,7 @@ const handlers: Record<string, Handler> = {
   "models.upsert": (m: ModelConfig) => store.upsertModel(m),
   "models.addMany": ({ providerId, models }: { providerId: string; models: { id: string; name?: string; contextWindow?: number; cost?: ModelConfig["cost"] }[] }) => {
     const p = store.getProvider(providerId);
-    if (!p) throw new Error("供应商不存在");
+    if (!p) throw new Error(st("providerNotFound", { id: providerId }));
     for (const m of models) {
       if (store.getModel(providerId, m.id)) continue;
       const d = modelDefaults(p.kind, m.id, m.name, m.contextWindow);
@@ -114,7 +116,7 @@ const handlers: Record<string, Handler> = {
   "sessions.update": ({ id, patch }: { id: string; patch: Partial<SessionInfo> }) => {
     if (patch.cwd) {
       patch.cwd = expandHome(patch.cwd);
-      if (!fs.existsSync(patch.cwd)) throw new Error(`目录不存在：${patch.cwd}`);
+      if (!fs.existsSync(patch.cwd)) throw new Error(st("dirNotFound", { path: patch.cwd }));
     }
     const allowed: (keyof SessionInfo)[] = ["title", "cwd", "providerId", "modelId", "thinking", "permissionMode", "pinned", "archived"];
     const clean: Partial<SessionInfo> = {};
@@ -139,7 +141,7 @@ const handlers: Record<string, Handler> = {
   "sessions.search": ({ query, limit }) => store.searchMessages(query, limit ?? 40),
   "sessions.context": ({ id }) => {
     const s = store.getSession(id);
-    if (!s) throw new Error("会话不存在");
+    if (!s) throw new Error(st("sessionNotFound"));
     return {
       instructions: collectInstructions(s.cwd).map((f) => ({ path: collapseHome(f.path), scope: f.scope, chars: f.content.length })),
       skills: discoverSkills(s.cwd).length,
@@ -172,8 +174,8 @@ const handlers: Record<string, Handler> = {
     return true;
   },
 
-  "approvals.respond": ({ id, decision, reason }) => {
-    respondApproval(id, decision, reason);
+  "approvals.respond": ({ id, decision, reason, pattern }) => {
+    respondApproval(id, decision, reason, pattern);
     return true;
   },
 
@@ -221,9 +223,7 @@ const handlers: Record<string, Handler> = {
   "skills.list": ({ cwd }) => discoverSkills(expandHome(cwd || store.getSettings().defaultCwd), true),
   "commands.list": ({ cwd }) => listSlashCommands(expandHome(cwd || store.getSettings().defaultCwd)),
 
-  "rules.list": () => store.listRules(),
-  "rules.add": (rule) => store.addRule(rule),
-  "rules.delete": ({ id }) => store.deleteRule(id),
+  "permissions.defaults": () => ({ bashWhitelist: DEFAULT_BASH_WHITELIST }),
 
   "usage.summary": ({ days }) => store.usageSummary(days ?? 30),
 

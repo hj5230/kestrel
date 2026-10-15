@@ -7,7 +7,6 @@ import type {
   CompactionInfo,
   McpServerConfig,
   ModelConfig,
-  PermissionRule,
   ProviderConfig,
   SearchHit,
   SessionInfo,
@@ -15,6 +14,7 @@ import type {
   UsageSummary,
 } from "../shared/protocol";
 import { HOME } from "./env";
+import { DEFAULT_BASH_WHITELIST } from "./permissions";
 
 const MIGRATIONS: string[] = [
   `
@@ -132,16 +132,21 @@ const MIGRATIONS: string[] = [
   );
   CREATE VIRTUAL TABLE messages_fts USING fts5(text, session_id UNINDEXED, seq UNINDEXED, role UNINDEXED, tokenize = 'trigram');
   `,
+  `
+  UPDATE sessions SET permission_mode = CASE permission_mode WHEN 'plan' THEN 'manual' WHEN 'default' THEN 'whitelist' ELSE permission_mode END;
+  DROP TABLE IF EXISTS permission_rules;
+  `,
 ];
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  language: "en",
   theme: "system",
   accent: "neutral",
   defaultCwd: HOME,
   defaultProviderId: "",
   defaultModelId: "",
   defaultThinking: "medium",
-  defaultPermissionMode: "default",
+  defaultPermissionMode: "whitelist",
   titleModel: "",
   autoCompact: true,
   compactThreshold: 0.8,
@@ -155,6 +160,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   proxyMode: "env",
   proxyUrl: "",
   bashTimeoutSec: 120,
+  bashWhitelist: DEFAULT_BASH_WHITELIST,
+  toolWhitelist: [],
   notifyOnFinish: true,
   sendKey: "enter",
 };
@@ -196,9 +203,13 @@ const json = <T>(s: string | null | undefined, fallback: T): T => {
 
 // ---------- settings ----------
 
+const PERMISSION_MODES = new Set(["manual", "acceptEdits", "whitelist", "bypass"]);
+
 export function getSettings(): AppSettings {
   const row = db.query("SELECT value FROM meta WHERE key = 'settings'").get() as { value: string } | null;
-  return { ...DEFAULT_SETTINGS, ...json<Partial<AppSettings>>(row?.value, {}) };
+  const s = { ...DEFAULT_SETTINGS, ...json<Partial<AppSettings>>(row?.value, {}) };
+  if (!PERMISSION_MODES.has(s.defaultPermissionMode)) s.defaultPermissionMode = "whitelist";
+  return s;
 }
 
 export function saveSettings(patch: Partial<AppSettings>): AppSettings {
@@ -678,35 +689,4 @@ export function upsertMcpServer(s: McpServerConfig) {
 
 export function deleteMcpServer(id: string) {
   db.run("DELETE FROM mcp_servers WHERE id = ?", [id]);
-}
-
-// ---------- permission rules ----------
-
-export function listRules(): PermissionRule[] {
-  return (db.query("SELECT * FROM permission_rules ORDER BY created_at DESC").all() as any[]).map((r) => ({
-    id: r.id,
-    tool: r.tool,
-    pattern: r.pattern,
-    decision: r.decision,
-    scope: r.scope,
-    createdAt: r.created_at,
-  }));
-}
-
-export function addRule(rule: Omit<PermissionRule, "id" | "createdAt">) {
-  const exists = db
-    .query("SELECT id FROM permission_rules WHERE tool = ? AND pattern = ? AND scope = ?")
-    .get(rule.tool, rule.pattern, rule.scope);
-  if (exists) return;
-  db.run("INSERT INTO permission_rules (tool, pattern, decision, scope, created_at) VALUES (?, ?, ?, ?, ?)", [
-    rule.tool,
-    rule.pattern,
-    rule.decision,
-    rule.scope,
-    Date.now(),
-  ]);
-}
-
-export function deleteRule(id: number) {
-  db.run("DELETE FROM permission_rules WHERE id = ?", [id]);
 }

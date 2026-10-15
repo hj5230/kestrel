@@ -37,6 +37,7 @@ import { downloadText } from "@/lib/download"
 import { shortPath } from "@/lib/format"
 import { appInfo, createSession, detailSignal, enabledModels, findModel, loadDetail, openSession, type DetailState } from "@/lib/store"
 import { cn } from "@/lib/utils"
+import { t } from "@/lib/i18n"
 
 function useStickToBottom(deps: unknown[]) {
   const ref = useRef<HTMLDivElement>(null)
@@ -121,10 +122,10 @@ function Transcript({ d, readOnly, onOpenSubagent, onEdit, onFork, onRetry }: {
       {(busyIdle || d.compacting) && (
         <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
           <Spinner className="size-3.5" />
-          <span className="text-shimmer">{d.compacting ? "正在压缩上下文…" : "思考中…"}</span>
+          <span className="text-shimmer">{d.compacting ? t("chat.compacting") : t("chat.thinking")}</span>
         </div>
       )}
-      {lastAssistantError && <ErrorCard message={lastAssistantError.errorMessage ?? "未知错误"} onRetry={readOnly ? undefined : onRetry} />}
+      {lastAssistantError && <ErrorCard message={lastAssistantError.errorMessage ?? t("common.unknownError")} onRetry={readOnly ? undefined : onRetry} />}
       {configError && <ErrorCard message={d.session.lastError!} onRetry={readOnly || last?.message.role !== "user" ? undefined : onRetry} />}
     </div>
   )
@@ -140,8 +141,8 @@ function SubagentSheet({ id, onClose }: { id: string | null; onClose: () => void
     <Sheet open={!!id} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-[min(720px,92vw)] gap-0 sm:max-w-none">
         <SheetHeader className="border-b">
-          <SheetTitle>{d?.session.title ?? "子代理"}</SheetTitle>
-          <SheetDescription>子代理的完整执行过程（只读）</SheetDescription>
+          <SheetTitle>{d?.session.title ?? t("chat.subagent")}</SheetTitle>
+          <SheetDescription>{t("chat.subagentDesc")}</SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto px-6 py-5">{d ? <Transcript d={d} readOnly /> : <Spinner />}</div>
       </SheetContent>
@@ -192,7 +193,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
       return
     }
     if (!enabledModels.value.length) {
-      toast.error("请先在设置中添加模型供应商")
+      toast.error(t("chat.addProviderFirst"))
       return false
     }
     await rpc("chat.send", { sessionId: s.id, text, images: imgs })
@@ -201,14 +202,14 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const fork = async (seq: number) => {
     const n = await rpc<SessionInfo>("sessions.fork", { id: s.id, seq })
     openSession(n.id)
-    toast.success("已创建分叉会话")
+    toast.success(t("chat.forked"))
   }
 
   const exportMd = async () => downloadText(`${s.title || "session"}.md`, await rpc<string>("sessions.export", { id: s.id }))
 
   const compact = (instructions?: string) =>
     rpc("chat.compact", { sessionId: s.id, instructions }).then(
-      () => toast.success("上下文已压缩"),
+      () => toast.success(t("chat.compacted")),
       (e) => toast.error(e.message),
     )
 
@@ -219,10 +220,6 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         return true
       case "clear":
         createSession({ cwd: s.cwd, providerId: s.providerId, modelId: s.modelId, thinking: s.thinking, permissionMode: s.permissionMode })
-        return true
-      case "plan":
-        update({ permissionMode: s.permissionMode === "plan" ? "default" : "plan" })
-        toast.info(s.permissionMode === "plan" ? "已退出只读规划模式" : "已进入只读规划模式")
         return true
       case "export":
         exportMd()
@@ -235,8 +232,8 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         const m = q ? enabledModels.value.find((m) => m.id.toLowerCase() === q || m.name.toLowerCase().includes(q)) : null
         if (m) {
           update({ providerId: m.providerId, modelId: m.id })
-          toast.success(`已切换到 ${m.name}`)
-        } else toast.info(q ? `没有找到模型 ${args}` : "用法：/model <模型名>，或使用输入框下方的模型选择器")
+          toast.success(t("chat.switchedModel", { name: m.name }))
+        } else toast.info(q ? t("chat.modelNotFound", { q: args }) : t("chat.modelUsage"))
         return true
       }
     }
@@ -251,7 +248,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
       >
         <SidebarTrigger className="text-muted-foreground" />
         <button type="button" onClick={() => setRenaming(s)} className="group/title flex min-w-0 max-w-[55%] shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-muted">
-          <span className={cn("truncate text-sm font-medium", !s.title && "text-muted-foreground")}>{s.title || "新会话"}</span>
+          <span className={cn("truncate text-sm font-medium", !s.title && "text-muted-foreground")}>{s.title || t("common.untitled")}</span>
           <PencilIcon className="size-3 shrink-0 text-muted-foreground opacity-0 group-hover/title:opacity-100" />
         </button>
         <Tooltip>
@@ -265,7 +262,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
               <span className="truncate font-mono">{shortPath(s.cwd, appInfo.value?.home)}</span>
             </button>
           </TooltipTrigger>
-          <TooltipContent>在访达中打开</TooltipContent>
+          <TooltipContent>{t("chat.openInFinder")}</TooltipContent>
         </Tooltip>
         <div className="ml-auto flex items-center gap-1">
           <ContextMeter session={s} model={model} onCompact={() => compact()} compacting={d.compacting} />
@@ -276,7 +273,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
                   <ListChecksIcon />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>计划</TooltipContent>
+              <TooltipContent>{t("chat.plan")}</TooltipContent>
             </Tooltip>
           )}
           <DropdownMenu>
@@ -288,24 +285,24 @@ export function ChatView({ sessionId }: { sessionId: string }) {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onSelect={() => setRenaming(s)}>
                 <PencilIcon />
-                重命名
+                {t("common.rename")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => compact()} disabled={running}>
                 <ShrinkIcon />
-                压缩上下文
+                {t("chat.compact")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => fork(d.messages[d.messages.length - 1]?.seq ?? -1)}>
                 <GitBranchIcon />
-                分叉会话
+                {t("chat.fork")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={exportMd}>
                 <DownloadIcon />
-                导出 Markdown
+                {t("sidebar.exportMd")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(s)}>
                 <Trash2Icon />
-                删除会话
+                {t("chat.delete")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -317,7 +314,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
           <div ref={ref} className="min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-3xl px-6 pt-8 pb-10">
               {d.messages.length === 0 && !d.streaming ? (
-                <div className="py-16 text-center text-sm text-muted-foreground">在下方输入任务开始对话</div>
+                <div className="py-16 text-center text-sm text-muted-foreground">{t("chat.empty")}</div>
               ) : (
                 <Transcript
                   d={d}
@@ -343,7 +340,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
                 <div className="flex flex-col gap-1">
                   {d.queued.map((q) => (
                     <div key={q.id} className="flex items-center gap-2 rounded-lg border border-dashed bg-muted/40 px-3 py-1.5 text-xs">
-                      <span className="shrink-0 text-muted-foreground">{q.mode === "steer" ? "待插入" : "排队中"}</span>
+                      <span className="shrink-0 text-muted-foreground">{q.mode === "steer" ? t("chat.queuedSteer") : t("chat.queuedFollow")}</span>
                       <span className="min-w-0 flex-1 truncate">{q.text}</span>
                       <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => rpc("chat.cancelQueued", { sessionId: s.id, id: q.id })}>
                         <XIcon className="size-3.5" />
@@ -355,9 +352,9 @@ export function ChatView({ sessionId }: { sessionId: string }) {
               {editing && (
                 <div className="flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-1.5 text-xs text-primary">
                   <PencilIcon className="size-3.5" />
-                  正在编辑消息，发送后将从这里重新生成
+                  {t("chat.editing")}
                   <button type="button" className="ml-auto hover:underline" onClick={() => setEditing(null)}>
-                    取消
+                    {t("common.cancel")}
                   </button>
                 </div>
               )}
@@ -387,7 +384,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
           <aside className="hidden w-72 shrink-0 border-l bg-sidebar/40 lg:block">
             <div className="flex items-center gap-2 border-b px-4 py-3 text-sm font-medium">
               <ListChecksIcon className="size-4 text-muted-foreground" />
-              计划
+              {t("chat.plan")}
               <span className="ml-auto text-xs font-normal text-muted-foreground tabular-nums">
                 {s.todos.filter((t) => t.status === "completed").length}/{s.todos.length}
               </span>

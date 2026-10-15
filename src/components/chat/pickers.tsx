@@ -3,12 +3,11 @@ import {
   BrainIcon,
   CheckIcon,
   ChevronDownIcon,
-  ClipboardListIcon,
   FilePenLineIcon,
   FolderIcon,
   FolderOpenIcon,
+  ListChecksIcon,
   ShieldCheckIcon,
-  ShieldIcon,
   ShieldOffIcon,
   Settings2Icon,
   EyeIcon,
@@ -30,6 +29,7 @@ import { pickDirectory } from "@/lib/download"
 import { basename, formatTokens, shortPath } from "@/lib/format"
 import { appInfo, enabledModels, findModel, providers, route } from "@/lib/store"
 import { cn } from "@/lib/utils"
+import { t, type MessageKey } from "@/lib/i18n"
 
 export function ModelPicker({
   providerId,
@@ -50,15 +50,15 @@ export function ModelPicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className="max-w-56 gap-1 px-2 text-muted-foreground hover:text-foreground">
-          <span className="truncate">{current?.name ?? (modelId || "选择模型")}</span>
+          <span className="truncate">{current?.name ?? (modelId || t("picker.selectModel"))}</span>
           <ChevronDownIcon className="opacity-60" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="start">
         <Command>
-          <CommandInput placeholder="搜索模型…" />
+          <CommandInput placeholder={t("picker.searchModels")} />
           <CommandList className="max-h-80">
-            <CommandEmpty>没有可用的模型</CommandEmpty>
+            <CommandEmpty>{t("picker.noModels")}</CommandEmpty>
             {groups.map(({ p, models }) => (
               <CommandGroup key={p.id} heading={p.name}>
                 {models.map((m) => (
@@ -73,8 +73,9 @@ export function ModelPicker({
                     <div className="min-w-0 flex-1">
                       <div className="truncate">{m.name}</div>
                       <div className="truncate text-[11px] text-muted-foreground">
-                        {m.id} · {formatTokens(m.contextWindow)} 上下文{m.reasoning ? " · 推理" : ""}
-                        {m.vision ? " · 视觉" : ""}
+                        {m.id} · {t("picker.context", { n: formatTokens(m.contextWindow) })}
+                        {m.reasoning ? ` · ${t("picker.reasoning")}` : ""}
+                        {m.vision ? ` · ${t("picker.vision")}` : ""}
                       </div>
                     </div>
                     {m.providerId === providerId && m.id === modelId && <CheckIcon className="size-4" />}
@@ -91,7 +92,7 @@ export function ModelPicker({
                 }}
               >
                 <Settings2Icon />
-                管理供应商与模型
+                {t("picker.manage")}
               </CommandItem>
             </CommandGroup>
           </CommandList>
@@ -101,31 +102,24 @@ export function ModelPicker({
   )
 }
 
-const THINKING: { value: ThinkingLevel; label: string }[] = [
-  { value: "off", label: "关闭" },
-  { value: "minimal", label: "最少" },
-  { value: "low", label: "低" },
-  { value: "medium", label: "中" },
-  { value: "high", label: "高" },
-  { value: "xhigh", label: "极高" },
-]
+const THINKING: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"]
 
 export function ThinkingPicker({ value, onChange }: { value: ThinkingLevel; onChange: (v: ThinkingLevel) => void }) {
-  const label = THINKING.find((t) => t.value === value)?.label ?? value
+  const label = t(`thinking.${value}` as MessageKey)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-1 px-2 text-muted-foreground hover:text-foreground" title="推理强度">
+        <Button variant="ghost" size="sm" className="gap-1 px-2 text-muted-foreground hover:text-foreground" title={t("picker.thinking")}>
           <BrainIcon />
           <span>{label}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-40">
-        <DropdownMenuLabel>推理强度</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("picker.thinking")}</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v as ThinkingLevel)}>
-          {THINKING.map((t) => (
-            <DropdownMenuRadioItem key={t.value} value={t.value}>
-              {t.label}
+          {THINKING.map((v) => (
+            <DropdownMenuRadioItem key={v} value={v}>
+              {t(`thinking.${v}` as MessageKey)}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
@@ -134,16 +128,19 @@ export function ThinkingPicker({ value, onChange }: { value: ThinkingLevel; onCh
   )
 }
 
-export const PERMISSION_MODES: { value: PermissionMode; label: string; desc: string; icon: any }[] = [
-  { value: "default", label: "逐项确认", desc: "修改文件和执行命令前询问", icon: ShieldCheckIcon },
-  { value: "acceptEdits", label: "自动编辑", desc: "自动接受文件修改，命令仍需确认", icon: FilePenLineIcon },
-  { value: "plan", label: "只读规划", desc: "只读探索并给出计划，不修改文件", icon: ClipboardListIcon },
-  { value: "bypass", label: "完全放行", desc: "所有操作不再询问（谨慎使用）", icon: ShieldOffIcon },
-]
+export function permissionModes(): { value: PermissionMode; label: string; desc: string; icon: any }[] {
+  return [
+    { value: "manual", label: t("perm.manual"), desc: t("perm.manual.desc"), icon: ShieldCheckIcon },
+    { value: "acceptEdits", label: t("perm.acceptEdits"), desc: t("perm.acceptEdits.desc"), icon: FilePenLineIcon },
+    { value: "whitelist", label: t("perm.whitelist"), desc: t("perm.whitelist.desc"), icon: ListChecksIcon },
+    { value: "bypass", label: t("perm.bypass"), desc: t("perm.bypass.desc"), icon: ShieldOffIcon },
+  ]
+}
 
 export function PermissionPicker({ value, onChange }: { value: PermissionMode; onChange: (v: PermissionMode) => void }) {
-  const cur = PERMISSION_MODES.find((m) => m.value === value) ?? PERMISSION_MODES[0]
-  const Icon = cur.icon ?? ShieldIcon
+  const modes = permissionModes()
+  const cur = modes.find((m) => m.value === value) ?? modes[2]
+  const Icon = cur.icon
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -153,7 +150,6 @@ export function PermissionPicker({ value, onChange }: { value: PermissionMode; o
           className={cn(
             "gap-1 px-2 text-muted-foreground hover:text-foreground",
             value === "bypass" && "text-destructive hover:text-destructive",
-            value === "plan" && "text-primary hover:text-primary",
           )}
         >
           <Icon />
@@ -161,9 +157,9 @@ export function PermissionPicker({ value, onChange }: { value: PermissionMode; o
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
-        <DropdownMenuLabel>权限模式</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("picker.permission")}</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v as PermissionMode)}>
-          {PERMISSION_MODES.map((m) => (
+          {modes.map((m) => (
             <DropdownMenuRadioItem key={m.value} value={m.value} className="items-start py-1.5">
               <div>
                 <div>{m.label}</div>
@@ -210,10 +206,10 @@ export function CwdPicker({ value, onChange }: { value: string; onChange: (v: st
       </PopoverTrigger>
       <PopoverContent className="w-96 p-0" align="start">
         <Command shouldFilter={false}>
-          <CommandInput placeholder="输入路径，如 ~/Code/project" value={query} onValueChange={setQuery} />
+          <CommandInput placeholder={t("picker.pathPlaceholder")} value={query} onValueChange={setQuery} />
           <CommandList className="max-h-80">
             {query && (
-              <CommandGroup heading="使用输入的路径">
+              <CommandGroup heading={t("picker.useTyped")}>
                 <CommandItem value={`__typed ${query}`} onSelect={() => choose(query)}>
                   <FolderOpenIcon />
                   <span className="truncate font-mono text-xs">{query}</span>
@@ -221,7 +217,7 @@ export function CwdPicker({ value, onChange }: { value: string; onChange: (v: st
               </CommandGroup>
             )}
             {suggest.length > 0 && (
-              <CommandGroup heading="子目录">
+              <CommandGroup heading={t("picker.subdirs")}>
                 {suggest.map((d) => (
                   <CommandItem key={d} value={`s ${d}`} onSelect={() => setQuery(d + "/")}>
                     <FolderIcon />
@@ -231,7 +227,7 @@ export function CwdPicker({ value, onChange }: { value: string; onChange: (v: st
               </CommandGroup>
             )}
             {!query && recent.length > 0 && (
-              <CommandGroup heading="最近使用">
+              <CommandGroup heading={t("picker.recent")}>
                 {recent.map((d) => (
                   <CommandItem key={d} value={`r ${d}`} onSelect={() => choose(d)}>
                     <FolderIcon />
@@ -253,7 +249,7 @@ export function CwdPicker({ value, onChange }: { value: string; onChange: (v: st
                     }}
                   >
                     <EyeIcon />
-                    浏览文件夹…
+                    {t("picker.browse")}
                   </CommandItem>
                 </CommandGroup>
               </>
