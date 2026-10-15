@@ -14,7 +14,6 @@ import {
   PinOffIcon,
   SearchIcon,
   Settings2Icon,
-  ShipWheelIcon,
   SquarePenIcon,
   Trash2Icon,
 } from "lucide-react"
@@ -44,6 +43,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Kbd } from "@/components/ui/kbd"
+import { Logo } from "@/components/logo"
 import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
@@ -60,7 +60,7 @@ type GroupMode = "time" | "project"
 
 function loadGroupMode(): GroupMode {
   try {
-    return (localStorage.getItem("helm-group-mode") as GroupMode) || "time"
+    return (localStorage.getItem("kestrel-group-mode") as GroupMode) || "time"
   } catch {
     return "time"
   }
@@ -167,7 +167,7 @@ export function AppSidebar() {
   const setMode = (m: GroupMode) => {
     setGroupMode(m)
     try {
-      localStorage.setItem("helm-group-mode", m)
+      localStorage.setItem("kestrel-group-mode", m)
     } catch {}
   }
 
@@ -182,10 +182,8 @@ export function AppSidebar() {
       <SidebarHeader className="gap-3 pt-0">
         <div data-tauri-drag-region className="drag-region h-9 shrink-0" />
         <div className="flex items-center gap-2 px-1.5">
-          <div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-            <ShipWheelIcon className="size-4" />
-          </div>
-          <span className="font-semibold tracking-tight">Helm</span>
+          <Logo className="size-7" />
+          <span className="font-semibold tracking-tight">Kestrel</span>
           <div className="ml-auto flex items-center">
             <Tooltip>
               <TooltipTrigger asChild>
