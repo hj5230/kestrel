@@ -9,7 +9,7 @@ import { text, defineTool, type HelmTool, type ToolContext } from "./types";
 export function createTodoTool(ctx: ToolContext): HelmTool {
   return defineTool({
     name: "todo_write",
-    label: "更新计划",
+    label: "Update plan",
     category: "meta",
     description:
       "Create or update the task plan shown to the user. Use it for multi-step tasks (3+ steps): pass the complete list every time. " +
@@ -35,7 +35,7 @@ export function createTodoTool(ctx: ToolContext): HelmTool {
 export function createTaskTool(ctx: ToolContext): HelmTool {
   return defineTool({
     name: "task",
-    label: "子代理",
+    label: "Subagent",
     category: "meta",
     description:
       "Launch a subagent with its own fresh context to handle a self-contained task (broad codebase searches, research, " +
@@ -82,11 +82,11 @@ function renderTranscript(messages: ChatMessage[], maxChars: number): string {
 export function createSearchSessionsTool(ctx: ToolContext): HelmTool {
   return defineTool({
     name: "search_sessions",
-    label: "检索历史会话",
+    label: "Search sessions",
     category: "read",
     description:
       "Full-text search across the user's past conversations in this app (titles and messages). " +
-      "Use when the user refers to earlier work ('之前我们…', 'that thing from last week'). Returns session ids with snippets; " +
+      "Use when the user refers to earlier work ('earlier we…', 'that thing from last week'). Returns session ids with snippets; " +
       "then use read_session to read one.",
     parameters: Type.Object({
       query: Type.String({ description: "Keywords (3+ characters each match best, CJK supported)" }),
@@ -96,7 +96,7 @@ export function createSearchSessionsTool(ctx: ToolContext): HelmTool {
       const hits = store.searchMessages(params.query, params.limit ?? 20, ctx.sessionId);
       if (!hits.length) return { content: text("No matching sessions."), details: { hits: [] } };
       const body = hits
-        .map((h) => `- session ${h.sessionId} 「${h.title || "未命名"}」 (${new Date(h.updatedAt).toLocaleString("zh-CN")})\n  ${h.role}#${h.seq}: ${h.snippet}`)
+        .map((h) => `- session ${h.sessionId} "${h.title || "untitled"}" (${new Date(h.updatedAt).toISOString().slice(0, 16).replace("T", " ")})\n  ${h.role}#${h.seq}: ${h.snippet}`)
         .join("\n");
       return { content: text(body), details: { hits } };
     },
@@ -106,7 +106,7 @@ export function createSearchSessionsTool(ctx: ToolContext): HelmTool {
 export function createReadSessionTool(): HelmTool {
   return defineTool({
     name: "read_session",
-    label: "读取历史会话",
+    label: "Read session",
     category: "read",
     description: "Read the transcript of a past session by id (from search_sessions). Use from_seq to read later parts of long sessions.",
     parameters: Type.Object({
@@ -118,7 +118,7 @@ export function createReadSessionTool(): HelmTool {
       const s = store.getSession(params.session_id);
       if (!s) throw new Error(`Session ${params.session_id} not found`);
       const msgs = store.loadMessages(s.id).filter((m) => m.seq >= (params.from_seq ?? 0));
-      const header = `# ${s.title || "未命名会话"}\ncwd: ${s.cwd}\nupdated: ${new Date(s.updatedAt).toLocaleString("zh-CN")}\nmessages: ${msgs.length}\n\n`;
+      const header = `# ${s.title || "untitled"}\ncwd: ${s.cwd}\nupdated: ${new Date(s.updatedAt).toISOString().slice(0, 16).replace("T", " ")}\nmessages: ${msgs.length}\n\n`;
       const compactions = store.listCompactions(s.id);
       const summary = compactions.length && !params.from_seq ? `[Earlier summary]\n${compactions[compactions.length - 1].summary}\n\n` : "";
       return {
@@ -132,7 +132,7 @@ export function createReadSessionTool(): HelmTool {
 export function createSkillTool(ctx: ToolContext): HelmTool {
   return defineTool({
     name: "skill",
-    label: "加载技能",
+    label: "Load skill",
     category: "read",
     description:
       "Load a skill's full instructions by name (see the available skills list in the system prompt). " +

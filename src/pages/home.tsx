@@ -9,13 +9,14 @@ import { rpc } from "@/lib/api"
 import { basename, relativeTime, shortPath } from "@/lib/format"
 import { appInfo, enabledModels, findModel, openSession, route, sessions, settings } from "@/lib/store"
 import { cn } from "@/lib/utils"
+import { t } from "@/lib/i18n"
 
 function greeting() {
   const h = new Date().getHours()
-  if (h < 6) return "夜深了"
-  if (h < 12) return "早上好"
-  if (h < 18) return "下午好"
-  return "晚上好"
+  if (h < 6) return t("home.night")
+  if (h < 12) return t("home.morning")
+  if (h < 18) return t("home.afternoon")
+  return t("home.evening")
 }
 
 export function HomeView() {
@@ -56,16 +57,16 @@ export function HomeView() {
             <div className="flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md">
               <ShipWheelIcon className="size-6" />
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight">{greeting()}，今天想让 Helm 做点什么？</h1>
-            <p className="text-sm text-muted-foreground">在本地目录里读写文件、执行命令、调用技能与 MCP 工具，过程可审批、可追溯。</p>
+            <h1 className="text-2xl font-semibold tracking-tight">{t("home.headline", { greeting: greeting() })}</h1>
+            <p className="text-sm text-muted-foreground">{t("home.sub")}</p>
           </div>
           {noModels ? (
             <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed p-8 text-center">
               <KeyRoundIcon className="size-6 text-muted-foreground" />
-              <div className="text-sm font-medium">还没有可用的模型</div>
-              <div className="max-w-sm text-xs text-muted-foreground">添加 Anthropic、OpenAI、Gemini、DeepSeek、OpenRouter、Ollama 或任意 OpenAI 兼容的服务后即可开始。</div>
+              <div className="text-sm font-medium">{t("home.noModels")}</div>
+              <div className="max-w-sm text-xs text-muted-foreground">{t("home.noModelsDesc")}</div>
               <Button onClick={() => (route.value = { name: "settings", tab: "models" })}>
-                添加模型供应商
+                {t("home.addProvider")}
                 <ArrowRightIcon />
               </Button>
             </div>
@@ -76,7 +77,7 @@ export function HomeView() {
               menuBelow
               draftKey="home"
               onSubmit={start}
-              placeholder="描述你的任务，例如：梳理这个仓库的构建流程并修复失败的测试"
+              placeholder={t("home.placeholder")}
               toolbar={
                 <>
                   <CwdPicker value={cwd} onChange={setCwd} />
@@ -89,7 +90,7 @@ export function HomeView() {
           )}
           {recent.length > 0 && (
             <div className="mt-10">
-              <div className="mb-2 px-1 text-xs font-medium text-muted-foreground">最近的会话</div>
+              <div className="mb-2 px-1 text-xs font-medium text-muted-foreground">{t("home.recent")}</div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {recent.map((r) => (
                   <button
@@ -98,7 +99,7 @@ export function HomeView() {
                     onClick={() => openSession(r.id)}
                     className="flex min-w-0 flex-col gap-0.5 rounded-xl border bg-card px-4 py-3 text-left transition-colors hover:bg-muted/60"
                   >
-                    <span className="truncate text-sm font-medium">{r.title || "新会话"}</span>
+                    <span className="truncate text-sm font-medium">{r.title || t("common.untitled")}</span>
                     <span className="truncate text-xs text-muted-foreground">
                       {basename(r.cwd)} · {relativeTime(r.updatedAt)}
                     </span>

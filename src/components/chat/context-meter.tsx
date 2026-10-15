@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator"
 import { formatCost, formatTokens } from "@/lib/format"
 import { settings } from "@/lib/store"
 import { cn } from "@/lib/utils"
+import { t } from "@/lib/i18n"
 
 function Ring({ value }: { value: number }) {
   const r = 7
@@ -28,10 +29,10 @@ export function ContextMeter({ session, model, onCompact, compacting }: { sessio
   const tone = ratio > threshold ? "text-destructive" : ratio > threshold * 0.75 ? "text-warning" : "text-muted-foreground"
   const u = session.usage
   const rows: [string, string][] = [
-    ["输入", formatTokens(u.input)],
-    ["输出", formatTokens(u.output)],
-    ["缓存读取", formatTokens(u.cacheRead)],
-    ["缓存写入", formatTokens(u.cacheWrite)],
+    [t("ctx.input"), formatTokens(u.input)],
+    [t("ctx.output"), formatTokens(u.output)],
+    [t("ctx.cacheRead"), formatTokens(u.cacheRead)],
+    [t("ctx.cacheWrite"), formatTokens(u.cacheWrite)],
   ]
   return (
     <HoverCard openDelay={150}>
@@ -46,14 +47,14 @@ export function ContextMeter({ session, model, onCompact, compacting }: { sessio
         <div className="grid gap-3">
           <div>
             <div className="flex items-baseline justify-between text-sm font-medium">
-              上下文窗口
+              {t("ctx.window")}
               <span className="text-xs font-normal text-muted-foreground tabular-nums">
                 {formatTokens(used)} / {formatTokens(window)}
               </span>
             </div>
             <Progress value={Math.min(100, ratio * 100)} className="mt-2 h-1.5" />
             <div className="mt-1.5 text-xs text-muted-foreground">
-              {settings.value?.autoCompact ? `超过 ${Math.round(threshold * 100)}% 时自动压缩` : "自动压缩已关闭"}
+              {settings.value?.autoCompact ? t("ctx.autoAt", { pct: Math.round(threshold * 100) }) : t("ctx.autoOff")}
             </div>
           </div>
           <Separator />
@@ -65,13 +66,13 @@ export function ContextMeter({ session, model, onCompact, compacting }: { sessio
               </div>
             ))}
             <div className="col-span-2 mt-1 flex justify-between border-t pt-1.5">
-              <span className="text-muted-foreground">累计费用</span>
+              <span className="text-muted-foreground">{t("ctx.cost")}</span>
               <span className="font-medium tabular-nums">{formatCost(u.cost)}</span>
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={onCompact} disabled={compacting || session.status === "running"}>
             <ShrinkIcon />
-            {compacting ? "压缩中…" : "立即压缩"}
+            {compacting ? t("ctx.compacting") : t("ctx.compact")}
           </Button>
         </div>
       </HoverCardContent>

@@ -1,6 +1,7 @@
 import DOMPurify from "dompurify"
 import hljs from "highlight.js/lib/common"
 import { Marked } from "marked"
+import { lang, t } from "./i18n"
 
 const marked = new Marked({ gfm: true, breaks: false })
 
@@ -19,7 +20,7 @@ marked.use({
         html = escapeHtml(text)
       }
       const label = escapeHtml(language || "text")
-      return `<pre><div class="code-head"><span>${label}</span><button type="button" class="copy-code" data-copy>复制</button></div><code class="hljs">${html}</code></pre>`
+      return `<pre><div class="code-head"><span>${label}</span><button type="button" class="copy-code" data-copy>${t("common.copy")}</button></div><code class="hljs">${html}</code></pre>`
     },
     link({ href, title, tokens }) {
       const text = this.parser.parseInline(tokens)
@@ -32,12 +33,13 @@ marked.use({
 const cache = new Map<string, string>()
 
 export function renderMarkdown(src: string): string {
-  const hit = cache.get(src)
+  const key = lang.value + "\u0000" + src
+  const hit = cache.get(key)
   if (hit) return hit
   const raw = marked.parse(src, { async: false }) as string
   const html = DOMPurify.sanitize(raw, { ADD_ATTR: ["target", "data-copy"] })
   if (cache.size > 400) cache.clear()
-  cache.set(src, html)
+  cache.set(key, html)
   return html
 }
 

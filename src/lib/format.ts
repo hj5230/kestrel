@@ -1,3 +1,5 @@
+import { locale, t } from "./i18n"
+
 export function formatTokens(n: number): string {
   if (!n) return "0"
   if (n < 1000) return String(Math.round(n))
@@ -22,15 +24,15 @@ export function formatDuration(ms: number): string {
 
 export function relativeTime(ts: number): string {
   const diff = Date.now() - ts
-  if (diff < 60_000) return "刚刚"
-  if (diff < 3600_000) return `${Math.floor(diff / 60_000)} 分钟前`
-  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)} 小时前`
-  if (diff < 7 * 86400_000) return `${Math.floor(diff / 86400_000)} 天前`
-  return new Date(ts).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })
+  if (diff < 60_000) return t("time.justNow")
+  if (diff < 3600_000) return t("time.minutesAgo", { n: Math.floor(diff / 60_000) })
+  if (diff < 86400_000) return t("time.hoursAgo", { n: Math.floor(diff / 3600_000) })
+  if (diff < 7 * 86400_000) return t("time.daysAgo", { n: Math.floor(diff / 86400_000) })
+  return new Date(ts).toLocaleDateString(locale(), { month: "short", day: "numeric" })
 }
 
 export function clockTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
+  return new Date(ts).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })
 }
 
 export function shortPath(p: string, home?: string): string {
@@ -50,9 +52,9 @@ export function dayBucket(ts: number): string {
   const day = new Date(d)
   day.setHours(0, 0, 0, 0)
   const diff = (today.getTime() - day.getTime()) / 86400_000
-  if (diff <= 0) return "今天"
-  if (diff <= 1) return "昨天"
-  if (diff <= 7) return "近 7 天"
-  if (diff <= 30) return "近 30 天"
-  return "更早"
+  if (diff <= 0) return t("time.today")
+  if (diff <= 1) return t("time.yesterday")
+  if (diff <= 7) return t("time.last7")
+  if (diff <= 30) return t("time.last30")
+  return t("time.older")
 }

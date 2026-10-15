@@ -3,6 +3,7 @@ import path from "node:path";
 import type { SkillInfo, SlashCommandInfo } from "../shared/protocol";
 import * as store from "./db";
 import { collapseHome, expandHome } from "./env";
+import { st } from "./i18n";
 
 export function parseFrontmatter(src: string): { attrs: Record<string, string>; body: string } {
   const m = src.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
@@ -40,7 +41,7 @@ export function discoverSkills(cwd: string, includeDisabled = false): SkillInfo[
   } else {
     const seen = new Map<string, SkillInfo>();
     const dirs = [
-      ...projectDirs(cwd, "skills").map((d) => ({ d, source: "项目" })),
+      ...projectDirs(cwd, "skills").map((d) => ({ d, source: "project" })),
       ...settings.skillDirs.map((d) => ({ d: expandHome(d), source: collapseHome(expandHome(d)) })),
     ];
     for (const { d, source } of dirs) {
@@ -114,25 +115,26 @@ function scanCommands(dir: string, source: string, prefix = "", out: PromptComma
 export function discoverCommands(cwd: string): PromptCommand[] {
   const settings = store.getSettings();
   const all: PromptCommand[] = [];
-  for (const d of projectDirs(cwd, "commands")) scanCommands(d, "项目", "", all);
+  for (const d of projectDirs(cwd, "commands")) scanCommands(d, "project", "", all);
   for (const d of settings.commandDirs) scanCommands(expandHome(d), collapseHome(expandHome(d)), "", all);
   const seen = new Set<string>();
   return all.filter((c) => (seen.has(c.name) ? false : (seen.add(c.name), true)));
 }
 
-export const BUILTIN_COMMANDS: SlashCommandInfo[] = [
-  { name: "compact", description: "压缩上下文：总结历史对话以释放上下文窗口", kind: "builtin" },
-  { name: "clear", description: "新建一个同目录、同模型的空会话", kind: "builtin" },
-  { name: "model", description: "切换当前会话的模型", kind: "builtin" },
-  { name: "plan", description: "切换到只读规划模式", kind: "builtin" },
-  { name: "export", description: "导出当前会话为 Markdown", kind: "builtin" },
-  { name: "fork", description: "从当前位置分叉出新会话", kind: "builtin" },
-];
+function builtinCommands(): SlashCommandInfo[] {
+  return [
+    { name: "compact", description: st("cmdCompact"), kind: "builtin" },
+    { name: "clear", description: st("cmdClear"), kind: "builtin" },
+    { name: "model", description: st("cmdModel"), kind: "builtin" },
+    { name: "export", description: st("cmdExport"), kind: "builtin" },
+    { name: "fork", description: st("cmdFork"), kind: "builtin" },
+  ];
+}
 
 export function listSlashCommands(cwd: string): SlashCommandInfo[] {
   const prompts = discoverCommands(cwd).map((c) => ({ name: c.name, description: c.description, kind: "prompt" as const, source: c.source }));
   const skills = discoverSkills(cwd).map((s) => ({ name: s.name, description: s.description, kind: "skill" as const, source: s.source }));
-  return [...BUILTIN_COMMANDS, ...prompts, ...skills];
+  return [...builtinCommands(), ...prompts, ...skills];
 }
 
 export function expandSlashCommand(cwd: string, input: string): string | null {

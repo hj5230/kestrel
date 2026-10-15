@@ -47,7 +47,7 @@ function isBinary(buf: Buffer) {
 export function createReadTool(ctx: ToolContext): HelmTool {
   return defineTool({
     name: "read",
-    label: "读取文件",
+    label: "Read file",
     category: "read",
     description:
       "Read a file from the local filesystem. Returns content with line numbers (cat -n format). " +
@@ -112,7 +112,7 @@ function checkFresh(ctx: ToolContext, file: string) {
 export function createWriteTool(ctx: ToolContext): HelmTool {
   return defineTool({
     name: "write",
-    label: "写入文件",
+    label: "Write file",
     category: "edit",
     description:
       "Write a file to the local filesystem, creating parent directories as needed. Overwrites existing files. " +
@@ -141,7 +141,7 @@ export function createWriteTool(ctx: ToolContext): HelmTool {
 export function createEditTool(ctx: ToolContext): HelmTool {
   return defineTool({
     name: "edit",
-    label: "编辑文件",
+    label: "Edit file",
     category: "edit",
     description:
       "Perform an exact string replacement in a file. old_string must match the file content exactly (including whitespace and indentation) " +
@@ -185,7 +185,7 @@ export function createEditTool(ctx: ToolContext): HelmTool {
 export function createLsTool(ctx: ToolContext): HelmTool {
   return defineTool({
     name: "ls",
-    label: "列目录",
+    label: "List directory",
     category: "read",
     description: "List entries of a directory (non-recursive). Directories end with '/'. Common build/dependency folders are listed but not expanded.",
     parameters: Type.Object({
@@ -217,7 +217,7 @@ export function createLsTool(ctx: ToolContext): HelmTool {
 export function createGlobTool(ctx: ToolContext): HelmTool {
   return defineTool({
     name: "glob",
-    label: "匹配文件",
+    label: "Find files",
     category: "read",
     description:
       "Find files by glob pattern (e.g. '**/*.ts', 'src/**/index.{js,tsx}'). Returns paths sorted by modification time (newest first). " +
@@ -280,7 +280,7 @@ function runProcess(cmd: string, args: string[], cwd: string, signal?: AbortSign
 export function createGrepTool(ctx: ToolContext): HelmTool {
   return defineTool({
     name: "grep",
-    label: "搜索内容",
+    label: "Search content",
     category: "read",
     description:
       "Search file contents with a regular expression (ripgrep syntax). Respects .gitignore. " +

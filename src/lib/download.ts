@@ -1,5 +1,6 @@
 import { toast } from "sonner"
 import { isTauri, rpc } from "./api"
+import { t } from "./i18n"
 
 export async function downloadText(filename: string, content: string) {
   const safe = filename.replace(/[\\/:*?"<>|]/g, "_")
@@ -8,7 +9,7 @@ export async function downloadText(filename: string, content: string) {
     const path = await save({ defaultPath: safe })
     if (!path) return
     await rpc("fs.writeText", { path, content })
-    toast.success("已导出", { description: path })
+    toast.success(t("notify.exported"), { description: path })
     return
   }
   const url = URL.createObjectURL(new Blob([content], { type: "text/markdown;charset=utf-8" }))

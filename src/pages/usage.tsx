@@ -12,14 +12,19 @@ import { rpc } from "@/lib/api"
 import { formatCost, formatDuration, formatTokens, relativeTime } from "@/lib/format"
 import { openSession } from "@/lib/store"
 import { cn } from "@/lib/utils"
+import { lang, locale, t as tr } from "@/lib/i18n"
 
 const RANGES = [
-  { value: "7", label: "7 天" },
-  { value: "30", label: "30 天" },
-  { value: "90", label: "90 天" },
-  { value: "0", label: "全部" },
-]
-const WEEK = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+  { value: "7", key: "usage.d7" },
+  { value: "30", key: "usage.d30" },
+  { value: "90", key: "usage.d90" },
+  { value: "0", key: "usage.all" },
+] as const
+
+function weekdays(style: "short" | "long" = "short") {
+  const base = new Date(2024, 0, 7)
+  return Array.from({ length: 7 }, (_, i) => new Date(base.getTime() + i * 86400_000).toLocaleDateString(locale(), { weekday: style }))
+}
 
 function Kpi({ icon: Icon, label, value, sub }: { icon: any; label: string; value: string; sub?: string }) {
   return (
@@ -71,18 +76,19 @@ export function UsagePage() {
   const daily = useMemo(() => {
     if (!data) return null
     const top = data.byModel.slice(0, 7).map((m) => m.model)
-    const models = [...top, ...(data.byModel.length > 7 ? ["其他"] : [])]
+    const other = tr("usage.other")
+    const models = [...top, ...(data.byModel.length > 7 ? [other] : [])]
     const axis = days(Number(range), data.daily)
     const series = models.map((m) => ({ name: m, values: axis.map(() => 0) }))
     for (const row of data.daily) {
       const i = axis.indexOf(row.day)
       if (i < 0) continue
-      const name = top.includes(row.model) ? row.model : "其他"
+      const name = top.includes(row.model) ? row.model : other
       const s = series.find((x) => x.name === name)
       if (s) s.values[i] += row.tokens
     }
     return { axis, series }
-  }, [data, range])
+  }, [data, range, lang.value])
 
   const dailyOption = useCallback(
     (t: VizTheme) => ({
@@ -131,7 +137,7 @@ export function UsagePage() {
           trigger: "item",
           formatter: (p: any) => {
             const r = rows[p.dataIndex]
-            return `<b>${r.model}</b><br/>${r.provider}<br/>${formatTokens(r.tokens)} tokens · ${r.requests} 次请求<br/>${formatCost(r.cost)}`
+            return `<b>${r.model}</b><br/>${r.provider}<br/>${formatTokens(r.tokens)} tokens · ${tr("usage.requestsN", { n: r.requests })}<br/>${formatCost(r.cost)}`
           },
         },
         xAxis: { type: "value", show: false },
@@ -153,7 +159,7 @@ export function UsagePage() {
         ],
       }
     },
-    [data],
+    [data, lang.value],
   )
 
   const toolOption = useCallback(
@@ -169,7 +175,7 @@ export function UsagePage() {
           axisPointer: { type: "none" },
           formatter: (ps: any[]) => {
             const r = rows[ps[0].dataIndex]
-            return `<b>${r.tool}</b><br/>${r.count} 次 · 失败 ${r.errors} 次<br/>平均耗时 ${formatDuration(r.avgMs)}`
+            return `<b>${r.tool}</b><br/>${tr("usage.toolTip", { count: r.count, errors: r.errors, avg: formatDuration(r.avgMs) })}`
           },
         },
         xAxis: { type: "value", show: false },
@@ -181,9 +187,9 @@ export function UsagePage() {
           axisLabel: { color: t.text, fontFamily: "monospace" },
         },
         series: [
-          { name: "成功", type: "bar", stack: "t", barMaxWidth: 14, data: rows.map((r) => r.count - r.errors), itemStyle: { color: t.series[2], borderColor: t.surface, borderWidth: 1 } },
+          { name: tr("usage.success"), type: "bar", stack: "t", barMaxWidth: 14, data: rows.map((r) => r.count - r.errors), itemStyle: { color: t.series[2], borderColor: t.surface, borderWidth: 1 } },
           {
-            name: "失败",
+            name: tr("usage.failed"),
             type: "bar",
             stack: "t",
             barMaxWidth: 14,
@@ -194,7 +200,7 @@ export function UsagePage() {
         ],
       }
     },
-    [data],
+    [data, lang.value],
   )
 
   const heatOption = useCallback(
@@ -206,7 +212,7 @@ export function UsagePage() {
         grid: { left: 8, right: 8, top: 4, bottom: 40, containLabel: true },
         tooltip: {
           ...baseOption(t).tooltip,
-          formatter: (p: any) => `${WEEK[(p.value[1] + 1) % 7]} ${p.value[0]}:00<br/>${p.value[2]} 次请求`,
+          formatter: (p: any) => `${weekdays("long")[(p.value[1] + 1) % 7]} ${p.value[0]}:00<br/>${tr("usage.requestsN", { n: p.value[2] })}`,
         },
         xAxis: {
           type: "category",
@@ -218,7 +224,7 @@ export function UsagePage() {
         },
         yAxis: {
           type: "category",
-          data: ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
+          data: [...weekdays().slice(1), weekdays()[0]],
           inverse: true,
           axisLine: { show: false },
           axisTick: { show: false },
@@ -239,7 +245,7 @@ export function UsagePage() {
         series: [{ type: "heatmap", data: cells, itemStyle: { borderColor: t.surface, borderWidth: 2, borderRadius: 3 } }],
       }
     },
-    [data],
+    [data, lang.value],
   )
 
   const tot = data?.totals
@@ -249,11 +255,11 @@ export function UsagePage() {
     <div className="flex h-full flex-col">
       <header data-tauri-drag-region className={cn("drag-region flex h-12 shrink-0 items-center gap-2 border-b px-3", sidebarState === "collapsed" && "pl-20")}>
         <SidebarTrigger className="text-muted-foreground" />
-        <span className="text-sm font-medium">用量统计</span>
+        <span className="text-sm font-medium">{tr("usage.title")}</span>
         <ToggleGroup type="single" variant="outline" size="sm" value={range} onValueChange={(v) => v && setRange(v)} className="ml-auto">
           {RANGES.map((r) => (
             <ToggleGroupItem key={r.value} value={r.value} className="px-3 text-xs">
-              {r.label}
+              {tr(r.key)}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
@@ -275,54 +281,54 @@ export function UsagePage() {
                 <EmptyMedia variant="icon">
                   <ActivityIcon />
                 </EmptyMedia>
-                <EmptyTitle>这段时间还没有用量</EmptyTitle>
-                <EmptyDescription>开始一次对话后，这里会展示 token、费用、模型与工具的使用情况。</EmptyDescription>
+                <EmptyTitle>{tr("usage.emptyTitle")}</EmptyTitle>
+                <EmptyDescription>{tr("usage.emptyDesc")}</EmptyDescription>
               </EmptyHeader>
             </Empty>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-                <Kpi icon={CoinsIcon} label="费用" value={formatCost(tot!.cost)} sub="按模型单价估算" />
-                <Kpi icon={ZapIcon} label="Tokens" value={formatTokens(tot!.input + tot!.output + tot!.cacheRead + tot!.cacheWrite)} sub={`输出 ${formatTokens(tot!.output)}`} />
-                <Kpi icon={DatabaseZapIcon} label="缓存命中" value={`${Math.round(cacheRate * 100)}%`} sub={`读取 ${formatTokens(tot!.cacheRead)}`} />
-                <Kpi icon={ActivityIcon} label="模型请求" value={String(tot!.requests)} />
-                <Kpi icon={MessagesSquareIcon} label="活跃会话" value={String(tot!.sessions)} />
+                <Kpi icon={CoinsIcon} label={tr("usage.cost")} value={formatCost(tot!.cost)} sub={tr("usage.costSub")} />
+                <Kpi icon={ZapIcon} label="Tokens" value={formatTokens(tot!.input + tot!.output + tot!.cacheRead + tot!.cacheWrite)} sub={tr("usage.outputN", { n: formatTokens(tot!.output) })} />
+                <Kpi icon={DatabaseZapIcon} label={tr("usage.cacheHit")} value={`${Math.round(cacheRate * 100)}%`} sub={tr("usage.readN", { n: formatTokens(tot!.cacheRead) })} />
+                <Kpi icon={ActivityIcon} label={tr("usage.requests")} value={String(tot!.requests)} />
+                <Kpi icon={MessagesSquareIcon} label={tr("usage.sessions")} value={String(tot!.sessions)} />
                 <Kpi
                   icon={WrenchIcon}
-                  label="工具调用"
+                  label={tr("usage.toolCalls")}
                   value={String(tot!.toolCalls)}
-                  sub={tot!.toolCalls ? `失败率 ${((tot!.toolErrors / tot!.toolCalls) * 100).toFixed(1)}%` : undefined}
+                  sub={tot!.toolCalls ? tr("usage.failRate", { pct: ((tot!.toolErrors / tot!.toolCalls) * 100).toFixed(1) }) : undefined}
                 />
               </div>
-              <ChartCard title="每日 Token 用量" desc="按模型堆叠">
+              <ChartCard title={tr("usage.daily")} desc={tr("usage.dailyDesc")}>
                 <EChart option={dailyOption} height={300} />
               </ChartCard>
               <div className="grid gap-4 lg:grid-cols-2">
-                <ChartCard title="模型用量排行" desc="按 token 总量">
+                <ChartCard title={tr("usage.byModel")} desc={tr("usage.byModelDesc")}>
                   <EChart option={modelOption} height={Math.max(160, Math.min(8, data.byModel.length) * 34 + 20)} />
                 </ChartCard>
-                <ChartCard title="工具调用" desc="调用次数与失败次数">
+                <ChartCard title={tr("usage.byTool")} desc={tr("usage.byToolDesc")}>
                   <EChart option={toolOption} height={Math.max(160, Math.min(10, data.byTool.length) * 28 + 40)} />
                 </ChartCard>
               </div>
               <div className="grid gap-4 lg:grid-cols-5">
-                <ChartCard title="活跃时段" desc="模型请求次数（本地时间）" className="lg:col-span-3">
+                <ChartCard title={tr("usage.activity")} desc={tr("usage.activityDesc")} className="lg:col-span-3">
                   <EChart option={heatOption} height={250} />
                 </ChartCard>
-                <ChartCard title="消耗最多的会话" className="lg:col-span-2">
+                <ChartCard title={tr("usage.topSessions")} className="lg:col-span-2">
                   <Table className="text-xs">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>会话</TableHead>
+                        <TableHead>{tr("usage.session")}</TableHead>
                         <TableHead className="text-right">Tokens</TableHead>
-                        <TableHead className="text-right">费用</TableHead>
+                        <TableHead className="text-right">{tr("usage.cost")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {data.topSessions.map((s) => (
                         <TableRow key={s.id} className="cursor-pointer" onClick={() => openSession(s.id)}>
                           <TableCell className="max-w-[9rem]">
-                            <div className="truncate">{s.title || "新会话"}</div>
+                            <div className="truncate">{s.title || tr("common.untitled")}</div>
                             <div className="text-[11px] text-muted-foreground">{relativeTime(s.updatedAt)}</div>
                           </TableCell>
                           <TableCell className="text-right tabular-nums">{formatTokens(s.tokens)}</TableCell>

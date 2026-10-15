@@ -50,7 +50,7 @@ export function htmlToMarkdown(html: string, base?: string): string {
 export function createWebFetchTool(): HelmTool {
   return defineTool({
     name: "web_fetch",
-    label: "抓取网页",
+    label: "Fetch page",
     category: "network",
     description:
       "Fetch a URL and return its content. HTML is converted to Markdown; JSON and plain text are returned as-is. " +
@@ -135,7 +135,7 @@ async function searchDuckDuckGo(query: string, signal?: AbortSignal): Promise<Se
 export function createWebSearchTool(): HelmTool {
   return defineTool({
     name: "web_search",
-    label: "网页搜索",
+    label: "Web search",
     category: "network",
     description:
       "Search the web and return a list of results (title, URL, snippet). Use web_fetch to read a result in full. " +
