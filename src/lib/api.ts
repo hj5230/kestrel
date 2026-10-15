@@ -21,8 +21,8 @@ async function resolveBackend() {
     throw new Error("Background service start-up timed out")
   }
   const params = new URLSearchParams(location.search)
-  base = params.get("backend") ?? import.meta.env.VITE_HELM_BACKEND ?? "http://127.0.0.1:47821"
-  token = params.get("token") ?? import.meta.env.VITE_HELM_TOKEN ?? "dev"
+  base = params.get("backend") ?? import.meta.env.VITE_KESTREL_BACKEND ?? "http://127.0.0.1:47821"
+  token = params.get("token") ?? import.meta.env.VITE_KESTREL_TOKEN ?? "dev"
 }
 
 export function backendReady() {
@@ -36,7 +36,7 @@ export async function rpc<T = any>(method: string, params: unknown = {}): Promis
   await backendReady()
   const res = await fetch(`${base}/rpc`, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-helm-token": token },
+    headers: { "content-type": "application/json", "x-kestrel-token": token },
     body: JSON.stringify({ method, params }),
   })
   const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))

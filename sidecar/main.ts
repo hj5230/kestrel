@@ -12,7 +12,7 @@ function arg(name: string): string | undefined {
 }
 
 const dev = process.argv.includes("--dev");
-const dataDir = arg("data-dir") ?? path.join(os.homedir(), "Library", "Application Support", "com.zhaoshangqi.helm");
+const dataDir = arg("data-dir") ?? path.join(os.homedir(), "Library", "Application Support", "com.zhaoshangqi.kestrel");
 const port = Number(arg("port") ?? (dev ? 47821 : 0));
 const token = arg("token") ?? (dev ? "dev" : crypto.randomUUID());
 
@@ -21,7 +21,7 @@ for (const k of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_
 openDb(dataDir, dev);
 const envReady = resolveShellEnv();
 const server = startServer({ port, token, dataDir, dev });
-console.log(`HELM_READY ${JSON.stringify({ port: server.port, token })}`);
+console.log(`KESTREL_READY ${JSON.stringify({ port: server.port, token })}`);
 
 envReady.then(() => startMcp()).catch(() => {});
 

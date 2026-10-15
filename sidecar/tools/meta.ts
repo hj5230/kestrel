@@ -4,9 +4,9 @@ import { Type } from "typebox";
 import type { ChatMessage, Todo } from "../../shared/protocol";
 import * as store from "../db";
 import { findSkill } from "../skills";
-import { text, defineTool, type HelmTool, type ToolContext } from "./types";
+import { text, defineTool, type KestrelTool, type ToolContext } from "./types";
 
-export function createTodoTool(ctx: ToolContext): HelmTool {
+export function createTodoTool(ctx: ToolContext): KestrelTool {
   return defineTool({
     name: "todo_write",
     label: "Update plan",
@@ -32,7 +32,7 @@ export function createTodoTool(ctx: ToolContext): HelmTool {
   });
 }
 
-export function createTaskTool(ctx: ToolContext): HelmTool {
+export function createTaskTool(ctx: ToolContext): KestrelTool {
   return defineTool({
     name: "task",
     label: "Subagent",
@@ -79,7 +79,7 @@ function renderTranscript(messages: ChatMessage[], maxChars: number): string {
   return out;
 }
 
-export function createSearchSessionsTool(ctx: ToolContext): HelmTool {
+export function createSearchSessionsTool(ctx: ToolContext): KestrelTool {
   return defineTool({
     name: "search_sessions",
     label: "Search sessions",
@@ -103,7 +103,7 @@ export function createSearchSessionsTool(ctx: ToolContext): HelmTool {
   });
 }
 
-export function createReadSessionTool(): HelmTool {
+export function createReadSessionTool(): KestrelTool {
   return defineTool({
     name: "read_session",
     label: "Read session",
@@ -129,7 +129,7 @@ export function createReadSessionTool(): HelmTool {
   });
 }
 
-export function createSkillTool(ctx: ToolContext): HelmTool {
+export function createSkillTool(ctx: ToolContext): KestrelTool {
   return defineTool({
     name: "skill",
     label: "Load skill",

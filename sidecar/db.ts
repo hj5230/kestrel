@@ -152,11 +152,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   compactThreshold: 0.8,
   keepRecentTokens: 24000,
   systemPromptAppend: "",
-  instructionFiles: ["~/.helm/AGENTS.md", "~/.claude/CLAUDE.md"],
+  instructionFiles: ["~/.kestrel/AGENTS.md", "~/.claude/CLAUDE.md"],
   loadProjectInstructions: true,
-  skillDirs: ["~/.helm/skills", "~/.claude/skills", "~/.agents/skills"],
+  skillDirs: ["~/.kestrel/skills", "~/.claude/skills", "~/.agents/skills"],
   disabledSkills: [],
-  commandDirs: ["~/.helm/commands", "~/.claude/commands"],
+  commandDirs: ["~/.kestrel/commands", "~/.claude/commands"],
   proxyMode: "env",
   proxyUrl: "",
   bashTimeoutSec: 120,
@@ -169,9 +169,22 @@ export const DEFAULT_SETTINGS: AppSettings = {
 export let db: Database;
 export let dbPath = "";
 
+function importLegacyDb(dataDir: string, target: string, dev: boolean) {
+  if (fs.existsSync(target)) return;
+  const legacy = path.join(path.dirname(dataDir), "com.zhaoshangqi.helm", dev ? "helm-dev.db" : "helm.db");
+  if (!fs.existsSync(legacy)) return;
+  const old = new Database(legacy);
+  try {
+    old.run(`VACUUM INTO '${target.replace(/'/g, "''")}'`);
+  } finally {
+    old.close();
+  }
+}
+
 export function openDb(dataDir: string, dev: boolean) {
   fs.mkdirSync(dataDir, { recursive: true });
-  dbPath = path.join(dataDir, dev ? "helm-dev.db" : "helm.db");
+  dbPath = path.join(dataDir, dev ? "kestrel-dev.db" : "kestrel.db");
+  importLegacyDb(dataDir, dbPath, dev);
   db = new Database(dbPath, { create: true, strict: true });
   db.run("PRAGMA journal_mode = WAL");
   db.run("PRAGMA foreign_keys = ON");

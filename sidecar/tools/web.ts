@@ -1,6 +1,6 @@
 import { Type } from "typebox";
 import { proxiedFetch } from "../providers";
-import { defineTool, text, type HelmTool } from "./types";
+import { defineTool, text, type KestrelTool } from "./types";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
 
@@ -47,7 +47,7 @@ export function htmlToMarkdown(html: string, base?: string): string {
   return title ? `# ${decode(title)}\n\n${s}` : s;
 }
 
-export function createWebFetchTool(): HelmTool {
+export function createWebFetchTool(): KestrelTool {
   return defineTool({
     name: "web_fetch",
     label: "Fetch page",
@@ -132,7 +132,7 @@ async function searchDuckDuckGo(query: string, signal?: AbortSignal): Promise<Se
   return out;
 }
 
-export function createWebSearchTool(): HelmTool {
+export function createWebSearchTool(): KestrelTool {
   return defineTool({
     name: "web_search",
     label: "Web search",

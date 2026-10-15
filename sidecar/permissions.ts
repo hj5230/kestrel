@@ -1,5 +1,5 @@
 import type { AppSettings, PermissionMode } from "../shared/protocol";
-import type { HelmTool } from "./tools/types";
+import type { KestrelTool } from "./tools/types";
 
 export const DEFAULT_BASH_WHITELIST = [
   "ls",
@@ -146,7 +146,7 @@ export function suggestBashPrefix(cmd: string): string {
   return words[0];
 }
 
-export function evaluatePermission(tool: HelmTool, args: any, mode: PermissionMode, settings: AppSettings): PermissionResult {
+export function evaluatePermission(tool: KestrelTool, args: any, mode: PermissionMode, settings: AppSettings): PermissionResult {
   const base = (kind: PermissionResult["kind"], detail: string, suggestion: string | null, path: string | null = null) => ({ kind, detail, suggestion, path });
   let info: Omit<PermissionResult, "action" | "reason">;
   if (tool.name === "bash") {
