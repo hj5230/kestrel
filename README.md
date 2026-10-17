@@ -16,6 +16,7 @@ Tauri (Rust)                 sidecar (Bun, 单文件二进制 kestrel-agent)    
 - agent 循环用 `@mariozechner/pi-agent-core`；模型调用通过自定义 `streamFn` 走 Vercel AI SDK v7（`ai` + `@ai-sdk/*`），pi 的模型目录只用于补全上下文窗口与单价。
 - 供应商：Anthropic、OpenAI、Google、DeepSeek、OpenRouter、Ollama、任意 OpenAI 兼容服务。
 - 存储：`~/Library/Application Support/com.zhaoshangqi.kestrel/kestrel.db`（开发模式为 `kestrel-dev.db`），日志 `~/Library/Logs/com.zhaoshangqi.kestrel/agent.log`。
+- 移动端：iOS App 是 Mac 上 agent 的遥控器，见下文「移动端」。
 
 ## 功能
 
@@ -44,3 +45,39 @@ npm run tauri build -- --bundles app
 ```
 
 `beforeBuildCommand` 会先构建前端，再用 `bun build --compile` 生成 `src-tauri/binaries/kestrel-agent-<target>`，作为 externalBin 打进 `Kestrel.app`。
+
+## 移动端（iOS）
+
+手机不运行 agent：文件、命令、MCP 和模型都留在 Mac 上，iOS App 复用同一套前端，连接已配对 Mac 上的 sidecar。
+
+```
+iPhone: WebView 前端 ──invoke/event──▶ Rust 传输层 ──HTTPS/WSS（证书锁定）──▶ Mac: sidecar 远程监听（0.0.0.0:47830）
+```
+
+- **开启**：桌面端 设置 → 移动端 → 允许手机连接。sidecar 另开一个 TLS 监听，与桌面窗口用的本机回环接口共享同一套 RPC 与事件。
+- **配对**：点「显示配对码」，手机扫码（或粘贴 `kestrel://pair?…` 链接）。二维码里包含候选地址（局域网 IP、Tailscale IP / MagicDNS、`.local`）、端口、证书 SHA-256 指纹和一次性配对码（10 分钟有效、只能用一次、连续猜错 5 次作废）。
+- **安全模型**：
+  - 自签证书（`<数据目录>/remote/`），手机只认二维码里的指纹，不校验主机名，因此 IP 变化或走 Tailscale 都不影响，网络上的中间人无法冒充 Mac。WebView 做不到证书锁定，所以手机端所有请求都经由 Rust（rustls + ring）发出。
+  - 每台手机有独立 token：Mac 只存哈希，手机存钥匙串；可在设置里单独移除（在线连接会被立即断开），或「重置证书」一次性移除全部。
+  - 配对后的手机拥有与桌面窗口相同的控制权（经由 agent 执行命令、读写文件）；唯一例外是 `remote.*` 管理接口只允许本机调用。
+- **网络**：同一 Wi-Fi 直连；在外面用 Tailscale 等虚拟局域网。Mac 需开着 Kestrel 且未休眠。
+- **平台分岔点**（业务组件里不出现平台判断）：
+  - 传输：`src/lib/api.ts`（桌面 HTTP/WS ↔ 手机原生通道），重连 / 退避 / 回到前台重建连接的策略共用；
+  - 平台能力：`src/lib/download.ts`（导出走分享面板、无原生选目录）、`src/lib/platform.ts`；
+  - 布局：`PageHeader`、安全区、`pointer-coarse` 触屏适配、`src/lib/viewport.ts`（键盘弹出时跟随可视区域）。
+
+### 构建与安装
+
+```bash
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+brew install cocoapods xcodegen
+npm run ios:sim      # 模拟器版：src-tauri/gen/apple/build/arm64-sim/Kestrel.app
+npm run ios:ipa      # 真机版（未签名）：src-tauri/gen/apple/build/arm64/Kestrel.ipa
+```
+
+真机安装：用 SideStore（或 Xcode / Sideloadly 等）导入 `Kestrel.ipa`，它会用你的 Apple ID 重签名。免费 Apple ID 的签名 7 天过期，SideStore 可在手机上续签。
+
+### 已知限制
+
+- 后台推送需要 APNs（付费开发者账号），因此 App 在后台时不会收到审批 / 完成通知；回到前台会自动重连并同步状态。
+- iOS 模拟器（iOS 26.3 运行时）本身无法渲染彩色 emoji，真机正常。
