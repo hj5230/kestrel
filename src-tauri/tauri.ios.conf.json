@@ -1,0 +1,11 @@
+{
+  "build": {
+    "beforeBuildCommand": "npm run build"
+  },
+  "bundle": {
+    "externalBin": [],
+    "iOS": {
+      "minimumSystemVersion": "16.0"
+    }
+  }
+}

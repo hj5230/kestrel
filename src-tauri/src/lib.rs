@@ -53,6 +53,12 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             desktop::spawn_backend(app.handle())?;
+            // iOS cannot spawn the Bun sidecar; until the agent runs in-process, talk to the
+            // dev sidecar on the host (`npm run sidecar`), which the simulator reaches at 127.0.0.1.
+            #[cfg(mobile)]
+            {
+                *app.state::<Backend>().info.lock().unwrap() = Some(BackendInfo { port: 47821, token: "dev".into() });
+            }
             Ok(())
         })
         .build(tauri::generate_context!())
