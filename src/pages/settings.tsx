@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "preact/hooks"
-import { BookTextIcon, CpuIcon, FolderOpenIcon, InfoIcon, PaletteIcon, PlugIcon, RotateCcwIcon, ShieldCheckIcon, SparklesIcon } from "lucide-react"
+import { BookTextIcon, CpuIcon, FolderOpenIcon, InfoIcon, LaptopIcon, PaletteIcon, PlugIcon, RotateCcwIcon, ShieldCheckIcon, SmartphoneIcon, SparklesIcon } from "lucide-react"
 import { toast } from "sonner"
 import type { AppSettings, SkillInfo } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
@@ -10,17 +10,20 @@ import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
+import { PageHeader } from "@/components/page-header"
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { Panel, Row, Section } from "@/components/settings/layout"
 import { ModelsSettings } from "@/components/settings/models"
 import { McpSettings } from "@/components/settings/mcp"
+import { MobileSettings } from "@/components/settings/mobile"
+import { ConnectionSettings } from "@/components/settings/connection"
 import { CwdPicker, ModelPicker, PermissionPicker, ThinkingPicker, permissionModes } from "@/components/chat/pickers"
 import { VIEWS } from "@/components/chat/view-picker"
 import { rpc } from "@/lib/api"
 import { shortPath } from "@/lib/format"
 import { t, type MessageKey } from "@/lib/i18n"
 import { appInfo, enabledModels, providerName, route, settings, updateSettings } from "@/lib/store"
+import { isMobileApp, isTouch } from "@/lib/platform"
 import { cn } from "@/lib/utils"
 
 const TABS = [
@@ -30,6 +33,9 @@ const TABS = [
   { key: "skills", icon: SparklesIcon },
   { key: "instructions", icon: BookTextIcon },
   { key: "permissions", icon: ShieldCheckIcon },
+  // Pairing phones is managed on the Mac; the phone shows which Mac it drives instead.
+  ...(!isMobileApp ? [{ key: "mobile", icon: SmartphoneIcon }] : []),
+  ...(isMobileApp ? [{ key: "connection", icon: LaptopIcon }] : []),
   { key: "about", icon: InfoIcon },
 ]
 
@@ -137,17 +143,20 @@ function General({ s }: { s: AppSettings }) {
       </Section>
       <Section title={t("settings.chat")}>
         <Panel>
-          <Row label={t("settings.sendKey")}>
-            <Select value={s.sendKey} onValueChange={(v) => save({ sendKey: v as any })}>
-              <SelectTrigger size="sm" className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="enter">{t("settings.sendEnter")}</SelectItem>
-                <SelectItem value="mod-enter">{t("settings.sendMod")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </Row>
+          {/* A software keyboard's return key always inserts a newline; this only applies to hardware keyboards. */}
+          {!isTouch && (
+            <Row label={t("settings.sendKey")}>
+              <Select value={s.sendKey} onValueChange={(v) => save({ sendKey: v as any })}>
+                <SelectTrigger size="sm" className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="enter">{t("settings.sendEnter")}</SelectItem>
+                  <SelectItem value="mod-enter">{t("settings.sendMod")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </Row>
+          )}
           <Row label={t("settings.transcriptView")} desc={t("settings.transcriptViewDesc")}>
             <Select value={s.transcriptView} onValueChange={(v) => save({ transcriptView: v as AppSettings["transcriptView"] })}>
               <SelectTrigger size="sm" className="w-44">
@@ -399,12 +408,14 @@ function About() {
           <Row key={k} label={k} desc={<span className="font-mono select-text">{v}</span>} />
         ))}
       </Panel>
-      <div>
-        <Button variant="outline" size="sm" onClick={() => rpc("app.open", { path: info.dataDir })}>
-          <FolderOpenIcon />
-          {t("settings.openDataDir")}
-        </Button>
-      </div>
+      {!isMobileApp && (
+        <div>
+          <Button variant="outline" size="sm" onClick={() => rpc("app.open", { path: info.dataDir })}>
+            <FolderOpenIcon />
+            {t("settings.openDataDir")}
+          </Button>
+        </div>
+      )}
     </Section>
   )
 }
@@ -412,23 +423,21 @@ function About() {
 export function SettingsPage({ tab }: { tab?: string }) {
   const current = tab ?? "general"
   const s = settings.value!
-  const { state: sidebarState } = useSidebar()
   return (
     <div className="flex h-full flex-col">
-      <header data-tauri-drag-region className={cn("flex h-12 shrink-0 items-center gap-2 border-b px-3", sidebarState === "collapsed" && "pl-20")}>
-        <SidebarTrigger className="text-muted-foreground" />
+      <PageHeader>
         <span className="text-sm font-medium">{t("settings.title")}</span>
-      </header>
-      <div className="flex min-h-0 flex-1">
-        <nav className="w-52 shrink-0 border-r p-3">
-          <div className="grid gap-0.5">
+      </PageHeader>
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <nav className="shrink-0 overflow-x-auto border-b p-2 [scrollbar-width:none] md:w-52 md:border-r md:border-b-0 md:p-3 [&::-webkit-scrollbar]:hidden">
+          <div className="flex gap-0.5 md:grid">
             {TABS.map((tb) => (
               <button
                 key={tb.key}
                 type="button"
                 onClick={() => (route.value = { name: "settings", tab: tb.key })}
                 className={cn(
-                  "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors",
+                  "flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm whitespace-nowrap transition-colors",
                   current === tb.key ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                 )}
               >
@@ -439,13 +448,15 @@ export function SettingsPage({ tab }: { tab?: string }) {
           </div>
         </nav>
         <div className="min-w-0 flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-3xl px-8 py-8">
+          <div className="mx-auto max-w-3xl px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-8 md:py-8">
             {current === "general" && <General s={s} />}
             {current === "models" && <ModelsSettings />}
             {current === "mcp" && <McpSettings />}
             {current === "skills" && <Skills s={s} />}
             {current === "instructions" && <Instructions s={s} />}
             {current === "permissions" && <Permissions s={s} />}
+            {current === "mobile" && <MobileSettings />}
+            {current === "connection" && <ConnectionSettings />}
             {current === "about" && <About />}
           </div>
         </div>

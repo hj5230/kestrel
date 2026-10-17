@@ -97,7 +97,7 @@ export function UserMessage({
           {text}
         </div>
       )}
-      <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/user:opacity-100">
+      <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/user:opacity-100 pointer-coarse:opacity-100">
         <span className="mr-1 text-[11px] text-muted-foreground">{clockTime(m.timestamp)}</span>
         <CopyButton text={text} />
         {canEdit && (
@@ -157,7 +157,7 @@ export function AssistantMeta({ msg, hover }: { msg: AssistantMsg; hover?: boole
     .map((c: any) => c.text)
     .join("\n\n")
   return (
-    <div className={cn("mt-1 flex items-center gap-0.5", hover && "opacity-0 transition-opacity group-hover/assistant:opacity-100")}>
+    <div className={cn("mt-1 flex items-center gap-0.5", hover && "opacity-0 transition-opacity group-hover/assistant:opacity-100 pointer-coarse:opacity-100")}>
       <CopyButton text={text} />
       <span className="ml-1 text-[11px] text-muted-foreground tabular-nums">
         {t("msg.usage", {

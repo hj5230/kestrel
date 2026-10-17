@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner"
 import type { SessionInfo, ThinkingLevel, PermissionMode } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
-import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
+import { PageHeader } from "@/components/page-header"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +39,8 @@ import { downloadText } from "@/lib/download"
 import { shortPath } from "@/lib/format"
 import { appInfo, createSession, detailSignal, enabledModels, findModel, loadDetail, openSession, settings } from "@/lib/store"
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom"
+import { useMediaQuery } from "@/hooks/use-media-query"
+import { isMobileApp } from "@/lib/platform"
 import { cn } from "@/lib/utils"
 import { t } from "@/lib/i18n"
 
@@ -61,6 +63,24 @@ function SubagentSheet({ id, onClose }: { id: string | null; onClose: () => void
   )
 }
 
+function PlanPanel({ todos }: { todos: SessionInfo["todos"] }) {
+  const open = todos.some((t) => t.status !== "completed")
+  return (
+    <>
+      <div className="flex items-center gap-2 border-b px-4 py-3 text-sm font-medium">
+        <ListChecksIcon className="size-4 text-muted-foreground" />
+        {t("chat.plan")}
+        <span className="ml-auto text-xs font-normal text-muted-foreground tabular-nums">
+          {todos.filter((t) => t.status === "completed").length}/{todos.length}
+        </span>
+      </div>
+      <div className={cn("px-4 py-3", !open && "opacity-70")}>
+        <TodoList todos={todos} />
+      </div>
+    </>
+  )
+}
+
 export function ChatView({ sessionId }: { sessionId: string }) {
   const sig = detailSignal(sessionId)
   const d = sig.value
@@ -69,7 +89,9 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const [renaming, setRenaming] = useState<SessionInfo | null>(null)
   const [deleting, setDeleting] = useState<SessionInfo | null>(null)
   const [showPlan, setShowPlan] = useState(true)
-  const { state: sidebarState } = useSidebar()
+  // Wide windows dock the plan beside the transcript; narrower screens open it as a drawer on demand.
+  const wide = useMediaQuery("(min-width: 1024px)")
+  const [planSheet, setPlanSheet] = useState(false)
 
   useEffect(() => {
     loadDetail(sessionId).catch((e) => toast.error(e.message))
@@ -94,7 +116,6 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const running = s.status === "running" || s.status === "waiting"
   const model = findModel(s.providerId, s.modelId)
   const update = (patch: Partial<SessionInfo>) => rpc("sessions.update", { id: s.id, patch }).catch((e) => toast.error(e.message))
-  const hasTodos = s.todos.length > 0 && s.todos.some((t) => t.status !== "completed")
 
   const send = async (text: string, images: Attachment[]) => {
     const imgs = images.map(({ data, mimeType }) => ({ type: "image", data, mimeType }))
@@ -154,35 +175,43 @@ export function ChatView({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header
-        data-tauri-drag-region
-        className={cn("flex h-12 shrink-0 items-center gap-2 border-b px-3", sidebarState === "collapsed" && "pl-20")}
-      >
-        <SidebarTrigger className="text-muted-foreground" />
+      <PageHeader>
         <button type="button" onClick={() => setRenaming(s)} className="group/title flex min-w-0 max-w-[55%] shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-muted">
           <span className={cn("truncate text-sm font-medium", !s.title && "text-muted-foreground")}>{s.title || t("common.untitled")}</span>
           <PencilIcon className="size-3 shrink-0 text-muted-foreground opacity-0 group-hover/title:opacity-100" />
         </button>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={() => rpc("app.open", { path: s.cwd })}
-              className="flex min-w-0 shrink items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <FolderIcon className="size-3.5 shrink-0" />
-              <span className="truncate font-mono">{shortPath(s.cwd, appInfo.value?.home)}</span>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{t("chat.openInFinder")}</TooltipContent>
-        </Tooltip>
+        {isMobileApp ? (
+          // The folder lives on the Mac; there is no Finder to open it in from here.
+          <span className="hidden min-w-0 shrink items-center gap-1 px-1.5 py-1 text-xs text-muted-foreground sm:flex">
+            <FolderIcon className="size-3.5 shrink-0" />
+            <span className="truncate font-mono">{shortPath(s.cwd, appInfo.value?.home)}</span>
+          </span>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => rpc("app.open", { path: s.cwd })}
+                className="flex min-w-0 shrink items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <FolderIcon className="size-3.5 shrink-0" />
+                <span className="truncate font-mono">{shortPath(s.cwd, appInfo.value?.home)}</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{t("chat.openInFinder")}</TooltipContent>
+          </Tooltip>
+        )}
         <div className="ml-auto flex items-center gap-1">
           <ViewPicker />
           <ContextMeter session={s} model={model} onCompact={() => compact()} compacting={d.compacting} />
           {s.todos.length > 0 && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant={showPlan ? "secondary" : "ghost"} size="icon-sm" onClick={() => setShowPlan(!showPlan)}>
+                <Button
+                  variant={(wide ? showPlan : planSheet) ? "secondary" : "ghost"}
+                  size="icon-sm"
+                  onClick={() => (wide ? setShowPlan(!showPlan) : setPlanSheet(true))}
+                >
                   <ListChecksIcon />
                 </Button>
               </TooltipTrigger>
@@ -220,12 +249,12 @@ export function ChatView({ sessionId }: { sessionId: string }) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </header>
+      </PageHeader>
 
       <div className="flex min-h-0 flex-1">
         <div className="relative flex min-w-0 flex-1 flex-col">
           <div ref={ref} className="min-h-0 flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-3xl px-6 pt-8 pb-10">
+            <div className="mx-auto w-full max-w-3xl px-4 pt-5 pb-8 md:px-6 md:pt-8 md:pb-10">
               {d.messages.length === 0 && !d.streaming ? (
                 <div className="py-16 text-center text-sm text-muted-foreground">{t("chat.empty")}</div>
               ) : (
@@ -245,7 +274,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
               <ArrowDownIcon />
             </Button>
           )}
-          <div className="mx-auto w-full max-w-3xl shrink-0 px-6 pb-5">
+          <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-[max(0.75rem,var(--safe-bottom))] md:px-6 md:pb-5">
             <div className="flex flex-col gap-2">
               {d.approvals.map((a) => (
                 <ApprovalCard key={a.id} req={a} />
@@ -294,21 +323,21 @@ export function ChatView({ sessionId }: { sessionId: string }) {
             </div>
           </div>
         </div>
-        {showPlan && s.todos.length > 0 && (
-          <aside className="hidden w-72 shrink-0 border-l bg-sidebar/40 lg:block">
-            <div className="flex items-center gap-2 border-b px-4 py-3 text-sm font-medium">
-              <ListChecksIcon className="size-4 text-muted-foreground" />
-              {t("chat.plan")}
-              <span className="ml-auto text-xs font-normal text-muted-foreground tabular-nums">
-                {s.todos.filter((t) => t.status === "completed").length}/{s.todos.length}
-              </span>
-            </div>
-            <div className={cn("px-4 py-3", !hasTodos && "opacity-70")}>
-              <TodoList todos={s.todos} />
-            </div>
+        {wide && showPlan && s.todos.length > 0 && (
+          <aside className="w-72 shrink-0 border-l bg-sidebar/40">
+            <PlanPanel todos={s.todos} />
           </aside>
         )}
       </div>
+      <Sheet open={!wide && planSheet && s.todos.length > 0} onOpenChange={setPlanSheet}>
+        <SheetContent className="w-[min(22rem,88vw)] gap-0 p-0">
+          <SheetHeader className="sr-only">
+            <SheetTitle>{t("chat.plan")}</SheetTitle>
+            <SheetDescription>{t("chat.plan")}</SheetDescription>
+          </SheetHeader>
+          <PlanPanel todos={s.todos} />
+        </SheetContent>
+      </Sheet>
       <SubagentSheet id={subagent} onClose={() => setSubagent(null)} />
       <RenameDialog session={renaming} onClose={() => setRenaming(null)} />
       <ConfirmDeleteDialog session={deleting} onClose={() => setDeleting(null)} />

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "preact/hooks"
+import { useEffect, useMemo, useState } from "preact/hooks"
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
@@ -31,6 +31,7 @@ import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import {
   DropdownMenu,
@@ -50,7 +51,8 @@ import { Button } from "@/components/ui/button"
 import { RenameDialog, ConfirmDeleteDialog, ArchivedDialog } from "@/components/session-dialogs"
 import { rpc } from "@/lib/api"
 import { basename, dayBucket, relativeTime, shortPath } from "@/lib/format"
-import { appInfo, connected, paletteOpen, route, sessions, enabledModels } from "@/lib/store"
+import { appInfo, connected, pairedMac, paletteOpen, route, sessions, enabledModels } from "@/lib/store"
+import { isDesktopApp, isMobileApp } from "@/lib/platform"
 import { downloadText } from "@/lib/download"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -80,12 +82,12 @@ function SessionItem({ s, active, onRename, onDelete }: { s: SessionInfo; active
       <SidebarMenuButton
         isActive={active}
         onClick={() => (route.value = { name: "chat", sessionId: s.id })}
-        className="h-8 gap-2 pr-8"
+        className="h-8 gap-2 pr-8 pointer-coarse:h-10"
         title={`${s.title || t("common.untitled")}\n${shortPath(s.cwd, appInfo.value?.home)}`}
       >
         {status && <span className="flex size-4 shrink-0 items-center justify-center">{status}</span>}
         <span className={cn("truncate", !s.title && "text-muted-foreground")}>{s.title || t("common.untitled")}</span>
-        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/70 tabular-nums group-hover/menu-item:opacity-0">
+        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/70 tabular-nums group-hover/menu-item:opacity-0 pointer-coarse:group-hover/menu-item:opacity-100">
           {relativeTime(s.updatedAt)}
         </span>
       </SidebarMenuButton>
@@ -113,10 +115,12 @@ function SessionItem({ s, active, onRename, onDelete }: { s: SessionInfo; active
             <DownloadIcon />
             {t("sidebar.exportMd")}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => rpc("app.open", { path: s.cwd })}>
-            <FolderOpenIcon />
-            {t("sidebar.openFolder")}
-          </DropdownMenuItem>
+          {!isMobileApp && (
+            <DropdownMenuItem onSelect={() => rpc("app.open", { path: s.cwd })}>
+              <FolderOpenIcon />
+              {t("sidebar.openFolder")}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onSelect={async () => {
@@ -145,6 +149,9 @@ export function AppSidebar() {
   const [archivedOpen, setArchivedOpen] = useState(false)
   const r = route.value
   const activeId = r.name === "chat" ? r.sessionId : null
+  const { setOpenMobile } = useSidebar()
+  // On phones the sidebar is a drawer over the page: get out of the way once something is picked.
+  useEffect(() => setOpenMobile(false), [JSON.stringify(r)])
   const list = sessions.value
 
   const groups = useMemo(() => {
@@ -180,7 +187,7 @@ export function AppSidebar() {
   return (
     <Sidebar variant="sidebar" collapsible="offcanvas">
       <SidebarHeader className="gap-3 pt-0">
-        <div data-tauri-drag-region className="h-9 shrink-0" />
+        <div data-tauri-drag-region={isDesktopApp || undefined} className={cn("shrink-0", isMobileApp ? "h-[max(0.5rem,env(safe-area-inset-top))]" : "h-9")} />
         <div className="flex items-center gap-2 px-1.5">
           <Logo className="size-7" />
           <span className="font-semibold tracking-tight">Kestrel</span>
@@ -249,11 +256,13 @@ export function AppSidebar() {
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border">
+      <SidebarFooter className="border-t border-sidebar-border pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground">
           <span className={cn("size-1.5 rounded-full", connected.value ? "bg-success" : "bg-destructive")} />
-          <span>{connected.value ? t("sidebar.connected") : t("sidebar.connecting")}</span>
-          <span className="ml-auto flex items-center gap-1">
+          <span className="truncate">
+            {isMobileApp && pairedMac.value ? pairedMac.value.serverName : connected.value ? t("sidebar.connected") : t("sidebar.connecting")}
+          </span>
+          <span className="ml-auto flex shrink-0 items-center gap-1">
             <HistoryIcon className="size-3" />
             {t("sidebar.stats", { sessions: list.length, models: enabledModels.value.length })}
           </span>

@@ -3,7 +3,7 @@ import { ActivityIcon, CoinsIcon, DatabaseZapIcon, MessagesSquareIcon, WrenchIco
 import type { UsageSummary } from "@shared/protocol"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
+import { PageHeader } from "@/components/page-header"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -66,7 +66,6 @@ function days(range: number, data: UsageSummary["daily"]) {
 export function UsagePage() {
   const [range, setRange] = useState("30")
   const [data, setData] = useState<UsageSummary | null>(null)
-  const { state: sidebarState } = useSidebar()
 
   useEffect(() => {
     setData(null)
@@ -253,8 +252,7 @@ export function UsagePage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header data-tauri-drag-region className={cn("flex h-12 shrink-0 items-center gap-2 border-b px-3", sidebarState === "collapsed" && "pl-20")}>
-        <SidebarTrigger className="text-muted-foreground" />
+      <PageHeader>
         <span className="text-sm font-medium">{tr("usage.title")}</span>
         <ToggleGroup type="single" variant="outline" size="sm" value={range} onValueChange={(v) => v && setRange(v)} className="ml-auto">
           {RANGES.map((r) => (
@@ -263,7 +261,7 @@ export function UsagePage() {
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-      </header>
+      </PageHeader>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto grid max-w-6xl gap-4 p-6">
           {!data ? (

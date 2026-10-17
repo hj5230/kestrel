@@ -3,13 +3,12 @@ import { ArrowRightIcon, KeyRoundIcon } from "lucide-react"
 import { Logo } from "@/components/logo"
 import type { PermissionMode, SessionInfo, ThinkingLevel } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
-import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
+import { PageHeader } from "@/components/page-header"
 import { Composer, type Attachment } from "@/components/chat/composer"
 import { CwdPicker, ModelPicker, PermissionPicker, ThinkingPicker } from "@/components/chat/pickers"
 import { rpc } from "@/lib/api"
 import { basename, relativeTime, shortPath } from "@/lib/format"
 import { appInfo, enabledModels, findModel, openSession, route, sessions, settings } from "@/lib/store"
-import { cn } from "@/lib/utils"
 import { t } from "@/lib/i18n"
 
 function greeting() {
@@ -31,7 +30,6 @@ export function HomeView() {
   })
   const [thinking, setThinking] = useState<ThinkingLevel>(s.defaultThinking)
   const [perm, setPerm] = useState<PermissionMode>(s.defaultPermissionMode)
-  const { state: sidebarState } = useSidebar()
 
   useEffect(() => {
     if (!model.modelId && firstModel) setModel({ providerId: firstModel.providerId, modelId: firstModel.id })
@@ -49,10 +47,8 @@ export function HomeView() {
 
   return (
     <div className="flex h-full flex-col">
-      <header data-tauri-drag-region className={cn("flex h-12 shrink-0 items-center px-3", sidebarState === "collapsed" && "pl-20")}>
-        <SidebarTrigger className="text-muted-foreground" />
-      </header>
-      <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6">
+      <PageHeader bordered={false} />
+      <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 pb-[var(--safe-bottom)] md:px-6">
         <div className="flex w-full max-w-3xl flex-1 flex-col justify-center pb-[12vh]">
           <div className="mb-8 flex flex-col items-center gap-3 text-center">
             <Logo className="size-14" />
