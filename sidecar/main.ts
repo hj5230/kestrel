@@ -4,6 +4,7 @@ import { openDb } from "./db";
 import { resolveShellEnv } from "./env";
 import { startMcp, stopAllMcp } from "./mcp";
 import { killAllShells } from "./tools/bash";
+import { initRemote, shutdownRemote } from "./remote";
 import { startServer } from "./server";
 
 function arg(name: string): string | undefined {
@@ -22,10 +23,12 @@ openDb(dataDir, dev);
 const envReady = resolveShellEnv();
 const server = startServer({ port, token, dataDir, dev });
 console.log(`KESTREL_READY ${JSON.stringify({ port: server.port, token })}`);
+initRemote(dataDir);
 
 envReady.then(() => startMcp()).catch(() => {});
 
 async function shutdown() {
+  shutdownRemote();
   killAllShells();
   await Promise.race([stopAllMcp(), new Promise((r) => setTimeout(r, 1500))]);
   process.exit(0);

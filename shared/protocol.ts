@@ -250,6 +250,30 @@ export interface AppSettings {
   notifyOnFinish: boolean;
   sendKey: "enter" | "mod-enter";
   transcriptView: TranscriptView;
+  remoteEnabled: boolean;
+  remotePort: number;
+}
+
+export interface RemoteDevice {
+  id: string;
+  name: string;
+  createdAt: number;
+  lastSeenAt: number;
+  online: boolean;
+}
+
+export interface RemoteStatus {
+  enabled: boolean;
+  running: boolean;
+  port: number;
+  serverName: string;
+  /** SHA-256 of the listener's certificate (lowercase hex); the mobile app pins it. */
+  fingerprint: string;
+  hosts: string[];
+  error: string | null;
+  /** Active one-time pairing offer, encoded as a kestrel://pair link for the QR code. */
+  pairing: { url: string; expiresAt: number } | null;
+  devices: RemoteDevice[];
 }
 
 export interface UsageSummary {
@@ -297,7 +321,8 @@ export type ServerEvent =
   | { type: "compacting"; sessionId: string; active: boolean }
   | { type: "mcp_status"; servers: McpServerStatus[] }
   | { type: "notice"; sessionId?: string; level: "info" | "warn" | "error"; text: string }
-  | { type: "run_finished"; sessionId: string; title: string; ok: boolean };
+  | { type: "run_finished"; sessionId: string; title: string; ok: boolean }
+  | { type: "remote_status"; status: RemoteStatus };
 
 export interface BashDetails {
   command: string;
