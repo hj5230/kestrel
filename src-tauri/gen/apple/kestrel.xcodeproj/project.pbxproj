@@ -1,0 +1,462 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		269E2652F51E25A775B2F4F3 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE7EA44D9568EDD87F10B1E7 /* Metal.framework */; };
+		26BF492F4DFFB12CA8EDB955 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = C422230037B0DA7748EA2AE8 /* main.mm */; };
+		3D9AC729BB1AFC5A2D8B4A99 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 375DC10AAD3DB56DB158CEDD /* QuartzCore.framework */; };
+		4F24F9A898F16988B5AEF2D8 /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 2B6EA4611C8AE658E393DFE3 /* libapp.a */; };
+		54F8D25D2195FC9E9D8771A2 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3F4CB5402EB128F7911BD4AC /* WebKit.framework */; };
+		668092F9C3E3D853CD61C795 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D9477D34F006910FFA17CC27 /* CoreGraphics.framework */; };
+		7A33E254A84716117D9D39BB /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2B49D1DEFF35C89A2C76F0DF /* MetalKit.framework */; };
+		7B377CE40109BA06A9A81B1D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D4B97566C62422D6331C882A /* Assets.xcassets */; };
+		9636467353CE1342DCDA732F /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 26D4A71E8EACE26AC7E626CA /* Security.framework */; };
+		A35A29F55510108DF279126E /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B7337FA441A4C0122FA8CB73 /* UIKit.framework */; };
+		A60DB544E580D68C923C4A52 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = C483D320C23FAABE4C04D229 /* assets */; };
+		F5E00F11DA21C054F4610CA5 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 1FD0DD41AF9B5ACB39754E03 /* LaunchScreen.storyboard */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		16CD1F5A9A0C3564630CFC43 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		1FD0DD41AF9B5ACB39754E03 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		26D4A71E8EACE26AC7E626CA /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		29079D0B8371B5D9EF40FB5E /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		2B49D1DEFF35C89A2C76F0DF /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		2B6EA4611C8AE658E393DFE3 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		375DC10AAD3DB56DB158CEDD /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		3F4CB5402EB128F7911BD4AC /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		3FB341E6306B8DAA65A8EF58 /* kestrel_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = kestrel_iOS.entitlements; sourceTree = "<group>"; };
+		B7337FA441A4C0122FA8CB73 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		BFBBFBF09736CC92A433B8EF /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		C422230037B0DA7748EA2AE8 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		C483D320C23FAABE4C04D229 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		CE7EA44D9568EDD87F10B1E7 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		D4B97566C62422D6331C882A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D9477D34F006910FFA17CC27 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		E62A34656DBA28E962AD7C40 /* desktop.rs */ = {isa = PBXFileReference; path = desktop.rs; sourceTree = "<group>"; };
+		F851A55E3204D096B080F9A0 /* kestrel_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = kestrel_iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FA0166B27D856932EA032BCE /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		FA8390863A51F6ABCF0E8F22 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4F24F9A898F16988B5AEF2D8 /* libapp.a in Frameworks */,
+				668092F9C3E3D853CD61C795 /* CoreGraphics.framework in Frameworks */,
+				269E2652F51E25A775B2F4F3 /* Metal.framework in Frameworks */,
+				7A33E254A84716117D9D39BB /* MetalKit.framework in Frameworks */,
+				3D9AC729BB1AFC5A2D8B4A99 /* QuartzCore.framework in Frameworks */,
+				9636467353CE1342DCDA732F /* Security.framework in Frameworks */,
+				A35A29F55510108DF279126E /* UIKit.framework in Frameworks */,
+				54F8D25D2195FC9E9D8771A2 /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		113F85E0337CCF712B970D91 /* kestrel_iOS */ = {
+			isa = PBXGroup;
+			children = (
+				16CD1F5A9A0C3564630CFC43 /* Info.plist */,
+				3FB341E6306B8DAA65A8EF58 /* kestrel_iOS.entitlements */,
+			);
+			path = kestrel_iOS;
+			sourceTree = "<group>";
+		};
+		1E1CD709EEA2986C810E8FAA /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				C737735AF3632DBE8CE2A899 /* kestrel */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		410A24C6FCB828BA1F0CA0AE /* src */ = {
+			isa = PBXGroup;
+			children = (
+				E62A34656DBA28E962AD7C40 /* desktop.rs */,
+				FA0166B27D856932EA032BCE /* lib.rs */,
+				29079D0B8371B5D9EF40FB5E /* main.rs */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+		5BE04F2D93D9131AB56A4C87 /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				BFBBFBF09736CC92A433B8EF /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
+		A53C8E05C2EEBA4776439E04 = {
+			isa = PBXGroup;
+			children = (
+				C483D320C23FAABE4C04D229 /* assets */,
+				D4B97566C62422D6331C882A /* Assets.xcassets */,
+				1FD0DD41AF9B5ACB39754E03 /* LaunchScreen.storyboard */,
+				E916C30CBFF6481474ACEA27 /* Externals */,
+				113F85E0337CCF712B970D91 /* kestrel_iOS */,
+				1E1CD709EEA2986C810E8FAA /* Sources */,
+				410A24C6FCB828BA1F0CA0AE /* src */,
+				C5E12814752A8F2253DA7AEF /* Frameworks */,
+				FF6049E10DEFD1B0C229EC51 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C5E12814752A8F2253DA7AEF /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D9477D34F006910FFA17CC27 /* CoreGraphics.framework */,
+				2B6EA4611C8AE658E393DFE3 /* libapp.a */,
+				CE7EA44D9568EDD87F10B1E7 /* Metal.framework */,
+				2B49D1DEFF35C89A2C76F0DF /* MetalKit.framework */,
+				375DC10AAD3DB56DB158CEDD /* QuartzCore.framework */,
+				26D4A71E8EACE26AC7E626CA /* Security.framework */,
+				B7337FA441A4C0122FA8CB73 /* UIKit.framework */,
+				3F4CB5402EB128F7911BD4AC /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		C737735AF3632DBE8CE2A899 /* kestrel */ = {
+			isa = PBXGroup;
+			children = (
+				C422230037B0DA7748EA2AE8 /* main.mm */,
+				5BE04F2D93D9131AB56A4C87 /* bindings */,
+			);
+			path = kestrel;
+			sourceTree = "<group>";
+		};
+		E916C30CBFF6481474ACEA27 /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Externals;
+			sourceTree = "<group>";
+		};
+		FF6049E10DEFD1B0C229EC51 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F851A55E3204D096B080F9A0 /* kestrel_iOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1A051E7E4E454BBDC64D7C9D /* kestrel_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 131B0A2F81473747D17F7C64 /* Build configuration list for PBXNativeTarget "kestrel_iOS" */;
+			buildPhases = (
+				2AB72A22F8642EC5DB69DEAD /* Build Rust Code */,
+				38A28C9DAAE41FE947561F23 /* Sources */,
+				5A35DD71DD040741230646A9 /* Resources */,
+				FA8390863A51F6ABCF0E8F22 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = kestrel_iOS;
+			packageProductDependencies = (
+			);
+			productName = kestrel_iOS;
+			productReference = F851A55E3204D096B080F9A0 /* kestrel_iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		056A8623C709A4E638F8EC3A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 346DE73913FAD81F5D227F06 /* Build configuration list for PBXProject "kestrel" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = A53C8E05C2EEBA4776439E04;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = FF6049E10DEFD1B0C229EC51 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1A051E7E4E454BBDC64D7C9D /* kestrel_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		5A35DD71DD040741230646A9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7B377CE40109BA06A9A81B1D /* Assets.xcassets in Resources */,
+				F5E00F11DA21C054F4610CA5 /* LaunchScreen.storyboard in Resources */,
+				A60DB544E580D68C923C4A52 /* assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		2AB72A22F8642EC5DB69DEAD /* Build Rust Code */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Code";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a",
+				"$(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "npm run -- tauri ios xcode-script -v --platform \"${PLATFORM_DISPLAY_NAME:?}\" --sdk-root \"${SDKROOT:?}\" --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration \"${CONFIGURATION:?}\" ${FORCE_COLOR} ${ARCHS:?}\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		38A28C9DAAE41FE947561F23 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				26BF492F4DFFB12CA8EDB955 /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1107AEE317E3DBB70EC1711C /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = kestrel_iOS/kestrel_iOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = kestrel_iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.zhaoshangqi.kestrel;
+				PRODUCT_NAME = "Kestrel";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+		7AFE144794A9ADE7BD0C7D1B /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = release;
+		};
+		8F80D47F34F933CBF1CB3505 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = kestrel_iOS/kestrel_iOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = kestrel_iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.zhaoshangqi.kestrel;
+				PRODUCT_NAME = "Kestrel";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = debug;
+		};
+		C8BAF57E830DAA67BBFD69D8 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		131B0A2F81473747D17F7C64 /* Build configuration list for PBXNativeTarget "kestrel_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8F80D47F34F933CBF1CB3505 /* debug */,
+				1107AEE317E3DBB70EC1711C /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		346DE73913FAD81F5D227F06 /* Build configuration list for PBXProject "kestrel" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C8BAF57E830DAA67BBFD69D8 /* debug */,
+				7AFE144794A9ADE7BD0C7D1B /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 056A8623C709A4E638F8EC3A /* Project object */;
+}
