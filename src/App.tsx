@@ -5,12 +5,14 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { CommandPalette } from "@/components/command-palette"
 import { BootScreen } from "@/components/boot-screen"
+import { PairScreen } from "@/components/pair-screen"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { ChatView } from "@/components/chat/chat-view"
 import { HomeView } from "@/pages/home"
 import { UsagePage } from "@/pages/usage"
 import { SettingsPage } from "@/pages/settings"
-import { bootError, paletteOpen, route, settings } from "@/lib/store"
+import { isMobileApp } from "@/lib/platform"
+import { bootError, deviceRevoked, pairedMac, paletteOpen, route, settings } from "@/lib/store"
 
 function useShortcuts() {
   useEffect(() => {
@@ -45,6 +47,7 @@ export default function App() {
   useShortcuts()
   const s = settings.value
   const dark = typeof document !== "undefined" && document.documentElement.classList.contains("dark")
+  if (isMobileApp && (pairedMac.value === null || deviceRevoked.value)) return <PairScreen />
   if (!s || bootError.value) return <BootScreen error={bootError.value} />
   return (
     <TooltipProvider delayDuration={400}>
@@ -59,7 +62,7 @@ export default function App() {
       <ErrorBoundary compact resetKey={paletteOpen.value}>
         <CommandPalette />
       </ErrorBoundary>
-      <Toaster theme={dark ? "dark" : "light"} position="bottom-right" />
+      <Toaster theme={dark ? "dark" : "light"} position={isMobileApp ? "top-center" : "bottom-right"} />
     </TooltipProvider>
   )
 }

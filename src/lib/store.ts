@@ -6,11 +6,14 @@ import type {
   McpServerStatus,
   ModelConfig,
   ProviderConfig,
+  RemoteStatus,
   SessionDetail,
   SessionInfo,
 } from "@shared/protocol"
-import { connectEvents, isTauri, onConnection, onServerEvent, rpc } from "./api"
+import { connectEvents, disconnectEvents, onConnection, onRevoked, onServerEvent, rpc } from "./api"
 import { setLang, t } from "./i18n"
+import { forgetMac, getPairedMac, type PairedMac } from "./pairing"
+import { isMobileApp, isTauri } from "./platform"
 
 export type Route =
   | { name: "home" }
@@ -22,9 +25,13 @@ export interface DetailState extends SessionDetail {
   compacting: boolean
 }
 
+// Desktop restores the route per window session; iOS kills backgrounded apps, so the phone keeps
+// it across launches to come back where the user left off.
+const routeStore = () => (isMobileApp ? localStorage : sessionStorage)
+
 function initialRoute(): Route {
   try {
-    const r = JSON.parse(sessionStorage.getItem("kestrel-route") ?? "null")
+    const r = JSON.parse(routeStore().getItem("kestrel-route") ?? "null")
     if (r && typeof r.name === "string") return r
   } catch {}
   return { name: "home" }
@@ -33,7 +40,7 @@ function initialRoute(): Route {
 export const route = signal<Route>(initialRoute())
 route.subscribe((r) => {
   try {
-    sessionStorage.setItem("kestrel-route", JSON.stringify(r))
+    routeStore().setItem("kestrel-route", JSON.stringify(r))
   } catch {}
 })
 export const sessions = signal<SessionInfo[]>([])
@@ -45,6 +52,12 @@ export const mcpServers = signal<McpServerStatus[]>([])
 export const connected = signal(false)
 export const bootError = signal<string | null>(null)
 export const paletteOpen = signal(false)
+/** Desktop: state of the LAN listener phones connect to (Settings → Mobile). */
+export const remoteStatus = signal<RemoteStatus | null>(null)
+/** Mobile: the Mac this phone controls; null = not paired yet, undefined = still loading. */
+export const pairedMac = signal<PairedMac | null | undefined>(undefined)
+/** Mobile: the Mac removed this phone; it has to pair again. */
+export const deviceRevoked = signal(false)
 export const newSessionOpen = signal(false)
 
 const details = new Map<string, Signal<DetailState | null>>()
@@ -150,7 +163,14 @@ async function notify(title: string, body: string) {
   } catch {}
 }
 
+let eventsWired = false
+
 function handleEvents() {
+  if (eventsWired) return
+  eventsWired = true
+  onRevoked(() => {
+    deviceRevoked.value = true
+  })
   onConnection((c) => {
     const was = connected.value
     connected.value = c
@@ -228,13 +248,21 @@ function handleEvents() {
       case "run_finished":
         if (settings.value?.notifyOnFinish) notify(e.ok ? t("notify.done") : t("notify.failed"), e.title)
         break
+      case "remote_status":
+        remoteStatus.value = e.status
+        break
     }
   })
 }
 
 export async function boot() {
   handleEvents()
+  bootError.value = null
   try {
+    if (isMobileApp) {
+      pairedMac.value = await getPairedMac()
+      if (!pairedMac.value) return
+    }
     const [info, s] = await Promise.all([rpc<AppInfo>("app.info"), rpc<AppSettings>("settings.get")])
     appInfo.value = info
     settings.value = s
@@ -247,6 +275,29 @@ export async function boot() {
     }
     connectEvents()
   } catch (e: any) {
-    bootError.value = e?.message ?? String(e)
+    const msg = e?.message ?? String(e)
+    if (isMobileApp && msg === "unauthorized") deviceRevoked.value = true
+    else bootError.value = msg
   }
+}
+
+/** Mobile: start using a freshly paired Mac. */
+export function adoptPairedMac(mac: PairedMac) {
+  disconnectEvents()
+  pairedMac.value = mac
+  deviceRevoked.value = false
+  settings.value = null
+  void boot()
+}
+
+/** Mobile: drop the pairing and go back to the pairing screen. */
+export async function unpairMac() {
+  disconnectEvents()
+  await forgetMac().catch(() => {})
+  settings.value = null
+  sessions.value = []
+  details.clear()
+  route.value = { name: "home" }
+  deviceRevoked.value = false
+  pairedMac.value = null
 }

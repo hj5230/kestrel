@@ -7,6 +7,7 @@ import { Kbd } from "@/components/ui/kbd"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { rpc } from "@/lib/api"
 import { settings } from "@/lib/store"
+import { isTouch } from "@/lib/platform"
 import { cn } from "@/lib/utils"
 import { t, type MessageKey } from "@/lib/i18n"
 import { toast } from "sonner"
@@ -132,8 +133,9 @@ export function Composer({
     el.style.height = `${Math.min(el.scrollHeight, 320)}px`
   }, [text])
 
+  // On touch devices focusing pops the keyboard over the conversation; let the user tap in.
   useEffect(() => {
-    if (autoFocus) ta.current?.focus()
+    if (autoFocus && !isTouch) ta.current?.focus()
   }, [autoFocus])
 
   const before = text.slice(0, caret)
@@ -276,7 +278,8 @@ export function Composer({
       setText(next >= 0 ? history[history.length - 1 - next] : "")
       return
     }
-    if (e.key === "Enter") {
+    // A software keyboard's return key inserts a newline; sending is the button's job.
+    if (e.key === "Enter" && !isTouch) {
       const mod = e.metaKey || e.ctrlKey
       const shouldSend = sendKey === "enter" ? !e.shiftKey && !mod : mod
       if (shouldSend) {

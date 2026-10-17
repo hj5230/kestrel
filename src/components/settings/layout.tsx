@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 export function Section({ title, desc, children, action }: { title: string; desc?: string; children: ComponentChildren; action?: ComponentChildren }) {
   return (
     <section className="grid gap-3">
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div>
           <h2 className="text-[15px] font-semibold">{title}</h2>
           {desc && <p className="mt-0.5 text-[13px] text-muted-foreground">{desc}</p>}

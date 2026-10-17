@@ -24,7 +24,8 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { rpc, isTauri } from "@/lib/api"
+import { rpc } from "@/lib/api"
+import { isDesktopApp } from "@/lib/platform"
 import { pickDirectory } from "@/lib/download"
 import { basename, formatTokens, shortPath } from "@/lib/format"
 import { appInfo, enabledModels, findModel, providers, route } from "@/lib/store"
@@ -237,7 +238,7 @@ export function CwdPicker({ value, onChange }: { value: string; onChange: (v: st
                 ))}
               </CommandGroup>
             )}
-            {isTauri && (
+            {isDesktopApp && (
               <>
                 <CommandSeparator />
                 <CommandGroup>

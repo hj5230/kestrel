@@ -512,7 +512,7 @@ export function ModelsSettings() {
                         {m.cost.input || m.cost.output ? t("models.perM", { in: +m.cost.input.toFixed(3), out: +m.cost.output.toFixed(3) }) : ""}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/model:opacity-100">
+                    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/model:opacity-100 pointer-coarse:opacity-100">
                       <Button variant="ghost" size="icon-sm" title={t("models.test")} onClick={() => test(m)} disabled={testing !== null}>
                         {testing === `${m.providerId}/${m.id}` ? <Spinner /> : <PlayIcon />}
                       </Button>
