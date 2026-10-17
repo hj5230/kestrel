@@ -40,5 +40,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Kestrel uses the camera to scan the pairing code shown by Kestrel on your Mac.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Kestrel connects to Kestrel on your Mac over your local network.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
