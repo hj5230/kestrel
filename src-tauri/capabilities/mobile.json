@@ -4,5 +4,5 @@
   "description": "Capability for the main window on mobile",
   "windows": ["main"],
   "platforms": ["iOS", "android"],
-  "permissions": ["core:default", "dialog:default", "opener:default", "notification:default"]
+  "permissions": ["core:default", "dialog:default", "opener:default", "notification:default", "barcode-scanner:default"]
 }

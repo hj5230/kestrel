@@ -1,9 +1,28 @@
+use serde::Serialize;
 use std::io::Write;
-use tauri::Manager;
-use tauri_plugin_shell::process::CommandEvent;
+use std::sync::Mutex;
+use tauri::{Manager, RunEvent, Runtime};
+use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
-use crate::{Backend, BackendInfo};
+#[derive(Clone, Serialize)]
+struct BackendInfo {
+    port: u16,
+    token: String,
+}
+
+#[derive(Default)]
+struct Backend {
+    info: Mutex<Option<BackendInfo>>,
+    child: Mutex<Option<CommandChild>>,
+    shutting_down: Mutex<bool>,
+    restarts: Mutex<Vec<std::time::Instant>>,
+}
+
+#[tauri::command]
+fn backend_info(state: tauri::State<Backend>) -> Option<BackendInfo> {
+    state.info.lock().unwrap().clone()
+}
 
 fn parse_ready(line: &str) -> Option<BackendInfo> {
     let json = line.trim().strip_prefix("KESTREL_READY ")?;
@@ -14,7 +33,7 @@ fn parse_ready(line: &str) -> Option<BackendInfo> {
     })
 }
 
-pub fn spawn_backend(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+fn spawn_backend(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let data_dir = app.path().app_data_dir()?;
     std::fs::create_dir_all(&data_dir)?;
     let log_dir = app.path().app_log_dir()?;
@@ -101,11 +120,33 @@ pub fn spawn_backend(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
-pub fn shutdown_backend(app: &tauri::AppHandle) {
-    let state = app.state::<Backend>();
-    *state.shutting_down.lock().unwrap() = true;
-    let child = state.child.lock().unwrap().take();
-    if let Some(child) = child {
-        let _ = child.kill();
+pub fn setup(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
+    builder
+        .activate_ignoring_other_apps(false)
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }))
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_shell::init())
+        .manage(Backend::default())
+        .invoke_handler(tauri::generate_handler![backend_info])
+        .setup(|app| {
+            spawn_backend(app.handle())?;
+            Ok(())
+        })
+}
+
+pub fn on_event<R: Runtime>(app: &tauri::AppHandle<R>, event: &RunEvent) {
+    if let RunEvent::Exit = event {
+        let state = app.state::<Backend>();
+        *state.shutting_down.lock().unwrap() = true;
+        let child = state.child.lock().unwrap().take();
+        if let Some(child) = child {
+            let _ = child.kill();
+        }
     }
 }
