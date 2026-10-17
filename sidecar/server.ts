@@ -13,10 +13,11 @@ import { DEFAULT_BASH_WHITELIST } from "./permissions";
 import { fetchRemoteModels, modelDefaults, PROVIDER_PRESETS } from "./providers";
 import { createSession, exportMarkdown, forkSession, newId } from "./sessions";
 import { discoverSkills, listSlashCommands } from "./skills";
+import type { Server, WebSocketHandler } from "bun";
 import { generateText } from "ai";
 import { languageModel } from "./providers";
 
-type Handler = (params: any) => any;
+type Handler = (params: any, caller: Caller) => any;
 
 const VERSION = "0.1.0";
 let appInfo: AppInfo;
@@ -263,6 +264,74 @@ const handlers: Record<string, Handler> = {
   },
 };
 
+export interface Caller {
+  /** True for requests arriving over the LAN listener from a paired device. */
+  remote: boolean;
+  deviceId?: string;
+}
+
+export interface SocketData {
+  caller: Caller;
+  unsub?: () => void;
+}
+
+export function registerHandlers(extra: Record<string, Handler>) {
+  Object.assign(handlers, extra);
+}
+
+// A paired phone gets the full agent API, but must not be able to pair or revoke devices.
+const localOnly = (method: string) => method.startsWith("remote.");
+
+async function dispatch(body: any, caller: Caller, headers: Record<string, string>): Promise<Response> {
+  const method = String(body?.method ?? "");
+  const h = handlers[method];
+  if (!h || (caller.remote && localOnly(method))) {
+    return Response.json({ error: `unknown method ${method}` }, { status: 404, headers });
+  }
+  try {
+    const result = await h(body.params ?? {}, caller);
+    return Response.json({ result: result ?? null }, { headers });
+  } catch (e: any) {
+    return Response.json({ error: e?.message ?? String(e) }, { headers });
+  }
+}
+
+/** Serves /events, /rpc and /health for a caller that has already been authenticated. */
+export async function handleApi(
+  req: Request,
+  server: Server<SocketData>,
+  caller: Caller,
+  headers: Record<string, string> = {},
+): Promise<Response | undefined> {
+  const url = new URL(req.url);
+  if (url.pathname === "/events") {
+    if (server.upgrade(req, { data: { caller } })) return undefined;
+    return new Response("upgrade failed", { status: 400, headers });
+  }
+  if (url.pathname === "/rpc" && req.method === "POST") {
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return Response.json({ error: "invalid json" }, { status: 400, headers });
+    }
+    return dispatch(body, caller, headers);
+  }
+  if (url.pathname === "/health") return new Response("ok", { headers });
+  return new Response("not found", { status: 404, headers });
+}
+
+export const socketHandlers: WebSocketHandler<SocketData> = {
+  open(ws) {
+    ws.data.unsub = subscribe((e) => ws.send(JSON.stringify(e)));
+    ws.send(JSON.stringify({ type: "mcp_status", servers: mcpStatuses() }));
+  },
+  message() {},
+  close(ws) {
+    ws.data.unsub?.();
+  },
+};
+
 export function startServer(opts: { port: number; token: string; dataDir: string; dev: boolean }) {
   appInfo = {
     version: VERSION,
@@ -282,48 +351,17 @@ export function startServer(opts: { port: number; token: string; dataDir: string
     "Access-Control-Max-Age": "86400",
   });
 
-  return Bun.serve({
+  return Bun.serve<SocketData>({
     hostname: "127.0.0.1",
     port: opts.port,
     idleTimeout: 255,
-    async fetch(req, server) {
-      const url = new URL(req.url);
+    fetch(req, server) {
       if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(req) });
+      const url = new URL(req.url);
       const token = req.headers.get("x-kestrel-token") ?? url.searchParams.get("token");
       if (token !== opts.token) return new Response("unauthorized", { status: 401, headers: cors(req) });
-
-      if (url.pathname === "/events") {
-        if (server.upgrade(req, { data: undefined })) return undefined;
-        return new Response("upgrade failed", { status: 400 });
-      }
-      if (url.pathname === "/rpc" && req.method === "POST") {
-        let body: any;
-        try {
-          body = await req.json();
-        } catch {
-          return Response.json({ error: "invalid json" }, { status: 400, headers: cors(req) });
-        }
-        const h = handlers[body.method];
-        if (!h) return Response.json({ error: `unknown method ${body.method}` }, { status: 404, headers: cors(req) });
-        try {
-          const result = await h(body.params ?? {});
-          return Response.json({ result: result ?? null }, { headers: cors(req) });
-        } catch (e: any) {
-          return Response.json({ error: e?.message ?? String(e) }, { headers: cors(req) });
-        }
-      }
-      if (url.pathname === "/health") return new Response("ok", { headers: cors(req) });
-      return new Response("not found", { status: 404, headers: cors(req) });
+      return handleApi(req, server, { remote: false }, cors(req));
     },
-    websocket: {
-      open(ws) {
-        (ws as any).unsub = subscribe((e) => ws.send(JSON.stringify(e)));
-        ws.send(JSON.stringify({ type: "mcp_status", servers: mcpStatuses() }));
-      },
-      message() {},
-      close(ws) {
-        (ws as any).unsub?.();
-      },
-    },
+    websocket: socketHandlers,
   });
 }

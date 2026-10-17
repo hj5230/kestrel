@@ -136,6 +136,15 @@ const MIGRATIONS: string[] = [
   UPDATE sessions SET permission_mode = CASE permission_mode WHEN 'plan' THEN 'manual' WHEN 'default' THEN 'whitelist' ELSE permission_mode END;
   DROP TABLE IF EXISTS permission_rules;
   `,
+  `
+  CREATE TABLE devices (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL
+  );
+  `,
 ];
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -165,6 +174,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   notifyOnFinish: true,
   sendKey: "enter",
   transcriptView: "compact",
+  remoteEnabled: false,
+  remotePort: 47830,
 };
 
 export let db: Database;
@@ -703,4 +714,41 @@ export function upsertMcpServer(s: McpServerConfig) {
 
 export function deleteMcpServer(id: string) {
   db.run("DELETE FROM mcp_servers WHERE id = ?", [id]);
+}
+
+// ---------- paired devices ----------
+
+export interface DeviceRow {
+  id: string;
+  name: string;
+  createdAt: number;
+  lastSeenAt: number;
+}
+
+const rowToDevice = (r: any): DeviceRow => ({ id: r.id, name: r.name, createdAt: r.created_at, lastSeenAt: r.last_seen_at });
+
+export function listDevices(): DeviceRow[] {
+  return db.query("SELECT * FROM devices ORDER BY created_at").all().map(rowToDevice);
+}
+
+export function addDevice(id: string, name: string, tokenHash: string) {
+  const now = Date.now();
+  db.run("INSERT INTO devices (id, name, token_hash, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)", [id, name, tokenHash, now, now]);
+}
+
+export function deviceByTokenHash(tokenHash: string): DeviceRow | null {
+  const r = db.query("SELECT * FROM devices WHERE token_hash = ?").get(tokenHash);
+  return r ? rowToDevice(r) : null;
+}
+
+export function touchDevice(id: string) {
+  db.run("UPDATE devices SET last_seen_at = ? WHERE id = ?", [Date.now(), id]);
+}
+
+export function deleteDevice(id: string) {
+  db.run("DELETE FROM devices WHERE id = ?", [id]);
+}
+
+export function deleteAllDevices() {
+  db.run("DELETE FROM devices");
 }
