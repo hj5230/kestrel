@@ -22,12 +22,14 @@ export function Panel({ children, className }: { children: ComponentChildren; cl
 
 export function Row({ label, desc, children, className }: { label: ComponentChildren; desc?: ComponentChildren; children?: ComponentChildren; className?: string }) {
   return (
-    <div className={cn("flex items-center gap-6 px-4 py-3.5", className)}>
-      <div className="min-w-0 flex-1">
+    // Wraps on narrow screens: the label keeps a readable width and a wide control (select, slider)
+    // drops below it instead of squeezing the label into a sliver.
+    <div className={cn("flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3.5", className)}>
+      <div className="min-w-0 flex-1 basis-36">
         <div className="text-sm font-medium">{label}</div>
         {desc && <div className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{desc}</div>}
       </div>
-      {children && <div className="flex shrink-0 items-center gap-2">{children}</div>}
+      {children && <div className="ml-auto flex shrink-0 items-center gap-2">{children}</div>}
     </div>
   )
 }
