@@ -263,7 +263,7 @@ function SubagentCard({
           </Button>
         )}
         {result && (
-          <Button variant="ghost" size="icon-xs" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon-xs" aria-label={t("tool.toggleDetails")} aria-expanded={open} onClick={() => setOpen(!open)}>
             <ChevronRightIcon className={cn("transition-transform", open && "rotate-90")} />
           </Button>
         )}

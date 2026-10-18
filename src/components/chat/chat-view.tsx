@@ -210,6 +210,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
                 <Button
                   variant={(wide ? showPlan : planSheet) ? "secondary" : "ghost"}
                   size="icon-sm"
+                  aria-label={t("chat.plan")}
                   onClick={() => (wide ? setShowPlan(!showPlan) : setPlanSheet(true))}
                 >
                   <ListChecksIcon />
@@ -220,7 +221,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm">
+              <Button variant="ghost" size="icon-sm" aria-label={t("common.moreActions")}>
                 <MoreHorizontalIcon />
               </Button>
             </DropdownMenuTrigger>
@@ -270,7 +271,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
             </div>
           </div>
           {detached && (
-            <Button variant="outline" size="icon-sm" onClick={jump} className="absolute bottom-40 left-1/2 z-10 -translate-x-1/2 rounded-full shadow-md">
+            <Button variant="outline" size="icon-sm" aria-label={t("chat.jumpToLatest")} onClick={jump} className="absolute bottom-40 left-1/2 z-10 -translate-x-1/2 rounded-full shadow-md">
               <ArrowDownIcon />
             </Button>
           )}

@@ -384,7 +384,7 @@ export function Composer({
           <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => fileInput.current?.click()}>
+                <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={t("composer.addImage")} onClick={() => fileInput.current?.click()}>
                   <ImagePlusIcon />
                 </Button>
               </TooltipTrigger>
@@ -407,7 +407,7 @@ export function Composer({
             {running && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="icon-sm" variant="secondary" onClick={onAbort} className="rounded-full">
+                  <Button size="icon-sm" variant="secondary" aria-label={t("composer.stop")} onClick={onAbort} className="rounded-full">
                     <SquareIcon className="fill-current" />
                   </Button>
                 </TooltipTrigger>
@@ -419,7 +419,7 @@ export function Composer({
             {(!running || canSend) && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="icon-sm" disabled={!canSend} onClick={submit} className="rounded-full">
+                  <Button size="icon-sm" disabled={!canSend} aria-label={running ? t("composer.steer") : t("composer.send")} onClick={submit} className="rounded-full">
                     <ArrowUpIcon />
                   </Button>
                 </TooltipTrigger>

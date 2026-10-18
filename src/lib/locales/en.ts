@@ -528,6 +528,12 @@ export const en = {
   "tailscale.state.stopped": "Signed in, disconnected",
   "tailscale.phoneNote": "Once it's connected here, install Tailscale on your iPhone too and sign in with the same account. Phones already paired pick up the new address on their next connection.",
   "tailscale.readyNote": "Connected. Install Tailscale on your iPhone with the same account to use Kestrel away from this Wi-Fi; paired phones pick up these addresses automatically. iOS runs one VPN at a time: switch to LocalDevVPN only while refreshing apps in SideStore.",
+
+  "common.moreActions": "More actions",
+  "common.show": "Show",
+  "common.hide": "Hide",
+  "tool.toggleDetails": "Show or hide details",
+  "chat.jumpToLatest": "Jump to latest",
 }
 
 export type MessageKey = keyof typeof en
