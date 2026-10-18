@@ -117,7 +117,7 @@ function General({ s }: { s: AppSettings }) {
                   type="button"
                   title={t(`accent.${a.value}` as MessageKey)}
                   onClick={() => save({ accent: a.value })}
-                  className={cn("size-6 rounded-full ring-offset-2 ring-offset-card transition", s.accent === a.value ? "ring-2 ring-ring" : "hover:scale-110")}
+                  className={cn("size-6 rounded-full ring-offset-2 ring-offset-card transition pointer-coarse:size-8", s.accent === a.value ? "ring-2 ring-ring" : "hover:scale-110")}
                   style={{ background: a.color }}
                 />
               ))}
@@ -437,7 +437,7 @@ export function SettingsPage({ tab }: { tab?: string }) {
                 type="button"
                 onClick={() => (route.value = { name: "settings", tab: tb.key })}
                 className={cn(
-                  "flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm whitespace-nowrap transition-colors",
+                  "flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm whitespace-nowrap transition-colors pointer-coarse:min-h-10",
                   current === tb.key ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                 )}
               >

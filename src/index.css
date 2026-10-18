@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
+@import "./styles/touch.css";
 
 @custom-variant dark (&:is(.dark *));
 
