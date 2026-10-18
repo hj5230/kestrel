@@ -1,10 +1,11 @@
 // Desktop: let phones drive this Mac's agent (Settings → Mobile).
-import { useEffect, useMemo, useState } from "preact/hooks"
-import { CopyIcon, QrCodeIcon, RotateCcwIcon, SmartphoneIcon, XIcon } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "preact/hooks"
+import { CopyIcon, DownloadIcon, LogInIcon, PlayIcon, QrCodeIcon, RotateCcwIcon, SmartphoneIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 import { renderSVG } from "uqr"
-import type { RemoteStatus } from "@shared/protocol"
+import type { RemoteStatus, TailscaleStatus } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import {
@@ -17,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Panel, Row, Section } from "@/components/settings/layout"
+import { HostList, Panel, Row, Section } from "@/components/settings/layout"
 import { rpc } from "@/lib/api"
 import { relativeTime } from "@/lib/format"
 import { t } from "@/lib/i18n"
@@ -92,23 +93,85 @@ function PairingCode({ status }: { status: RemoteStatus }) {
   )
 }
 
+/** Away from the local Wi-Fi the phone reaches this Mac over Tailscale; guide through setting it up. */
+function TailscaleSection({ ts }: { ts: TailscaleStatus }) {
+  const [busy, setBusy] = useState(false)
+  const connect = async () => {
+    setBusy(true)
+    try {
+      const r = await rpc<{ authUrl: string | null; status: RemoteStatus }>("remote.tailscaleConnect")
+      remoteStatus.value = r.status
+      if (r.authUrl) toast.info(t("tailscale.loginOpened"))
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const action =
+    ts.state === "not_installed" ? (
+      <Button size="sm" variant="outline" onClick={() => rpc("remote.tailscaleInstall")}>
+        <DownloadIcon />
+        {t("tailscale.install")}
+      </Button>
+    ) : ts.state === "not_running" ? (
+      <Button size="sm" variant="outline" onClick={() => call("remote.tailscaleOpen")}>
+        <PlayIcon />
+        {t("tailscale.open")}
+      </Button>
+    ) : ts.state === "needs_login" || ts.state === "stopped" ? (
+      <Button size="sm" variant="outline" onClick={connect} disabled={busy}>
+        {busy ? <Spinner /> : <LogInIcon />}
+        {ts.state === "needs_login" ? t("tailscale.signIn") : t("tailscale.connect")}
+      </Button>
+    ) : null
+  return (
+    <Section title={t("tailscale.title")} desc={t("tailscale.desc")}>
+      <Panel>
+        <Row
+          label={
+            <span className="flex items-center gap-2">
+              Tailscale
+              <span className={cn("size-1.5 rounded-full", ts.state === "running" ? "bg-success" : "bg-muted-foreground/40")} />
+            </span>
+          }
+          desc={
+            ts.state === "running" ? (
+              <HostList hosts={[ts.dnsName, ...ts.ips].filter((h): h is string => !!h)} />
+            ) : (
+              t(`tailscale.state.${ts.state}`)
+            )
+          }
+        >
+          {action}
+        </Row>
+      </Panel>
+      <p className="text-xs leading-relaxed text-muted-foreground">{ts.state === "running" ? t("tailscale.readyNote") : t("tailscale.phoneNote")}</p>
+    </Section>
+  )
+}
+
 export function MobileSettings() {
   const status = remoteStatus.value
   const [port, setPort] = useState("")
   const [resetting, setResetting] = useState(false)
 
+  // Poll while the page is open: Tailscale login finishes in the browser, outside Kestrel.
   useEffect(() => {
     call("remote.status")
+    const poll = () => rpc<RemoteStatus>("remote.status").then((s) => (remoteStatus.value = s), () => {})
+    const id = setInterval(() => document.visibilityState === "visible" && poll(), 5000)
+    return () => clearInterval(id)
   }, [])
   useEffect(() => setPort(String(status?.port ?? "")), [status?.port])
 
-  // A phone just redeemed the code: the offer disappears and a device is added.
-  const count = status?.devices.length ?? 0
-  const [seen, setSeen] = useState<number | null>(null)
+  // A phone just redeemed the code: the offer that was on screen disappears and a device is added.
+  const prev = useRef<RemoteStatus | null>(null)
   useEffect(() => {
-    if (seen !== null && count > seen) toast.success(t("mobile.paired"))
-    setSeen(count)
-  }, [count])
+    const before = prev.current
+    if (status && before?.pairing && !status.pairing && status.devices.length > before.devices.length) toast.success(t("mobile.paired"))
+    prev.current = status
+  }, [status])
 
   if (!status) return null
   const commitPort = () => {
@@ -136,12 +199,14 @@ export function MobileSettings() {
           {status.running && (
             <Row
               label={t("mobile.addresses")}
-              desc={<span className="font-mono select-text">{status.hosts.map((h) => `${h}:${status.port}`).join("  ·  ")}</span>}
+              desc={<HostList hosts={status.hosts} port={status.port} />}
             />
           )}
         </Panel>
         <p className="text-xs leading-relaxed text-muted-foreground">{t("mobile.trustNote")}</p>
       </Section>
+
+      {status.running && <TailscaleSection ts={status.tailscale} />}
 
       {status.running && (
         <Section title={t("mobile.pairTitle")} desc={t("mobile.pairDesc")}>

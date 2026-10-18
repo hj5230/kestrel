@@ -12,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Panel, Row, Section } from "@/components/settings/layout"
+import { HostList, Panel, Row, Section } from "@/components/settings/layout"
 import { relativeTime } from "@/lib/format"
 import { t } from "@/lib/i18n"
 import { connected, pairedMac, unpairMac } from "@/lib/store"
@@ -34,7 +34,7 @@ export function ConnectionSettings() {
           }
           desc={connected.value ? t("sidebar.connected") : t("sidebar.connecting")}
         />
-        <Row label={t("connection.addresses")} desc={<span className="font-mono break-all select-text">{mac.hosts.map((h) => `${h}:${mac.port}`).join("  ·  ")}</span>} />
+        <Row label={t("connection.addresses")} desc={<HostList hosts={mac.hosts} port={mac.port} />} />
         <Row label={t("connection.pairedAt")} desc={relativeTime(mac.pairedAt)} />
         <Row label={t("mobile.fingerprint")} desc={<span className="font-mono text-[11px] select-text">{mac.fingerprint.match(/.{4}/g)?.join(" ")}</span>} />
       </Panel>

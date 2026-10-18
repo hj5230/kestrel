@@ -13,9 +13,9 @@ import path from "node:path";
 import type { Server, ServerWebSocket } from "bun";
 import type { RemoteStatus } from "../shared/protocol";
 import * as store from "./db";
-import { which } from "./env";
 import { emit } from "./hub";
 import { handleApi, registerHandlers, socketHandlers, type Caller, type SocketData } from "./server";
+import { DOWNLOAD_URL, openTailscaleApp, tailscaleConnect, tailscaleStatus } from "./tailscale";
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 const MAX_PAIR_ATTEMPTS = 5;
@@ -95,23 +95,7 @@ const isProxyTun = (ip: string) => {
   return a === 198 && (b === 18 || b === 19);
 };
 
-let tailscaleName: { at: number; name: string | null } | null = null;
-
-function tailscaleDnsName(): string | null {
-  if (tailscaleName && Date.now() - tailscaleName.at < 60_000) return tailscaleName.name;
-  let name: string | null = null;
-  const bin = which("tailscale") ?? ["/Applications/Tailscale.app/Contents/MacOS/Tailscale"].find((p) => fs.existsSync(p));
-  if (bin) {
-    const r = spawnSync(bin, ["status", "--json"], { encoding: "utf8", timeout: 2000 });
-    try {
-      name = String(JSON.parse(r.stdout).Self?.DNSName ?? "").replace(/\.$/, "") || null;
-    } catch {}
-  }
-  tailscaleName = { at: Date.now(), name };
-  return name;
-}
-
-/** Addresses the phone can try, most likely first: LAN IPs, then Tailscale, then names. */
+/** Addresses the phone can try, most likely first: LAN IPs, then the tailnet, then names. */
 function candidateHosts(): string[] {
   const lan: string[] = [];
   const tailnet: string[] = [];
@@ -121,12 +105,12 @@ function candidateHosts(): string[] {
       (isTailscale(a.address) ? tailnet : lan).push(a.address);
     }
   }
+  const ts = tailscaleStatus();
   const names: string[] = [];
-  const ts = tailnet.length ? tailscaleDnsName() : null;
-  if (ts) names.push(ts);
+  if (ts.dnsName) names.push(ts.dnsName);
   const host = os.hostname();
   if (host) names.push(host.endsWith(".local") ? host : `${host}.local`);
-  return [...new Set([...lan, ...tailnet, ...names])];
+  return [...new Set([...lan, ...ts.ips, ...tailnet, ...names])];
 }
 
 let cachedName: { at: number; name: string } | null = null;
@@ -166,6 +150,7 @@ export function remoteStatus(): RemoteStatus {
     error: listenError,
     pairing: offer,
     devices: store.listDevices().map((d) => ({ ...d, online: (sockets.get(d.id)?.size ?? 0) > 0 })),
+    tailscale: tailscaleStatus(),
   };
 }
 
@@ -324,6 +309,21 @@ registerHandlers({
     dropDevice(id);
     broadcast();
     return remoteStatus();
+  },
+  // A paired phone refreshes where it can reach this Mac (e.g. Tailscale set up after pairing).
+  "device.hosts": () => ({ hosts: server ? candidateHosts() : [] }),
+  "remote.tailscaleInstall": () => {
+    spawnSync("open", [DOWNLOAD_URL]);
+    return true;
+  },
+  "remote.tailscaleOpen": () => {
+    openTailscaleApp();
+    return remoteStatus();
+  },
+  "remote.tailscaleConnect": async () => {
+    const { authUrl } = await tailscaleConnect();
+    if (authUrl) spawnSync("open", [authUrl]);
+    return { authUrl, status: remoteStatus() };
   },
   // Called by a phone that is forgetting this Mac, so it disappears from the device list too.
   "device.unpair": (_params, caller: Caller) => {

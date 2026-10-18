@@ -516,4 +516,18 @@ export const zhCN: Record<MessageKey, string> = {
   "pair.error.link": "这不是 Kestrel 的配对链接。",
   "pair.error.camera": "相机权限已关闭。请在 设置 → Kestrel 中允许，或改为粘贴配对链接。",
   "pair.error.revoked": "这台手机已不再与该 Mac 配对。",
+
+  "tailscale.title": "在外面使用",
+  "tailscale.desc": "不在这个 Wi-Fi 下时，手机通过 Tailscale（你自己设备之间的私有网络）连接这台 Mac。",
+  "tailscale.install": "安装 Tailscale",
+  "tailscale.open": "打开 Tailscale",
+  "tailscale.signIn": "登录",
+  "tailscale.connect": "连接",
+  "tailscale.loginOpened": "请在浏览器里完成 Tailscale 登录。",
+  "tailscale.state.not_installed": "这台 Mac 上还没有安装",
+  "tailscale.state.not_running": "已安装，但没有运行",
+  "tailscale.state.needs_login": "未登录",
+  "tailscale.state.stopped": "已登录，未连接",
+  "tailscale.phoneNote": "这里连接好之后，在 iPhone 上也安装 Tailscale 并登录同一个账号。已配对的手机下次连接时会自动获取新地址。",
+  "tailscale.readyNote": "已连接。在 iPhone 上安装 Tailscale 并登录同一个账号，就能在这个 Wi-Fi 之外使用 Kestrel；已配对的手机会自动获取这些地址。iOS 同时只能开一个 VPN：只在 SideStore 里续签 App 时切换到 LocalDevVPN。",
 }

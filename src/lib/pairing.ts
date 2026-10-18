@@ -26,6 +26,12 @@ export function forgetMac(): Promise<void> {
   return invoke("remote_forget")
 }
 
+/** The native side learned new addresses for the paired Mac after connecting. */
+export async function onPairedMacChanged(fn: (mac: PairedMac) => void) {
+  const { listen } = await import("@tauri-apps/api/event")
+  return listen<PairedMac>("remote://profile", (e) => fn(e.payload))
+}
+
 export function defaultDeviceName() {
   return /iPad/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)) ? "iPad" : "iPhone"
 }
