@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks"
+import { useEffect, useMemo, useRef, useState } from "preact/hooks"
 import { BookTextIcon, CpuIcon, FolderOpenIcon, InfoIcon, LaptopIcon, PaletteIcon, PlugIcon, RotateCcwIcon, ShieldCheckIcon, SmartphoneIcon, SparklesIcon } from "lucide-react"
 import { toast } from "sonner"
 import type { AppSettings, SkillInfo } from "@shared/protocol"
@@ -423,6 +423,9 @@ function About() {
 export function SettingsPage({ tab }: { tab?: string }) {
   const current = tab ?? "general"
   const s = settings.value!
+  // On phones the tabs are a sideways strip: keep the selected one in view.
+  const activeTab = useRef<HTMLButtonElement>(null)
+  useEffect(() => activeTab.current?.scrollIntoView({ block: "nearest", inline: "nearest" }), [current])
   return (
     <div className="flex h-full flex-col">
       <PageHeader>
@@ -434,6 +437,7 @@ export function SettingsPage({ tab }: { tab?: string }) {
             {TABS.map((tb) => (
               <button
                 key={tb.key}
+                ref={current === tb.key ? activeTab : undefined}
                 type="button"
                 onClick={() => (route.value = { name: "settings", tab: tb.key })}
                 className={cn(
