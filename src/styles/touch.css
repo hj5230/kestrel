@@ -109,3 +109,56 @@
     display: none;
   }
 }
+
+/* Phones: menus, selects and popovers open as iOS-style bottom sheets instead of tiny floating
+   panels. Radix positions them through a popper wrapper with inline styles, hence !important. */
+@media (pointer: coarse) and (max-width: 767px) {
+  [data-radix-popper-content-wrapper]:has(
+      > :is([data-slot="dropdown-menu-content"], [data-slot="select-content"], [data-slot="popover-content"])
+    ) {
+    transform: none !important;
+    inset: auto 0 var(--kb, 0px) 0 !important;
+    min-width: 0 !important;
+  }
+  :is([data-slot="dropdown-menu-content"], [data-slot="select-content"], [data-slot="popover-content"]) {
+    width: 100%;
+    max-width: none;
+    max-height: min(75vh, calc(var(--app-height, 100vh) - 96px));
+    overflow-y: auto;
+    border-radius: 16px 16px 0 0;
+    padding: 20px 8px calc(8px + env(safe-area-inset-bottom));
+    /* Dims the page behind the sheet. */
+    box-shadow: 0 0 0 100vmax oklch(0 0 0 / 0.35);
+    translate: none;
+  }
+  /* Grabber, as on native sheets. */
+  :is([data-slot="dropdown-menu-content"], [data-slot="select-content"], [data-slot="popover-content"])::before {
+    content: "";
+    position: absolute;
+    top: 7px;
+    left: 50%;
+    width: 36px;
+    height: 5px;
+    margin-left: -18px;
+    border-radius: 3px;
+    background: var(--muted-foreground);
+    opacity: 0.35;
+  }
+  :is([data-slot="dropdown-menu-content"], [data-slot="select-content"], [data-slot="popover-content"])[data-state="open"] {
+    animation: kestrel-sheet-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  :is([data-slot="dropdown-menu-content"], [data-slot="select-content"], [data-slot="popover-content"])[data-state="closed"] {
+    animation: kestrel-sheet-out 0.16s ease-in forwards;
+  }
+}
+
+@keyframes kestrel-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes kestrel-sheet-out {
+  to {
+    transform: translateY(100%);
+  }
+}

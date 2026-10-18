@@ -6,8 +6,11 @@ export function trackVisualViewport() {
   if (!vv) return
   const root = document.documentElement
   const sync = () => {
+    const keyboard = Math.max(0, window.innerHeight - vv.height)
     root.style.setProperty("--app-height", `${Math.round(vv.height)}px`)
-    root.classList.toggle("keyboard-open", window.innerHeight - vv.height > 120)
+    // Bottom sheets sit on top of the keyboard rather than behind it.
+    root.style.setProperty("--kb", `${Math.round(keyboard)}px`)
+    root.classList.toggle("keyboard-open", keyboard > 120)
     if (window.scrollY !== 0 || window.scrollX !== 0) window.scrollTo(0, 0)
   }
   vv.addEventListener("resize", sync)
