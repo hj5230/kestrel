@@ -99,6 +99,11 @@
     background-color: white;
   }
 
+  /* Native range input: iOS draws the system slider; give it a full-height touch row. */
+  [data-slot="slider"] {
+    min-height: 44px;
+  }
+
   /* ---------- dialogs ---------- */
   /* Position against the visible area, not the layout viewport, so the keyboard never covers the
      buttons (--app-height follows the visual viewport on the phone; elsewhere it is 100dvh). */
