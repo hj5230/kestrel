@@ -60,7 +60,12 @@ iPhone: WebView 前端 ──invoke/event──▶ Rust 传输层 ──HTTPS/WS
   - 自签证书（`<数据目录>/remote/`），手机只认二维码里的指纹，不校验主机名，因此 IP 变化或走 Tailscale 都不影响，网络上的中间人无法冒充 Mac。WebView 做不到证书锁定，所以手机端所有请求都经由 Rust（rustls + ring）发出。
   - 每台手机有独立 token：Mac 只存哈希，手机存钥匙串；可在设置里单独移除（在线连接会被立即断开），或「重置证书」一次性移除全部。
   - 配对后的手机拥有与桌面窗口相同的控制权（经由 agent 执行命令、读写文件）；唯一例外是 `remote.*` 管理接口只允许本机调用。
-- **网络**：同一 Wi-Fi 直连；在外面用 Tailscale 等虚拟局域网。Mac 需开着 Kestrel 且未休眠。
+- **网络**：同一 Wi-Fi 直连；在外面走 Tailscale（见下）。Mac 需开着 Kestrel 且未休眠。
+- **地址刷新**：二维码里的地址只是配对时的快照；手机每次连上 Mac 都会通过 `device.hosts` 拉取最新候选地址（Mac 给的排前面，旧地址保留在后，最多 8 个），因此之后再装 Tailscale 或局域网 IP 变化都不用重新配对。
+
+### 在外面使用：Tailscale
+
+Kestrel 不内置 Tailscale，而是在 设置 → 移动端 →「在外面使用」里驱动 Mac 上已安装的 Tailscale（App 包内自带的 CLI、`/usr/local/bin` 或 Homebrew 的 `tailscale`）：未安装 → 打开下载页；已安装未运行 → 启动 App；未登录 → `tailscale login` 并在浏览器打开授权链接；已登录未连接 → `tailscale up`；已连接 → 显示 MagicDNS 名与 IP，并自动加入配对 / 刷新地址。手机端需要另装 Tailscale 并登录同一账号。iOS 同一时间只能开一个 VPN：平时开 Tailscale，在 SideStore 里续签时临时切到 LocalDevVPN。
 - **平台分岔点**（业务组件里不出现平台判断）：
   - 传输：`src/lib/api.ts`（桌面 HTTP/WS ↔ 手机原生通道），重连 / 退避 / 回到前台重建连接的策略共用；
   - 平台能力：`src/lib/download.ts`（导出走分享面板、无原生选目录）、`src/lib/platform.ts`；

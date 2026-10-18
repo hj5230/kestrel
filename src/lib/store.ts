@@ -12,7 +12,7 @@ import type {
 } from "@shared/protocol"
 import { connectEvents, disconnectEvents, onConnection, onRevoked, onServerEvent, rpc } from "./api"
 import { setLang, t } from "./i18n"
-import { forgetMac, getPairedMac, type PairedMac } from "./pairing"
+import { forgetMac, getPairedMac, onPairedMacChanged, type PairedMac } from "./pairing"
 import { isMobileApp, isTauri } from "./platform"
 
 export type Route =
@@ -171,6 +171,11 @@ function handleEvents() {
   onRevoked(() => {
     deviceRevoked.value = true
   })
+  if (isMobileApp) {
+    void onPairedMacChanged((mac) => {
+      if (pairedMac.value?.deviceId === mac.deviceId) pairedMac.value = mac
+    })
+  }
   onConnection((c) => {
     const was = connected.value
     connected.value = c

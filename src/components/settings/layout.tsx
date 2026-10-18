@@ -31,3 +31,14 @@ export function Row({ label, desc, children, className }: { label: ComponentChil
     </div>
   )
 }
+
+/** Network addresses, one per line so long names (MagicDNS) never break mid-word. */
+export function HostList({ hosts, port }: { hosts: string[]; port?: number }) {
+  return (
+    <span className="grid font-mono break-all select-text">
+      {hosts.map((h) => (
+        <span key={h}>{port ? `${h}:${port}` : h}</span>
+      ))}
+    </span>
+  )
+}

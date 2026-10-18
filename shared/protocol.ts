@@ -262,6 +262,15 @@ export interface RemoteDevice {
   online: boolean;
 }
 
+export interface TailscaleStatus {
+  /** not_installed → install; not_running → open the app; needs_login → sign in; stopped → connect. */
+  state: "not_installed" | "not_running" | "needs_login" | "stopped" | "running";
+  appInstalled: boolean;
+  tailnet: string | null;
+  dnsName: string | null;
+  ips: string[];
+}
+
 export interface RemoteStatus {
   enabled: boolean;
   running: boolean;
@@ -274,6 +283,7 @@ export interface RemoteStatus {
   /** Active one-time pairing offer, encoded as a kestrel://pair link for the QR code. */
   pairing: { url: string; expiresAt: number } | null;
   devices: RemoteDevice[];
+  tailscale: TailscaleStatus;
 }
 
 export interface UsageSummary {

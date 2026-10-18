@@ -20,6 +20,8 @@ use tokio_tungstenite::Connector;
 const KEYCHAIN_SERVICE: &str = "com.zhaoshangqi.kestrel.remote";
 const EVENT: &str = "remote://event";
 const STATUS: &str = "remote://status";
+const PROFILE: &str = "remote://profile";
+const MAX_HOSTS: usize = 8;
 const PROBE_TIMEOUT: Duration = Duration::from_secs(4);
 const PING_EVERY: Duration = Duration::from_secs(20);
 const DEAD_AFTER: Duration = Duration::from_secs(50);
@@ -107,6 +109,11 @@ fn load_conn<R: Runtime>(app: &AppHandle<R>) -> Result<Option<Conn>, String> {
             Ok(None)
         }
     }
+}
+
+fn save_profile<R: Runtime>(app: &AppHandle<R>, profile: &Profile) -> Result<(), String> {
+    let json = serde_json::to_string_pretty(profile).map_err(|e| e.to_string())?;
+    std::fs::write(profile_path(app)?, json).map_err(|e| e.to_string())
 }
 
 fn current<R: Runtime>(app: &AppHandle<R>, state: &Remote) -> Result<Conn, String> {
@@ -247,8 +254,7 @@ async fn remote_pair<R: Runtime>(
         paired_at: SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0),
     };
     keychain_set(&profile.device_id, &paired.token)?;
-    let json = serde_json::to_string_pretty(&profile).map_err(|e| e.to_string())?;
-    std::fs::write(profile_path(&app)?, json).map_err(|e| e.to_string())?;
+    save_profile(&app, &profile)?;
     *state.conn.lock().unwrap() = Some(Conn { profile: profile.clone(), token: paired.token.into(), tls, client });
     *state.host.lock().unwrap() = Some(found);
     Ok(profile)
@@ -325,6 +331,41 @@ async fn remote_rpc<R: Runtime>(
     }
 }
 
+/// The addresses in the QR code are a snapshot from pairing time. Once connected, ask the Mac where
+/// else it can be reached (Tailscale set up later, a new LAN address) and remember it. The Mac's
+/// list goes first; earlier addresses stay behind it so a Mac that is briefly off its tailnet does
+/// not make the phone forget how to reach it from outside.
+async fn refresh_hosts<R: Runtime>(app: AppHandle<R>, conn: Conn, host: String) {
+    let Ok(v) = post_rpc(&conn, &host, "device.hosts", &json!({})).await else { return };
+    let fresh: Vec<String> = v.get("hosts").and_then(|h| h.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();
+    if fresh.is_empty() {
+        return;
+    }
+    let mut hosts: Vec<String> = Vec::new();
+    for h in fresh.iter().chain(conn.profile.hosts.iter()) {
+        if !hosts.contains(h) {
+            hosts.push(h.clone());
+        }
+    }
+    hosts.truncate(MAX_HOSTS);
+    if hosts == conn.profile.hosts {
+        return;
+    }
+    let state = app.state::<Remote>();
+    let profile = {
+        let mut slot = state.conn.lock().unwrap();
+        let Some(c) = slot.as_mut() else { return };
+        if c.profile.device_id != conn.profile.device_id {
+            return; // re-paired meanwhile
+        }
+        c.profile.hosts = hosts;
+        c.profile.clone()
+    };
+    if save_profile(&app, &profile).is_ok() {
+        let _ = app.emit(PROFILE, profile);
+    }
+}
+
 fn disconnect_events(state: &Remote) {
     if let Some(task) = state.events.lock().unwrap().take() {
         task.abort();
@@ -353,11 +394,12 @@ async fn remote_events_connect<R: Runtime>(app: AppHandle<R>, state: State<'_, R
         Ok(ws) => ws,
         Err(_) => {
             h = host(&state, &conn, true).await?;
-            open(h).await?
+            open(h.clone()).await?
         }
     };
 
     let _ = app.emit(STATUS, ConnStatus { connected: true, code: None });
+    tauri::async_runtime::spawn(refresh_hosts(app.clone(), conn.clone(), h.clone()));
     let handle = app.clone();
     let task = tauri::async_runtime::spawn(async move {
         let (mut tx, mut rx) = ws.split();

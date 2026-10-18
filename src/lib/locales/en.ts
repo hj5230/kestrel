@@ -514,6 +514,20 @@ export const en = {
   "pair.error.link": "That doesn't look like a Kestrel pairing link.",
   "pair.error.camera": "Camera access is off. Allow it in Settings → Kestrel, or paste the pairing link.",
   "pair.error.revoked": "This phone is no longer paired with the Mac.",
+
+  "tailscale.title": "Away from home",
+  "tailscale.desc": "Outside this Wi-Fi, your phone reaches this Mac through Tailscale, a private network between your own devices.",
+  "tailscale.install": "Install Tailscale",
+  "tailscale.open": "Open Tailscale",
+  "tailscale.signIn": "Sign in",
+  "tailscale.connect": "Connect",
+  "tailscale.loginOpened": "Finish signing in to Tailscale in your browser.",
+  "tailscale.state.not_installed": "Not installed on this Mac",
+  "tailscale.state.not_running": "Installed but not running",
+  "tailscale.state.needs_login": "Not signed in",
+  "tailscale.state.stopped": "Signed in, disconnected",
+  "tailscale.phoneNote": "Once it's connected here, install Tailscale on your iPhone too and sign in with the same account. Phones already paired pick up the new address on their next connection.",
+  "tailscale.readyNote": "Connected. Install Tailscale on your iPhone with the same account to use Kestrel away from this Wi-Fi; paired phones pick up these addresses automatically. iOS runs one VPN at a time: switch to LocalDevVPN only while refreshing apps in SideStore.",
 }
 
 export type MessageKey = keyof typeof en
