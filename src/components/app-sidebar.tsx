@@ -82,7 +82,7 @@ function SessionItem({ s, active, onRename, onDelete }: { s: SessionInfo; active
       <SidebarMenuButton
         isActive={active}
         onClick={() => (route.value = { name: "chat", sessionId: s.id })}
-        className="h-8 gap-2 pr-8 pointer-coarse:h-10"
+        className="h-8 gap-2 pr-8"
         title={`${s.title || t("common.untitled")}\n${shortPath(s.cwd, appInfo.value?.home)}`}
       >
         {status && <span className="flex size-4 shrink-0 items-center justify-center">{status}</span>}
@@ -210,7 +210,7 @@ export function AppSidebar() {
               <SidebarMenuButton isActive={r.name === n.key} onClick={n.onClick}>
                 <n.icon />
                 <span>{n.label}</span>
-                {n.kbd && <span className="ml-auto text-[11px] text-muted-foreground/70">{n.kbd}</span>}
+                {n.kbd && <span className="ml-auto text-[11px] text-muted-foreground/70 pointer-coarse:hidden">{n.kbd}</span>}
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}

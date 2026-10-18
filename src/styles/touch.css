@@ -1,0 +1,111 @@
+/* Touch density: sizes for a finger instead of a mouse pointer.
+ *
+ * The UI kit (src/components/ui) is sized for desktop. Rather than threading touch variants through
+ * every component and call site, this layer resizes kit parts by their data-slot on coarse-pointer
+ * devices only, so desktop stays exactly as it is. It is intentionally outside any cascade layer:
+ * unlayered rules beat Tailwind's utilities layer, which lets the minimums here win over the kit's
+ * h-7 / size-7 without !important.
+ *
+ * Targets follow Apple's HIG: 44pt for rows and primary controls, 40pt for compact chrome
+ * (page headers, the composer toolbar), and 16px text in fields so iOS never zooms on focus. */
+
+@media (pointer: coarse) {
+  /* ---------- buttons ---------- */
+  /* Matched by the kit's own group/button class: Radix triggers using asChild (tooltips, popovers,
+     menus) overwrite the button's data-slot with theirs, but its classes and data-size survive. */
+  .group\/button:is([data-size="default"], [data-size="lg"]) {
+    min-height: 44px;
+  }
+  .group\/button:is([data-size="sm"], [data-size="xs"]) {
+    min-height: 40px;
+  }
+  .group\/button:is([data-size="icon"], [data-size="icon-lg"]) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .group\/button:is([data-size="icon-sm"], [data-size="icon-xs"]) {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .group\/button:is([data-size^="icon"]) svg:not([class*="size-"]) {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* ---------- fields ---------- */
+  [data-slot="input"],
+  [data-slot="select-trigger"] {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  [data-slot="textarea"],
+  [data-slot="command-input"] {
+    font-size: 16px;
+  }
+  /* The command palette pins its search box to h-8 with !important. */
+  [data-slot="command-input-wrapper"] > [data-slot="input-group"] {
+    height: 44px !important;
+  }
+
+  /* ---------- menus and lists ---------- */
+  :is(
+      [data-slot="dropdown-menu-item"],
+      [data-slot="dropdown-menu-checkbox-item"],
+      [data-slot="dropdown-menu-radio-item"],
+      [data-slot="dropdown-menu-sub-trigger"],
+      [data-slot="context-menu-item"],
+      [data-slot="select-item"],
+      [data-slot="command-item"]
+    ) {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  [data-slot="sidebar-menu-button"] {
+    min-height: 44px;
+  }
+  /* Per-row "…" action: a real target, vertically centred in the 44pt row. */
+  [data-slot="sidebar-menu-action"] {
+    width: 32px;
+    height: 32px;
+    top: 6px;
+  }
+
+  /* ---------- tabs, toggles, switches ---------- */
+  [data-slot="tabs-trigger"],
+  [data-slot="toggle-group-item"],
+  [data-slot="toggle"] {
+    min-height: 40px;
+  }
+  /* iOS switch geometry (51×31) and its green "on" state. */
+  [data-slot="switch"] {
+    width: 51px;
+    height: 31px;
+  }
+  [data-slot="switch-thumb"] {
+    width: 27px;
+    height: 27px;
+    margin-left: 1px;
+  }
+  [data-slot="switch"]:is([data-state="checked"], [data-checked]) {
+    background-color: oklch(0.72 0.19 150);
+  }
+  /* Tailwind v4 moves the thumb with the `translate` property, so override that, not transform. */
+  [data-slot="switch-thumb"] {
+    translate: 0 0;
+  }
+  [data-slot="switch"]:is([data-state="checked"], [data-checked]) [data-slot="switch-thumb"] {
+    translate: 20px 0;
+    background-color: white;
+  }
+
+  /* ---------- desktop-only affordances ---------- */
+  /* No keyboard shortcuts to hint at, and hover tooltips can't be summoned with a finger. */
+  [data-slot="kbd"],
+  [data-slot="kbd-group"],
+  [data-slot="dropdown-menu-shortcut"],
+  [data-slot="context-menu-shortcut"],
+  [data-slot="command-shortcut"],
+  [data-slot="tooltip-content"] {
+    display: none;
+  }
+}
