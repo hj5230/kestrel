@@ -4,6 +4,7 @@ import * as React from "react"
 import { cn } from "cn"
 import { Select as SelectPrimitive } from "radix-ui"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
+import { isTouch } from "@/lib/platform"
 
 function Select({
   ...props
@@ -59,7 +60,8 @@ function SelectTrigger({
 function SelectContent({
   className,
   children,
-  position = "item-aligned",
+  // Touch screens use popper positioning so the list can be shown as a bottom sheet (styles/touch.css).
+  position = isTouch ? "popper" : "item-aligned",
   align = "center",
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
