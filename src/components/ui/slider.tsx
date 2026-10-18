@@ -1,55 +1,69 @@
-import * as React from "react"
+import { useEffect, useRef, useState } from "preact/hooks"
 import { cn } from "cn"
-import { Slider as SliderPrimitive } from "radix-ui"
 
+/**
+ * Single-thumb slider on a native range input. Radix's slider registers its thumbs through a
+ * collection that does not resolve under preact/compat, which left the thumb hidden (and the
+ * value frozen while dragging). The native control also renders as the system slider on iOS.
+ * Keeps the array-valued API of the kit component it replaces.
+ */
 function Slider({
   className,
-  defaultValue,
   value,
+  defaultValue,
   min = 0,
   max = 100,
-  ...props
-}: React.ComponentProps<typeof SliderPrimitive.Root>) {
-  const _values = React.useMemo(
-    () =>
-      Array.isArray(value)
-        ? value
-        : Array.isArray(defaultValue)
-          ? defaultValue
-          : [min, max],
-    [value, defaultValue, min, max]
-  )
+  step = 1,
+  disabled,
+  onValueChange,
+  onValueCommit,
+}: {
+  className?: string
+  value?: number[]
+  defaultValue?: number[]
+  min?: number
+  max?: number
+  step?: number
+  disabled?: boolean
+  onValueChange?: (value: number[]) => void
+  /** Called once the user lets go (native `change`), not on every step of a drag. */
+  onValueCommit?: (value: number[]) => void
+}) {
+  const [current, setCurrent] = useState((value ?? defaultValue ?? [min])[0])
+  const external = value?.[0]
+  useEffect(() => {
+    if (external !== undefined) setCurrent(external)
+  }, [external])
+
+  // preact/compat maps onChange to the input event, so listen for the real commit natively.
+  const ref = useRef<HTMLInputElement>(null)
+  const commit = useRef(onValueCommit)
+  commit.current = onValueCommit
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const onCommit = () => commit.current?.([Number(el.value)])
+    el.addEventListener("change", onCommit)
+    return () => el.removeEventListener("change", onCommit)
+  }, [])
 
   return (
-    <SliderPrimitive.Root
+    <input
+      ref={ref}
+      type="range"
       data-slot="slider"
-      defaultValue={defaultValue}
-      value={value}
       min={min}
       max={max}
-      className={cn(
-        "relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-vertical:flex-col",
-        className
-      )}
-      {...props}
-    >
-      <SliderPrimitive.Track
-        data-slot="slider-track"
-        className="relative grow overflow-hidden rounded-full bg-muted data-horizontal:h-1 data-horizontal:w-full data-vertical:h-full data-vertical:w-1"
-      >
-        <SliderPrimitive.Range
-          data-slot="slider-range"
-          className="absolute bg-primary select-none data-horizontal:h-full data-vertical:w-full"
-        />
-      </SliderPrimitive.Track>
-      {Array.from({ length: _values.length }, (_, index) => (
-        <SliderPrimitive.Thumb
-          data-slot="slider-thumb"
-          key={index}
-          className="relative block size-3 shrink-0 rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
-        />
-      ))}
-    </SliderPrimitive.Root>
+      step={step}
+      value={current}
+      disabled={disabled}
+      onInput={(e) => {
+        const v = Number(e.currentTarget.value)
+        setCurrent(v)
+        onValueChange?.([v])
+      }}
+      className={cn("h-5 w-full cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50", className)}
+    />
   )
 }
 
