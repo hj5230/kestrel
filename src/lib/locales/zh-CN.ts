@@ -528,6 +528,7 @@ export const zhCN: Record<MessageKey, string> = {
   "tailscale.loginOpened": "请在浏览器里完成 Tailscale 登录。",
   "tailscale.state.not_installed": "这台 Mac 上还没有安装",
   "tailscale.state.not_running": "已安装，但没有运行",
+  "tailscale.state.not_running_cli": "已安装，但没有运行。用这条命令启动：sudo brew services start tailscale",
   "tailscale.state.needs_login": "未登录",
   "tailscale.state.stopped": "已登录，未连接",
   "tailscale.phoneNote": "这里连接好之后，在 iPhone 上也安装 Tailscale 并登录同一个账号。已配对的手机下次连接时会自动获取新地址。",

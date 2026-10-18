@@ -526,6 +526,7 @@ export const en = {
   "tailscale.loginOpened": "Finish signing in to Tailscale in your browser.",
   "tailscale.state.not_installed": "Not installed on this Mac",
   "tailscale.state.not_running": "Installed but not running",
+  "tailscale.state.not_running_cli": "Installed but not running. Start it with: sudo brew services start tailscale",
   "tailscale.state.needs_login": "Not signed in",
   "tailscale.state.stopped": "Signed in, disconnected",
   "tailscale.phoneNote": "Once it's connected here, install Tailscale on your iPhone too and sign in with the same account. Phones already paired pick up the new address on their next connection.",
