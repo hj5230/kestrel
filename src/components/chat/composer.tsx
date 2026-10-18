@@ -309,7 +309,7 @@ export function Composer({
                   applyItem(item)
                 }}
                 onMouseEnter={() => setMenuIndex(i)}
-                className={cn("flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm", i === menuIndex && "bg-accent text-accent-foreground")}
+                className={cn("flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm pointer-coarse:min-h-11", i === menuIndex && "bg-accent text-accent-foreground")}
               >
                 <Icon className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className={cn("shrink-0", item.kind === "file" ? "truncate font-mono text-xs" : "font-medium")}>{item.label}</span>
@@ -346,7 +346,7 @@ export function Composer({
                 <button
                   type="button"
                   onClick={() => setImages(images.filter((_, j) => j !== i))}
-                  className="absolute -top-1.5 -right-1.5 hidden size-5 items-center justify-center rounded-full border bg-background shadow group-hover/img:flex"
+                  className="absolute -top-1.5 -right-1.5 hidden size-5 items-center justify-center rounded-full border bg-background shadow group-hover/img:flex pointer-coarse:-top-2.5 pointer-coarse:-right-2.5 pointer-coarse:flex pointer-coarse:size-7"
                 >
                   <XIcon className="size-3" />
                 </button>

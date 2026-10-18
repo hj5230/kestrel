@@ -216,7 +216,7 @@ function ProcessGroup({
         disabled={!expandable}
         onClick={() => setOpen(!open)}
         className={cn(
-          "flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-left text-[13px] text-muted-foreground transition-colors",
+          "flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-left text-[13px] text-muted-foreground transition-colors pointer-coarse:min-h-10",
           expandable && "hover:bg-muted/70 hover:text-foreground",
           open && "bg-muted/50 text-foreground",
         )}

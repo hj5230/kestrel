@@ -318,7 +318,7 @@ export function ToolCallView({
         <button
           type="button"
           className={cn(
-            "flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-left text-[13px] transition-colors hover:bg-muted/70",
+            "flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-left text-[13px] transition-colors hover:bg-muted/70 pointer-coarse:min-h-10",
             open && "bg-muted/50",
           )}
         >

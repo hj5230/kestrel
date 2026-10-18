@@ -137,7 +137,7 @@ export function Thinking({ text, streaming, defaultOpen = false }: { text: strin
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
-        <button type="button" className="flex max-w-full items-center gap-1.5 rounded-md py-0.5 text-[13px] text-muted-foreground hover:text-foreground">
+        <button type="button" className="flex max-w-full items-center gap-1.5 rounded-md py-0.5 text-[13px] text-muted-foreground hover:text-foreground pointer-coarse:min-h-10">
           <BrainIcon className="size-3.5 shrink-0" />
           <span className={cn("shrink-0", streaming && "text-shimmer")}>{streaming ? t("msg.thinking") : t("msg.thoughts")}</span>
           {!open && streaming && <span className="truncate text-xs opacity-70">{firstLine}</span>}
@@ -177,7 +177,7 @@ export function CompactionDivider({ c }: { c: CompactionInfo }) {
     <div className="py-2">
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <div className="h-px flex-1 bg-border" />
-        <button type="button" onClick={() => setOpen(true)} className="flex items-center gap-1.5 rounded-full border px-3 py-1 hover:bg-muted">
+        <button type="button" onClick={() => setOpen(true)} className="flex items-center gap-1.5 rounded-full border px-3 py-1 hover:bg-muted pointer-coarse:min-h-9">
           <ShrinkIcon className="size-3" />
           {c.auto ? t("msg.autoCompacted") : t("msg.compacted")} · {t("msg.compactedFrom", { n: formatTokens(c.tokensBefore) })}
         </button>

@@ -285,7 +285,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
                     <div key={q.id} className="flex items-center gap-2 rounded-lg border border-dashed bg-muted/40 px-3 py-1.5 text-xs">
                       <span className="shrink-0 text-muted-foreground">{q.mode === "steer" ? t("chat.queuedSteer") : t("chat.queuedFollow")}</span>
                       <span className="min-w-0 flex-1 truncate">{q.text}</span>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => rpc("chat.cancelQueued", { sessionId: s.id, id: q.id })}>
+                      <button type="button" className="text-muted-foreground hover:text-foreground pointer-coarse:-m-2 pointer-coarse:p-2" onClick={() => rpc("chat.cancelQueued", { sessionId: s.id, id: q.id })}>
                         <XIcon className="size-3.5" />
                       </button>
                     </div>
@@ -296,7 +296,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
                 <div className="flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-1.5 text-xs text-primary">
                   <PencilIcon className="size-3.5" />
                   {t("chat.editing")}
-                  <button type="button" className="ml-auto hover:underline" onClick={() => setEditing(null)}>
+                  <button type="button" className="ml-auto hover:underline pointer-coarse:-my-2 pointer-coarse:py-2" onClick={() => setEditing(null)}>
                     {t("common.cancel")}
                   </button>
                 </div>
