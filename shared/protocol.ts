@@ -284,6 +284,8 @@ export interface RemoteStatus {
   pairing: { url: string; expiresAt: number } | null;
   devices: RemoteDevice[];
   tailscale: TailscaleStatus;
+  /** System sleep is off (`pmset disablesleep`): the Mac stays online with the lid closed. */
+  stayAwake: boolean;
 }
 
 export interface UsageSummary {

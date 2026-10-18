@@ -15,6 +15,7 @@ import type { RemoteStatus } from "../shared/protocol";
 import * as store from "./db";
 import { emit } from "./hub";
 import { handleApi, registerHandlers, socketHandlers, type Caller, type SocketData } from "./server";
+import { setSleepDisabled, sleepDisabled } from "./power";
 import { DOWNLOAD_URL, openTailscaleApp, tailscaleConnect, tailscaleStatus } from "./tailscale";
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
@@ -151,6 +152,7 @@ export function remoteStatus(): RemoteStatus {
     pairing: offer,
     devices: store.listDevices().map((d) => ({ ...d, online: (sockets.get(d.id)?.size ?? 0) > 0 })),
     tailscale: tailscaleStatus(),
+    stayAwake: sleepDisabled(),
   };
 }
 
@@ -324,6 +326,15 @@ registerHandlers({
     const { authUrl } = await tailscaleConnect();
     if (authUrl) spawnSync("open", [authUrl]);
     return { authUrl, status: remoteStatus() };
+  },
+  "remote.stayAwake": async ({ on }: { on: boolean }) => {
+    try {
+      await setSleepDisabled(on);
+    } catch (e: any) {
+      if (e.message !== "cancelled") throw e;
+    }
+    broadcast();
+    return remoteStatus();
   },
   // Called by a phone that is forgetting this Mac, so it disappears from the device list too.
   "device.unpair": (_params, caller: Caller) => {

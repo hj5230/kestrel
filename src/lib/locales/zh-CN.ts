@@ -472,6 +472,8 @@ export const zhCN: Record<MessageKey, string> = {
   "mobile.enableDesc": "在局域网上开启加密连接，只有已配对的手机能使用。",
   "mobile.port": "端口",
   "mobile.addresses": "访问地址",
+  "mobile.stayAwake": "合盖时保持在线",
+  "mobile.stayAwakeDesc": "关闭系统睡眠，合盖或闲置时手机仍能连到这台 Mac，屏幕照常熄灭。这是 macOS 系统设置，需要输入密码，退出 Kestrel 后依然生效。放进包里前记得关掉。",
   "mobile.trustNote": "已配对的手机拥有和本窗口相同的控制权：可以通过 agent 执行命令、读写文件。不再使用的手机请及时移除。",
   "mobile.pairTitle": "配对手机",
   "mobile.pairDesc": "配对码只能使用一次，10 分钟后失效。",
