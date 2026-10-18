@@ -288,7 +288,7 @@ export function McpSettings() {
                   />
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon-sm">
+                      <Button variant="ghost" size="icon-sm" aria-label={t("common.moreActions")}>
                         <MoreHorizontalIcon />
                       </Button>
                     </DropdownMenuTrigger>

@@ -29,7 +29,7 @@ export function ViewPicker() {
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="text-muted-foreground">
+            <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={t("view.label")}>
               <Icon />
             </Button>
           </DropdownMenuTrigger>

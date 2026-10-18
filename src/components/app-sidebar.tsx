@@ -194,7 +194,7 @@ export function AppSidebar() {
           <div className="ml-auto flex items-center">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" onClick={() => (paletteOpen.value = true)}>
+                <Button variant="ghost" size="icon-sm" aria-label={t("nav.search")} onClick={() => (paletteOpen.value = true)}>
                   <SearchIcon />
                 </Button>
               </TooltipTrigger>

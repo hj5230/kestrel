@@ -28,6 +28,7 @@ function CopyButton({ text }: { text: string }) {
         <Button
           variant="ghost"
           size="icon-xs"
+          aria-label={t("common.copy")}
           onClick={() => {
             navigator.clipboard.writeText(text)
             setDone(true)
@@ -103,7 +104,7 @@ export function UserMessage({
         {canEdit && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-xs" onClick={() => onEdit(stored.seq, text)}>
+              <Button variant="ghost" size="icon-xs" aria-label={t("msg.editResend")} onClick={() => onEdit(stored.seq, text)}>
                 <PencilIcon />
               </Button>
             </TooltipTrigger>
@@ -112,7 +113,7 @@ export function UserMessage({
         )}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-xs" onClick={() => onFork(stored.seq)}>
+            <Button variant="ghost" size="icon-xs" aria-label={t("msg.fork")} onClick={() => onFork(stored.seq)}>
               <GitBranchIcon />
             </Button>
           </TooltipTrigger>

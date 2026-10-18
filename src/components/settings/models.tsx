@@ -162,7 +162,7 @@ function ProviderDialog({ open, provider, presets, onClose }: { open: boolean; p
                   autoComplete="off"
                 />
                 <InputGroupAddon align="inline-end">
-                  <InputGroupButton size="icon-xs" onClick={() => setReveal(!reveal)}>
+                  <InputGroupButton size="icon-xs" aria-label={reveal ? t("common.hide") : t("common.show")} onClick={() => setReveal(!reveal)}>
                     {reveal ? <EyeOffIcon /> : <EyeIcon />}
                   </InputGroupButton>
                 </InputGroupAddon>
@@ -468,7 +468,7 @@ export function ModelsSettings() {
               />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon-sm">
+                  <Button variant="ghost" size="icon-sm" aria-label={t("common.moreActions")}>
                     <MoreHorizontalIcon />
                   </Button>
                 </DropdownMenuTrigger>
@@ -542,7 +542,7 @@ export function ModelsSettings() {
                     ) : (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon-sm" className="hidden pointer-coarse:inline-flex" disabled={testing !== null}>
+                          <Button variant="ghost" size="icon-sm" className="hidden pointer-coarse:inline-flex" aria-label={t("common.moreActions")} disabled={testing !== null}>
                             <MoreHorizontalIcon />
                           </Button>
                         </DropdownMenuTrigger>
