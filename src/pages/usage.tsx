@@ -247,6 +247,16 @@ export function UsagePage() {
     [data, lang.value],
   )
 
+  const rangePicker = (className: string, segmented = false) => (
+    <ToggleGroup type="single" variant="outline" size="sm" spacing={segmented ? 0 : undefined} value={range} onValueChange={(v) => v && setRange(v)} className={className}>
+      {RANGES.map((r) => (
+        <ToggleGroupItem key={r.value} value={r.value} className={cn("px-3 text-xs", segmented && "flex-1")}>
+          {tr(r.key)}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
+  )
+
   const tot = data?.totals
   const cacheRate = tot && tot.input + tot.cacheRead > 0 ? tot.cacheRead / (tot.input + tot.cacheRead + tot.cacheWrite) : 0
 
@@ -254,16 +264,14 @@ export function UsagePage() {
     <div className="flex h-full flex-col">
       <PageHeader>
         <span className="text-sm font-medium">{tr("usage.title")}</span>
-        <ToggleGroup type="single" variant="outline" size="sm" value={range} onValueChange={(v) => v && setRange(v)} className="ml-auto">
-          {RANGES.map((r) => (
-            <ToggleGroupItem key={r.value} value={r.value} className="px-3 text-xs">
-              {tr(r.key)}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+        {rangePicker("ml-auto max-sm:hidden")}
       </PageHeader>
+      {/* Phones: a full-width segmented control under the header, as in native apps. */}
+      <div className="border-b px-4 py-2 sm:hidden">
+        {rangePicker("w-full", true)}
+      </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto grid max-w-6xl gap-4 p-6">
+        <div className="mx-auto grid max-w-6xl gap-4 p-4 pb-[max(1rem,var(--safe-bottom))] md:p-6">
           {!data ? (
             <div className="grid gap-4">
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
