@@ -445,8 +445,8 @@ export function ModelsSettings() {
           <div key={p.id} className={cn("overflow-hidden rounded-xl border bg-card", !p.enabled && "opacity-60")}>
             <div className="flex items-center gap-3 border-b bg-muted/30 px-4 py-3">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{p.name}</span>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="min-w-0 truncate font-medium">{p.name}</span>
                   <Badge variant="outline" className="text-[10px]">
                     {presets?.[p.kind]?.name ?? p.kind}
                   </Badge>
@@ -454,7 +454,8 @@ export function ModelsSettings() {
                 </div>
                 <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground select-text">{p.baseUrl || presets?.[p.kind]?.baseUrl}</div>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setFetchFor(p)}>
+              {/* Phones: "add models" moves into the ⋯ menu so the name and URL keep their width. */}
+              <Button variant="outline" size="sm" className="max-sm:hidden" onClick={() => setFetchFor(p)}>
                 <CloudDownloadIcon />
                 {t("models.addModels")}
               </Button>
@@ -472,6 +473,10 @@ export function ModelsSettings() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem className="sm:hidden" onSelect={() => setFetchFor(p)}>
+                    <CloudDownloadIcon />
+                    {t("models.addModels")}
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() => {
                       setEditing(p)
@@ -512,7 +517,8 @@ export function ModelsSettings() {
                         {m.cost.input || m.cost.output ? t("models.perM", { in: +m.cost.input.toFixed(3), out: +m.cost.output.toFixed(3) }) : ""}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/model:opacity-100 pointer-coarse:opacity-100">
+                    {/* Mouse: hover reveals the actions. Touch: one ⋯ menu, so the model name keeps the row. */}
+                    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/model:opacity-100 pointer-coarse:hidden">
                       <Button variant="ghost" size="icon-sm" title={t("models.test")} onClick={() => test(m)} disabled={testing !== null}>
                         {testing === `${m.providerId}/${m.id}` ? <Spinner /> : <PlayIcon />}
                       </Button>
@@ -531,6 +537,38 @@ export function ModelsSettings() {
                         <Trash2Icon />
                       </Button>
                     </div>
+                    {testing === `${m.providerId}/${m.id}` ? (
+                      <Spinner className="hidden pointer-coarse:block" />
+                    ) : (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon-sm" className="hidden pointer-coarse:inline-flex" disabled={testing !== null}>
+                            <MoreHorizontalIcon />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => test(m)}>
+                            <PlayIcon />
+                            {t("models.test")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => setEditModel(m)}>
+                            <PencilIcon />
+                            {t("common.edit")}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onSelect={async () => {
+                              await rpc("models.delete", { providerId: m.providerId, id: m.id })
+                              refreshProviders()
+                            }}
+                          >
+                            <Trash2Icon />
+                            {t("common.remove")}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                     <Switch
                       checked={m.enabled}
                       onCheckedChange={async (v) => {
