@@ -112,6 +112,30 @@
     max-height: calc(var(--app-height, 100dvh) * 2 / 3 - 16px);
   }
 
+  /* ---------- press feedback ---------- */
+  /* Hover never fires under a finger, so acknowledge the press itself, as native controls do:
+     buttons dim (works for every variant, including filled ones), list rows highlight. */
+  .group\/button:active:not(:disabled) {
+    opacity: 0.6;
+    transition: opacity 0s;
+  }
+  :is(
+      [data-slot="sidebar-menu-button"],
+      [data-slot="dropdown-menu-item"],
+      [data-slot="select-item"],
+      [data-slot="command-item"],
+      [data-slot="toggle-group-item"]
+    ):active:not([data-disabled]) {
+    background-color: var(--muted);
+  }
+  /* No long-press preview / callout on interface chrome; message text keeps it for links. */
+  body {
+    -webkit-touch-callout: none;
+  }
+  .markdown {
+    -webkit-touch-callout: default;
+  }
+
   /* ---------- desktop-only affordances ---------- */
   /* No keyboard shortcuts to hint at, and hover tooltips can't be summoned with a finger. */
   [data-slot="kbd"],
