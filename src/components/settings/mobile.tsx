@@ -186,6 +186,11 @@ export function MobileSettings() {
           <Row label={t("mobile.enable")} desc={t("mobile.enableDesc")}>
             <Switch checked={status.enabled} onCheckedChange={(v) => call("remote.configure", { enabled: v })} />
           </Row>
+          {status.enabled && (
+            <Row label={t("mobile.stayAwake")} desc={t("mobile.stayAwakeDesc")}>
+              <Switch checked={status.stayAwake} onCheckedChange={(v) => call("remote.stayAwake", { on: v })} />
+            </Row>
+          )}
           <Row label={t("mobile.port")} desc={status.error ? <span className="text-destructive">{status.error}</span> : undefined}>
             <Input
               className="w-24 font-mono"

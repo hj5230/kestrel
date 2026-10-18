@@ -470,6 +470,8 @@ export const en = {
   "mobile.enableDesc": "Listens on your network with an encrypted connection that only paired phones can use.",
   "mobile.port": "Port",
   "mobile.addresses": "Reachable at",
+  "mobile.stayAwake": "Stay online with the lid closed",
+  "mobile.stayAwakeDesc": "Turns off system sleep so your phone keeps reaching this Mac when the lid is closed or it sits idle; the screen still turns off. A macOS setting that needs your password and stays on after Kestrel quits. Don't leave it on in a bag.",
   "mobile.trustNote": "A paired phone has the same control as this window: through the agent it can run commands and read or change files. Remove phones you no longer use.",
   "mobile.pairTitle": "Pair a phone",
   "mobile.pairDesc": "Codes work once and expire after 10 minutes.",
