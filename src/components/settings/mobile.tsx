@@ -114,7 +114,7 @@ function TailscaleSection({ ts }: { ts: TailscaleStatus }) {
         <DownloadIcon />
         {t("tailscale.install")}
       </Button>
-    ) : ts.state === "not_running" ? (
+    ) : ts.state === "not_running" && ts.appInstalled ? (
       <Button size="sm" variant="outline" onClick={() => call("remote.tailscaleOpen")}>
         <PlayIcon />
         {t("tailscale.open")}
@@ -139,7 +139,8 @@ function TailscaleSection({ ts }: { ts: TailscaleStatus }) {
             ts.state === "running" ? (
               <HostList hosts={[ts.dnsName, ...ts.ips].filter((h): h is string => !!h)} />
             ) : (
-              t(`tailscale.state.${ts.state}`)
+              // Without the app it is the CLI daemon (Homebrew), which only starts as a root service.
+              t(ts.state === "not_running" && !ts.appInstalled ? "tailscale.state.not_running_cli" : `tailscale.state.${ts.state}`)
             )
           }
         >
