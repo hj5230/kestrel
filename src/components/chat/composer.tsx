@@ -380,27 +380,30 @@ export function Composer({
           }}
         />
         <div className="flex items-center gap-0.5 px-2 pb-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => fileInput.current?.click()}>
-                <ImagePlusIcon />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{t("composer.addImage")}</TooltipContent>
-          </Tooltip>
-          <input
-            ref={fileInput}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              if (e.currentTarget.files) addFiles(e.currentTarget.files)
-              e.currentTarget.value = ""
-            }}
-          />
-          {toolbar}
-          <div className="ml-auto flex items-center gap-1.5">
+          {/* Pickers scroll sideways on narrow screens; stop/send stay pinned and always reachable. */}
+          <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => fileInput.current?.click()}>
+                  <ImagePlusIcon />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("composer.addImage")}</TooltipContent>
+            </Tooltip>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.currentTarget.files) addFiles(e.currentTarget.files)
+                e.currentTarget.value = ""
+              }}
+            />
+            {toolbar}
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5 pl-1">
             {running && (
               <Tooltip>
                 <TooltipTrigger asChild>
