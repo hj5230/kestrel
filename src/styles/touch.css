@@ -60,11 +60,12 @@
     min-height: 44px;
     font-size: 16px;
   }
-  [data-slot="sidebar-menu-button"] {
+  /* Sidebar parts are matched by data-sidebar: tooltip and menu triggers (asChild) take over data-slot. */
+  [data-sidebar="menu-button"] {
     min-height: 44px;
   }
   /* Per-row "…" action: a real target, vertically centred in the 44pt row. */
-  [data-slot="sidebar-menu-action"] {
+  [data-sidebar="menu-action"] {
     width: 32px;
     height: 32px;
     top: 6px;
@@ -120,7 +121,7 @@
     transition: opacity 0s;
   }
   :is(
-      [data-slot="sidebar-menu-button"],
+      [data-sidebar="menu-button"],
       [data-slot="dropdown-menu-item"],
       [data-slot="select-item"],
       [data-slot="command-item"],
