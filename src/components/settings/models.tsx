@@ -195,11 +195,36 @@ function ProviderDialog({ open, provider, presets, onClose }: { open: boolean; p
   )
 }
 
+/**
+ * A number field that keeps what is typed as text ("0.", "0.00") and hands up the number. Any decimal
+ * is valid: a fixed step made values like 0.008 "invalid", and a controlled number would rewrite
+ * the text mid-typing.
+ */
+function NumField({ value, onValue, as: Comp = Input }: { value: number; onValue: (n: number) => void; as?: typeof Input }) {
+  const [text, setText] = useState(String(value))
+  useEffect(() => {
+    if (Number(text) !== value) setText(String(value))
+  }, [value])
+  return (
+    <Comp
+      type="number"
+      step="any"
+      min={0}
+      inputMode="decimal"
+      value={text}
+      onInput={(e) => {
+        setText(e.currentTarget.value)
+        const n = Number(e.currentTarget.value)
+        onValue(e.currentTarget.value === "" || !Number.isFinite(n) ? 0 : n)
+      }}
+    />
+  )
+}
+
 function ModelDialog({ model, onClose }: { model: ModelConfig | null; onClose: () => void }) {
   const [m, setM] = useState<ModelConfig | null>(model)
   useEffect(() => setM(model), [model])
   if (!m) return null
-  const num = (v: string) => (v === "" ? 0 : Number(v))
   const set = (patch: Partial<ModelConfig>) => setM({ ...m, ...patch })
   const setCost = (patch: Partial<ModelConfig["cost"]>) => setM({ ...m, cost: { ...m.cost, ...patch } })
   const save = async (e: Event) => {
@@ -228,11 +253,11 @@ function ModelDialog({ model, onClose }: { model: ModelConfig | null; onClose: (
             <div className="grid grid-cols-2 gap-3">
               <Field>
                 <FieldLabel>{t("models.contextWindow")}</FieldLabel>
-                <Input type="number" value={m.contextWindow} onInput={(e) => set({ contextWindow: num(e.currentTarget.value) })} />
+                <NumField value={m.contextWindow} onValue={(n) => set({ contextWindow: n })} />
               </Field>
               <Field>
                 <FieldLabel>{t("models.maxOutput")}</FieldLabel>
-                <Input type="number" value={m.maxTokens} onInput={(e) => set({ maxTokens: num(e.currentTarget.value) })} />
+                <NumField value={m.maxTokens} onValue={(n) => set({ maxTokens: n })} />
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -248,7 +273,7 @@ function ModelDialog({ model, onClose }: { model: ModelConfig | null; onClose: (
                   <FieldLabel>{label}</FieldLabel>
                   <InputGroup>
                     <InputGroupAddon>$</InputGroupAddon>
-                    <InputGroupInput type="number" step="0.01" value={m.cost[k]} onInput={(e) => setCost({ [k]: num(e.currentTarget.value) })} />
+                    <NumField as={InputGroupInput} value={m.cost[k]} onValue={(n) => setCost({ [k]: n })} />
                     <InputGroupAddon align="inline-end" className="text-xs">
                       / 1M
                     </InputGroupAddon>
