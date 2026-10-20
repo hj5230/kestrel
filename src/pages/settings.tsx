@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks"
-import { BookTextIcon, CpuIcon, FolderOpenIcon, InfoIcon, LaptopIcon, PaletteIcon, PlugIcon, RotateCcwIcon, ShieldCheckIcon, SmartphoneIcon, SparklesIcon } from "lucide-react"
+import { BookTextIcon, BrainIcon, CpuIcon, FolderOpenIcon, InfoIcon, LaptopIcon, PaletteIcon, PlugIcon, RotateCcwIcon, ShieldCheckIcon, SmartphoneIcon, SparklesIcon } from "lucide-react"
 import { toast } from "sonner"
 import type { AppSettings, SkillInfo } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { Panel, Row, Section } from "@/components/settings/layout"
 import { ModelsSettings } from "@/components/settings/models"
 import { McpSettings } from "@/components/settings/mcp"
+import { MemorySettings } from "@/components/settings/memory"
 import { MobileSettings } from "@/components/settings/mobile"
 import { ConnectionSettings } from "@/components/settings/connection"
 import { CwdPicker, ModelPicker, PermissionPicker, ThinkingPicker, permissionModes } from "@/components/chat/pickers"
@@ -32,6 +33,7 @@ const TABS = [
   { key: "mcp", icon: PlugIcon },
   { key: "skills", icon: SparklesIcon },
   { key: "instructions", icon: BookTextIcon },
+  { key: "memory", icon: BrainIcon },
   { key: "permissions", icon: ShieldCheckIcon },
   // Pairing phones is managed on the Mac; the phone shows which Mac it drives instead.
   ...(!isMobileApp ? [{ key: "mobile", icon: SmartphoneIcon }] : []),
@@ -458,6 +460,7 @@ export function SettingsPage({ tab }: { tab?: string }) {
             {current === "mcp" && <McpSettings />}
             {current === "skills" && <Skills s={s} />}
             {current === "instructions" && <Instructions s={s} />}
+            {current === "memory" && <MemorySettings s={s} />}
             {current === "permissions" && <Permissions s={s} />}
             {current === "mobile" && <MobileSettings />}
             {current === "connection" && <ConnectionSettings />}

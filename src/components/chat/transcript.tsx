@@ -143,9 +143,13 @@ const CATEGORY: Record<string, string> = {
   web_fetch: "web",
   web_search: "web",
   task: "subagents",
+  memory_search: "memory",
+  memory_read: "memory",
+  memory_write: "memory",
+  memory_delete: "memory",
   todo_write: "plan",
 }
-const ORDER = ["commands", "reads", "searches", "edits", "web", "subagents", "mcp", "other", "plan"]
+const ORDER = ["commands", "reads", "searches", "edits", "web", "subagents", "memory", "mcp", "other", "plan"]
 
 function plural(base: string, n: number) {
   return t(`group.${base}.${n === 1 ? "one" : "other"}` as MessageKey, { n })

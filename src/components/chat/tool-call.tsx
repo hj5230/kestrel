@@ -2,6 +2,7 @@ import { useState } from "preact/hooks"
 import type { ComponentType } from "preact"
 import {
   BotIcon,
+  BrainIcon,
   CheckIcon,
   ChevronRightIcon,
   CircleDashedIcon,
@@ -58,6 +59,10 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   search_sessions: HistoryIcon,
   read_session: MessagesSquareIcon,
   skill: SparklesIcon,
+  memory_search: BrainIcon,
+  memory_read: BrainIcon,
+  memory_write: BrainIcon,
+  memory_delete: BrainIcon,
 }
 
 
@@ -106,6 +111,13 @@ export function summary(call: ToolCallBlock): string {
       return a.description ?? ""
     case "skill":
       return a.name ?? ""
+    case "memory_write":
+      return `${a.topic ?? ""}/${a.name ?? ""}`
+    case "memory_read":
+    case "memory_delete":
+      return a.id ?? ""
+    case "memory_search":
+      return [a.query, a.topic && `in ${a.topic}`].filter(Boolean).join("  ")
     case "todo_write":
       return `${(a.todos ?? []).filter((t: Todo) => t.status === "completed").length}/${(a.todos ?? []).length}`
     default:
@@ -214,6 +226,15 @@ function Body({ call, result, partial, state }: { call: ToolCallBlock; result?: 
           </li>
         ))}
       </ul>
+    )
+  }
+  if (call.name === "memory_write") {
+    return (
+      <div className="select-text">
+        <div className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">{a.description}</div>
+        <OutputBlock text={a.content ?? ""} />
+        {state === "error" && <OutputBlock text={text} className="border-t text-destructive" />}
+      </div>
     )
   }
   const showArgs = call.name.startsWith("mcp__") || !ICONS[call.name]
