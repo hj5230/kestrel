@@ -23,6 +23,7 @@ import { st } from "../i18n";
 import { buildTranscript, describeAction, partsFromMessages, reviewAction, reviewerConfigured } from "../auto-review";
 import { evaluatePermission, isBroadEntry, type PermissionResult } from "../permissions";
 import { languageModel, resolveModel, toPiModel } from "../providers";
+import { costOf, parseModelSetting, recordSideUsage, sideModel, usageOf } from "../side-model";
 import { createSession, newId } from "../sessions";
 import { discoverSkills, expandSlashCommand } from "../skills";
 import { createBashOutputTool, createBashTool, createKillShellTool, killSessionShells } from "../tools/bash";
@@ -280,15 +281,16 @@ export class SessionRunner {
       return;
     }
     const s = this.info();
-    const model = this.agent.state.model.id === s.modelId ? this.agent.state.model : toPiModel(resolveModel(s.providerId, s.modelId));
+    // Summaries can run on a cheaper model chosen in Settings; its window decides how much history it is given.
+    const side = sideModel(settings.compactModel, s);
     this.compacting = true;
     emit({ type: "compacting", sessionId: this.id, active: true });
     try {
       const tokensBefore = estimateContextTokens(messages.slice(start), this.compaction?.summary ?? null);
       const { summary, usage } = await summarize({
-        providerId: s.providerId,
-        modelId: s.modelId,
-        contextWindow: model.contextWindow,
+        providerId: side.providerId,
+        modelId: side.modelId,
+        contextWindow: side.config.contextWindow,
         previousSummary: this.compaction?.summary ?? null,
         messages: messages.slice(start, cut),
         instructions: opts.instructions,
@@ -297,10 +299,8 @@ export class SessionRunner {
       if (!summary) throw new Error(st("emptySummary"));
       const info = store.addCompaction(this.id, cut, summary, tokensBefore, opts.auto);
       this.compaction = { cutSeq: cut, summary, at: info.createdAt };
-      const cost =
-        (usage.input * model.cost.input + usage.output * model.cost.output + usage.cacheRead * model.cost.cacheRead + usage.cacheWrite * model.cost.cacheWrite) /
-        1e6;
-      store.recordUsage({ sessionId: this.id, providerId: s.providerId, modelId: s.modelId, ...usage, cost, purpose: "compaction" });
+      const cost = costOf(usage, side.config);
+      store.recordUsage({ sessionId: this.id, providerId: side.providerId, modelId: side.modelId, ...usage, cost, purpose: "compaction" });
       const overhead = estimateTextTokens(this.agent.state.systemPrompt) + estimateTextTokens(JSON.stringify(this.agent.state.tools.map((t) => [t.name, t.description, t.parameters])));
       const after = overhead + estimateTextTokens(summary) + messages.slice(cut).reduce((n, m) => n + estimateMessageTokens(m), 0);
       store.addSessionUsage(this.id, { ...usage, cost }, after);
@@ -334,11 +334,14 @@ export class SessionRunner {
     const gate = this.root().gate;
     if (gate.paused) return { ...perm, action: "ask", note: { code: "review_paused" } };
     try {
+      const settings = store.getSettings();
+      const picked = parseModelSetting(settings.autoModel);
       const r = await reviewAction({
-        settings: store.getSettings(),
+        settings,
         transcript: this.reviewTranscript(),
         action: describeAction(tool, args, this.info().cwd),
         signal,
+        onUsage: (u) => picked && recordSideUsage(this.id, "review", picked, u),
       });
       if (!r.block) {
         gate.consecutive = 0;
@@ -537,17 +540,25 @@ export class SessionRunner {
       (typeof firstUser.content === "string" ? firstUser.content : firstUser.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n"));
     const fallback = text.replace(/\s+/g, " ").trim().slice(0, 40) || st("untitled");
     this.titlePending = true;
-    const settings = store.getSettings();
-    const [pid, mid] = settings.titleModel ? settings.titleModel.split("::") : [s.providerId, s.modelId];
+    let side: ReturnType<typeof sideModel>;
+    try {
+      side = sideModel(store.getSettings().titleModel, s);
+    } catch {
+      this.titlePending = false;
+      return;
+    }
     generateText({
-      model: languageModel(pid, mid),
+      model: languageModel(side.providerId, side.modelId),
       system:
         "Generate a concise title for the conversation that starts with the user's message below. Use the user's language. At most 16 Chinese characters or 7 English words. No quotes, no punctuation at the end. Output only the title.",
       prompt: text.slice(0, 3000),
       maxRetries: 1,
       abortSignal: AbortSignal.timeout(30000),
     })
-      .then((r) => r.text.replace(/^["'「『#\s]+|["'」』。.\s]+$/g, "").split("\n")[0].slice(0, 60) || fallback)
+      .then((r) => {
+        recordSideUsage(this.id, "title", side, usageOf(r.usage));
+        return r.text.replace(/^["'「『#\s]+|["'」』。.\s]+$/g, "").split("\n")[0].slice(0, 60) || fallback;
+      })
       .catch(() => fallback)
       .then((title) => {
         const cur = store.getSession(this.id);
