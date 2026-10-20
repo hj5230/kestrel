@@ -12,7 +12,7 @@ import { HomeView } from "@/pages/home"
 import { UsagePage } from "@/pages/usage"
 import { SettingsPage } from "@/pages/settings"
 import { isMobileApp } from "@/lib/platform"
-import { bootError, deviceRevoked, pairedMac, paletteOpen, route, settings } from "@/lib/store"
+import { addingMac, bootError, deviceRevoked, pairedMac, paletteOpen, route, settings } from "@/lib/store"
 
 function useShortcuts() {
   useEffect(() => {
@@ -47,7 +47,7 @@ export default function App() {
   useShortcuts()
   const s = settings.value
   const dark = typeof document !== "undefined" && document.documentElement.classList.contains("dark")
-  if (isMobileApp && (pairedMac.value === null || deviceRevoked.value)) return <PairScreen />
+  if (isMobileApp && (pairedMac.value === null || deviceRevoked.value || addingMac.value)) return <PairScreen />
   if (!s || bootError.value) return <BootScreen error={bootError.value} />
   return (
     <TooltipProvider delayDuration={400}>

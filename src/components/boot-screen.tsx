@@ -5,7 +5,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { t } from "@/lib/i18n"
 import { describePairingError, pairingErrorDetail } from "@/lib/pairing"
 import { isDesktopApp, isMobileApp } from "@/lib/platform"
-import { boot, pairedMac, unpairMac } from "@/lib/store"
+import { addingMac, boot, pairedMac } from "@/lib/store"
 
 export function BootScreen({ error }: { error: string | null }) {
   const mac = isMobileApp ? pairedMac.value : null
@@ -36,8 +36,8 @@ export function BootScreen({ error }: { error: string | null }) {
                   <RefreshCwIcon />
                   {t("common.retry")}
                 </Button>
-                <Button variant="ghost" className="text-muted-foreground" onClick={() => void unpairMac()}>
-                  {t("boot.pairOther")}
+                <Button variant="ghost" className="text-muted-foreground" onClick={() => (addingMac.value = true)}>
+                  {t("boot.switchMac")}
                 </Button>
               </div>
             ) : (

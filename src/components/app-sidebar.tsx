@@ -3,15 +3,19 @@ import {
   ArchiveIcon,
   ArchiveRestoreIcon,
   BarChart3Icon,
+  CheckIcon,
+  ChevronsUpDownIcon,
   CircleAlertIcon,
   DownloadIcon,
   FolderOpenIcon,
   FolderTreeIcon,
   HistoryIcon,
+  LaptopIcon,
   MoreHorizontalIcon,
   PencilIcon,
   PinIcon,
   PinOffIcon,
+  PlusIcon,
   SearchIcon,
   Settings2Icon,
   SquarePenIcon,
@@ -51,7 +55,7 @@ import { Button } from "@/components/ui/button"
 import { RenameDialog, ConfirmDeleteDialog, ArchivedDialog } from "@/components/session-dialogs"
 import { rpc } from "@/lib/api"
 import { basename, dayBucket, relativeTime, shortPath } from "@/lib/format"
-import { appInfo, connected, pairedMac, paletteOpen, route, sessions, enabledModels } from "@/lib/store"
+import { addingMac, appInfo, connected, pairedMac, pairedMacs, paletteOpen, route, sessions, enabledModels, switchMac } from "@/lib/store"
 import { isDesktopApp, isMobileApp } from "@/lib/platform"
 import { downloadText } from "@/lib/download"
 import { toast } from "sonner"
@@ -139,6 +143,50 @@ function SessionItem({ s, active, onRename, onDelete }: { s: SessionInfo; active
         </DropdownMenuContent>
       </DropdownMenu>
     </SidebarMenuItem>
+  )
+}
+
+/** Mobile: which Mac is in use, with a menu to move to another paired Mac or add one. */
+function MacSwitcher() {
+  const { setOpenMobile } = useSidebar()
+  const current = pairedMac.value
+  if (!current) return null
+  const macs = pairedMacs.value.length ? pairedMacs.value : [current]
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" aria-label={t("sidebar.switchMac")} className="-my-1 flex min-w-0 items-center gap-1 rounded-md py-1 pr-1 outline-none active:bg-sidebar-accent">
+          <span className="truncate">{current.serverName}</span>
+          <ChevronsUpDownIcon className="size-3 shrink-0" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="start" className="w-auto min-w-52">
+        <DropdownMenuLabel>{t("sidebar.switchMac")}</DropdownMenuLabel>
+        {macs.map((m) => (
+          <DropdownMenuItem
+            key={m.deviceId}
+            onSelect={() => {
+              setOpenMobile(false)
+              void switchMac(m.deviceId)
+            }}
+          >
+            <LaptopIcon />
+            <span className="truncate">{m.serverName}</span>
+            {m.deviceId === current.deviceId && <CheckIcon className="ml-auto" />}
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={() => {
+            setOpenMobile(false)
+            addingMac.value = true
+          }}
+        >
+          <PlusIcon />
+          {t("connection.add")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -258,10 +306,12 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground">
-          <span className={cn("size-1.5 rounded-full", connected.value ? "bg-success" : "bg-destructive")} />
-          <span className="truncate">
-            {isMobileApp && pairedMac.value ? pairedMac.value.serverName : connected.value ? t("sidebar.connected") : t("sidebar.connecting")}
-          </span>
+          <span className={cn("size-1.5 shrink-0 rounded-full", connected.value ? "bg-success" : "bg-destructive")} />
+          {isMobileApp && pairedMac.value ? (
+            <MacSwitcher />
+          ) : (
+            <span className="truncate">{connected.value ? t("sidebar.connected") : t("sidebar.connecting")}</span>
+          )}
           <span className="ml-auto flex shrink-0 items-center gap-1">
             <HistoryIcon className="size-3" />
             {t("sidebar.stats", { sessions: list.length, models: enabledModels.value.length })}
