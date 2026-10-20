@@ -27,6 +27,7 @@ Tauri (Rust)                  sidecar (Bun, single binary kestrel-agent)        
 - English and Chinese UI, English by default.
 - Context: AGENTS.md / CLAUDE.md loaded level by level, a global instructions file, skills (SKILL.md) and custom `/` commands, auto-compaction with retry on context overflow.
 - Memory: notes the agent keeps across sessions, as Markdown files grouped by topic in `~/.kestrel/memory/<topic>/<name>.md` (types: user, feedback, project, reference). Each session starts with an index of one-line descriptions; the agent opens notes with `memory_read` and can save, replace and delete them itself (deleted notes go to `.trash`; secrets are refused; subagents are read-only). Browse, edit, move and delete them in Settings → Memory, or turn the feature or the agent's own saving off there.
+- Past conversations beyond this app: `search_sessions` / `read_session` also search the sessions that Claude Code (`~/.claude/projects`), Codex (`~/.codex/sessions`) and Cursor (`~/.cursor/projects`) keep on this Mac, read-only. A background index (`history.db` next to Kestrel's database, rebuilt from the originals, incremental after the first pass) holds only what you said and what the assistant answered, not tool output or helper/subagent threads. Turn each app on or off, or rebuild the index, in Settings → Memory.
 - Usage: cost, tokens, cache hits, model ranking, tool calls and active hours (ECharts).
 
 ## Development
