@@ -49,6 +49,8 @@ export const settings = signal<AppSettings | null>(null)
 export const providers = signal<ProviderConfig[]>([])
 export const models = signal<ModelConfig[]>([])
 export const mcpServers = signal<McpServerStatus[]>([])
+/** Bumped whenever a memory note is added, changed or deleted, so the Memory settings reload. */
+export const memoryRev = signal(0)
 export const connected = signal(false)
 export const bootError = signal<string | null>(null)
 export const paletteOpen = signal(false)
@@ -244,6 +246,9 @@ function handleEvents() {
         break
       case "mcp_status":
         mcpServers.value = e.servers
+        break
+      case "memory_changed":
+        memoryRev.value++
         break
       case "notice":
         if (e.level === "error") toast.error(e.text)
