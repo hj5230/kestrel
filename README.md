@@ -22,10 +22,11 @@ Tauri (Rust)                  sidecar (Bun, single binary kestrel-agent)        
 
 - Sessions: grouped by time or project, pin, archive, rename, fork, edit and resend, export to Markdown, full-text search (⌘K).
 - Chat: streaming output, reasoning, tool-call cards (command output, diffs, subagent progress), image input, steering/queueing, stop, retry.
-- Tools: read / write / edit / ls / glob / grep (ripgrep) / bash (with background processes) / web_fetch / web_search / todo_write / task (subagents) / search_sessions / read_session / skill / MCP.
+- Tools: read / write / edit / ls / glob / grep (ripgrep) / bash (with background processes) / web_fetch / web_search / todo_write / task (subagents) / search_sessions / read_session / skill / memory_search / memory_read / memory_write / memory_delete / MCP.
 - Permissions: Manual, Accept edits, White list and Bypass modes. A bash allowlist (low-risk command prefixes built in, editable in Settings); an approval can add the command prefix or MCP tool to the allowlist in one click, and a denial can carry a reason.
 - English and Chinese UI, English by default.
 - Context: AGENTS.md / CLAUDE.md loaded level by level, a global instructions file, skills (SKILL.md) and custom `/` commands, auto-compaction with retry on context overflow.
+- Memory: notes the agent keeps across sessions, as Markdown files grouped by topic in `~/.kestrel/memory/<topic>/<name>.md` (types: user, feedback, project, reference). Each session starts with an index of one-line descriptions; the agent opens notes with `memory_read` and can save, replace and delete them itself (deleted notes go to `.trash`; secrets are refused; subagents are read-only). Browse, edit, move and delete them in Settings → Memory, or turn the feature or the agent's own saving off there.
 - Usage: cost, tokens, cache hits, model ranking, tool calls and active hours (ECharts).
 
 ## Development
