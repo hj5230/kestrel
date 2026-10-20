@@ -145,6 +145,9 @@ const MIGRATIONS: string[] = [
     last_seen_at INTEGER NOT NULL
   );
   `,
+  `
+  UPDATE sessions SET permission_mode = 'auto' WHERE permission_mode = 'whitelist';
+  `,
 ];
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -155,7 +158,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultProviderId: "",
   defaultModelId: "",
   defaultThinking: "medium",
-  defaultPermissionMode: "whitelist",
+  defaultPermissionMode: "auto",
   titleModel: "",
   autoCompact: true,
   compactThreshold: 0.8,
@@ -173,6 +176,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   bashTimeoutSec: 120,
   bashWhitelist: DEFAULT_BASH_WHITELIST,
   toolWhitelist: [],
+  autoModel: "",
+  autoEnvironment: "",
+  autoBlockRules: "",
+  autoAllowRules: "",
   notifyOnFinish: true,
   sendKey: "enter",
   transcriptView: "compact",
@@ -230,12 +237,14 @@ const json = <T>(s: string | null | undefined, fallback: T): T => {
 
 // ---------- settings ----------
 
-const PERMISSION_MODES = new Set(["manual", "acceptEdits", "whitelist", "bypass"]);
+const PERMISSION_MODES = new Set(["manual", "acceptEdits", "auto", "bypass"]);
 
 export function getSettings(): AppSettings {
   const row = db.query("SELECT value FROM meta WHERE key = 'settings'").get() as { value: string } | null;
   const s = { ...DEFAULT_SETTINGS, ...json<Partial<AppSettings>>(row?.value, {}) };
-  if (!PERMISSION_MODES.has(s.defaultPermissionMode)) s.defaultPermissionMode = "whitelist";
+  // "whitelist" was renamed to "auto" (the allowlist now feeds a smarter mode).
+  if ((s.defaultPermissionMode as string) === "whitelist") s.defaultPermissionMode = "auto";
+  if (!PERMISSION_MODES.has(s.defaultPermissionMode)) s.defaultPermissionMode = "auto";
   return s;
 }
 

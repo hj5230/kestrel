@@ -9,7 +9,13 @@ export type ProviderKind =
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
-export type PermissionMode = "manual" | "acceptEdits" | "whitelist" | "bypass";
+/**
+ * manual      — ask before every edit, command and MCP call.
+ * acceptEdits — edits in the project go through, commands are asked.
+ * auto        — rules and the allowlist decide what is clearly fine; an auto-review model judges the rest.
+ * bypass      — never ask.
+ */
+export type PermissionMode = "manual" | "acceptEdits" | "auto" | "bypass";
 
 export type Language = "en" | "zh-CN";
 
@@ -168,7 +174,24 @@ export interface ApprovalRequest {
   detail: string;
   subagent: boolean;
   whitelistSuggestion: string | null;
+  /** Why a person is asked when it is more than "nothing allows this" (credentials, auto-review said no, …). */
+  note: ApprovalNote | null;
   createdAt: number;
+}
+
+export type ApprovalNoteCode =
+  | "protected_path" // a startup file, git hook, credential store or agent config
+  | "sensitive_read" // reading credentials
+  | "critical_delete" // deleting or moving `/`, the home folder or a folder directly under it
+  | "outside_project" // editing a file outside the working folder
+  | "review_blocked" // the auto-review model said no and the agent kept pushing
+  | "review_error" // the auto-review model could not be reached
+  | "review_paused"; // too many blocks in a row: auto mode paused until you approve something
+
+export interface ApprovalNote {
+  code: ApprovalNoteCode;
+  /** The path or the reviewer's one-line reason. */
+  detail?: string;
 }
 
 export type ApprovalDecision = "allow_once" | "allow_always" | "deny";
@@ -271,6 +294,14 @@ export interface AppSettings {
   bashTimeoutSec: number;
   bashWhitelist: string[];
   toolWhitelist: string[];
+  /** `providerId::modelId` of the model that reviews calls in auto mode; empty = no reviewer, unclear calls are asked. */
+  autoModel: string;
+  /** Auto-review policy, appended to the built-in one: what counts as trusted (repos, hosts, buckets). */
+  autoEnvironment: string;
+  /** Extra things the reviewer must block. */
+  autoBlockRules: string;
+  /** Exceptions: things the reviewer must allow even though a block rule matches. */
+  autoAllowRules: string;
   notifyOnFinish: boolean;
   sendKey: "enter" | "mod-enter";
   transcriptView: TranscriptView;
