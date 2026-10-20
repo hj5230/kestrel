@@ -243,6 +243,13 @@ function handleEvents() {
       case "approval_resolved":
         patchDetail(e.sessionId, (d) => ({ ...d, approvals: d.approvals.filter((a) => a.id !== e.id) }))
         break
+      case "question_request":
+        patchDetail(e.request.sessionId, (d) => ({ ...d, questions: [...d.questions.filter((q) => q.id !== e.request.id), e.request] }))
+        notify(t("notify.question"), e.request.questions[0]?.prompt.slice(0, 120) ?? "")
+        break
+      case "question_resolved":
+        patchDetail(e.sessionId, (d) => ({ ...d, questions: d.questions.filter((q) => q.id !== e.id) }))
+        break
       case "compaction":
         patchDetail(e.sessionId, (d) => ({ ...d, compactions: [...d.compactions, e.compaction] }))
         break

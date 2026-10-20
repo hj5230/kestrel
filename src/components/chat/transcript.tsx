@@ -148,8 +148,9 @@ const CATEGORY: Record<string, string> = {
   memory_write: "memory",
   memory_delete: "memory",
   todo_write: "plan",
+  ask_user: "questions",
 }
-const ORDER = ["commands", "reads", "searches", "edits", "web", "subagents", "memory", "mcp", "other", "plan"]
+const ORDER = ["commands", "reads", "searches", "edits", "web", "subagents", "memory", "questions", "mcp", "other", "plan"]
 
 function plural(base: string, n: number) {
   return t(`group.${base}.${n === 1 ? "one" : "other"}` as MessageKey, { n })
@@ -284,8 +285,8 @@ export function Transcript({
   const last = d.messages[d.messages.length - 1]
   const lastAssistantError = !running && last?.message.role === "assistant" && last.message.stopReason === "error" ? (last.message as AssistantMsg) : null
   const configError = !running && d.session.status === "error" && !lastAssistantError && d.session.lastError
-  const busy = running && (!lastRow || lastRow.k === "user" || lastRow.k === "compaction") && d.approvals.length === 0
-  const waiting = d.approvals.length > 0
+  const busy = running && (!lastRow || lastRow.k === "user" || lastRow.k === "compaction") && d.approvals.length === 0 && d.questions.length === 0
+  const waiting = d.approvals.length > 0 || d.questions.length > 0
 
   const rendered: preact.JSX.Element[] = []
   rows.forEach((row, i) => {

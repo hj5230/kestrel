@@ -28,6 +28,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { ConfirmDeleteDialog, RenameDialog } from "@/components/session-dialogs"
 import { Composer, type Attachment } from "./composer"
 import { ApprovalCard } from "./approval-card"
+import { QuestionCard } from "./question-card"
 import { userText } from "./messages"
 import { Transcript } from "./transcript"
 import { ViewPicker } from "./view-picker"
@@ -97,7 +98,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
     loadDetail(sessionId).catch((e) => toast.error(e.message))
   }, [sessionId])
 
-  const { ref, detached, jump, follow } = useStickToBottom([d?.messages.length, d?.streaming, d?.runningTools, d?.approvals.length, d?.compacting])
+  const { ref, detached, jump, follow } = useStickToBottom([d?.messages.length, d?.streaming, d?.runningTools, d?.approvals.length, d?.questions.length, d?.compacting])
 
   const history = useMemo(
     () => (d?.messages ?? []).filter((m) => m.message.role === "user").map((m) => userText(m.message as any)).filter(Boolean),
@@ -279,6 +280,9 @@ export function ChatView({ sessionId }: { sessionId: string }) {
             <div className="flex flex-col gap-2">
               {d.approvals.map((a) => (
                 <ApprovalCard key={a.id} req={a} />
+              ))}
+              {d.questions.map((q) => (
+                <QuestionCard key={q.id} req={q} />
               ))}
               {d.queued.length > 0 && (
                 <div className="flex flex-col gap-1">
