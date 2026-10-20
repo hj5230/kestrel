@@ -3,8 +3,13 @@
 //! All traffic goes through Rust rather than the WebView because WKWebView cannot pin a
 //! self-signed certificate. The frontend sees the same RPC + event-stream contract it uses on
 //! desktop; only the carrier differs.
+//!
+//! A phone can be paired with several Macs (`profiles::Store`); one is active and every RPC and
+//! the event stream go to it. Each Mac keeps its own device token in the Keychain, so switching
+//! between them never needs a new pairing code.
 
 use crate::pinned_tls;
+use crate::profiles::{Profile, Store};
 use futures_util::{future::select_ok, FutureExt, SinkExt, StreamExt};
 use rustls::ClientConfig;
 use serde::{Deserialize, Serialize};
@@ -26,17 +31,6 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(4);
 const PING_EVERY: Duration = Duration::from_secs(20);
 const DEAD_AFTER: Duration = Duration::from_secs(50);
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Profile {
-    server_name: String,
-    hosts: Vec<String>,
-    port: u16,
-    fingerprint: String,
-    device_id: String,
-    paired_at: u64,
-}
-
 #[derive(Clone)]
 struct Conn {
     profile: Profile,
@@ -47,6 +41,9 @@ struct Conn {
 
 #[derive(Default)]
 pub struct Remote {
+    /// Every paired Mac. `None` until first read from disk. Never held while taking `conn`.
+    store: Mutex<Option<Store>>,
+    /// Connection to the active Mac, built lazily.
     conn: Mutex<Option<Conn>>,
     /// Last address that answered; re-probed when it stops working.
     host: Mutex<Option<String>>,
@@ -62,7 +59,7 @@ struct ConnStatus {
 
 // ---------- storage ----------
 
-fn profile_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+fn store_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.join("remote.json"))
@@ -97,29 +94,50 @@ fn build_conn(profile: Profile, token: String) -> Result<Conn, String> {
     Ok(Conn { profile, token: token.into(), tls, client })
 }
 
-fn load_conn<R: Runtime>(app: &AppHandle<R>) -> Result<Option<Conn>, String> {
-    let path = profile_path(app)?;
-    let Ok(text) = std::fs::read_to_string(&path) else { return Ok(None) };
-    let profile: Profile = serde_json::from_str(&text).map_err(|e| e.to_string())?;
-    match keychain_get(&profile.device_id) {
-        Some(token) => build_conn(profile, token).map(Some),
-        // Profile without its secret (e.g. restored from a backup to a new phone): unusable.
-        None => {
-            let _ = std::fs::remove_file(path);
-            Ok(None)
-        }
-    }
+fn read_store<R: Runtime>(app: &AppHandle<R>) -> Result<Store, String> {
+    let Ok(text) = std::fs::read_to_string(store_path(app)?) else { return Ok(Store::default()) };
+    let mut store = Store::parse(&text)?;
+    // A profile without its secret (e.g. restored from a backup to a new phone) is unusable.
+    store.retain_with_secret(|id| keychain_get(id).is_some());
+    Ok(store)
 }
 
-fn save_profile<R: Runtime>(app: &AppHandle<R>, profile: &Profile) -> Result<(), String> {
-    let json = serde_json::to_string_pretty(profile).map_err(|e| e.to_string())?;
-    std::fs::write(profile_path(app)?, json).map_err(|e| e.to_string())
+fn write_store<R: Runtime>(app: &AppHandle<R>, store: &Store) -> Result<(), String> {
+    let json = serde_json::to_string_pretty(store).map_err(|e| e.to_string())?;
+    std::fs::write(store_path(app)?, json).map_err(|e| e.to_string())
+}
+
+fn snapshot<R: Runtime>(app: &AppHandle<R>, state: &Remote) -> Result<Store, String> {
+    let mut slot = state.store.lock().unwrap();
+    if slot.is_none() {
+        *slot = Some(read_store(app)?);
+    }
+    Ok(slot.clone().unwrap())
+}
+
+/// Changes the store and persists it, under one lock so concurrent updates cannot interleave.
+fn update_store<R: Runtime, T>(app: &AppHandle<R>, state: &Remote, change: impl FnOnce(&mut Store) -> T) -> Result<T, String> {
+    let mut slot = state.store.lock().unwrap();
+    if slot.is_none() {
+        *slot = Some(read_store(app)?);
+    }
+    let store = slot.as_mut().unwrap();
+    let out = change(store);
+    write_store(app, store)?;
+    Ok(out)
+}
+
+fn load_active<R: Runtime>(app: &AppHandle<R>, state: &Remote) -> Result<Option<Conn>, String> {
+    let store = snapshot(app, state)?;
+    let Some(profile) = store.active_profile().cloned() else { return Ok(None) };
+    let Some(token) = keychain_get(&profile.device_id) else { return Ok(None) };
+    build_conn(profile, token).map(Some)
 }
 
 fn current<R: Runtime>(app: &AppHandle<R>, state: &Remote) -> Result<Conn, String> {
     let mut slot = state.conn.lock().unwrap();
     if slot.is_none() {
-        *slot = load_conn(app)?;
+        *slot = load_active(app, state)?;
     }
     slot.clone().ok_or_else(|| "not_paired".to_string())
 }
@@ -242,9 +260,6 @@ async fn remote_pair<R: Runtime>(
     let paired: PairResponse = res.json().await.map_err(|e| e.to_string())?;
 
     disconnect_events(&state);
-    if let Some(old) = state.conn.lock().unwrap().take() {
-        keychain_delete(&old.profile.device_id);
-    }
     let profile = Profile {
         server_name: if paired.server_name.is_empty() { link.name } else { paired.server_name },
         hosts: link.hosts,
@@ -254,34 +269,81 @@ async fn remote_pair<R: Runtime>(
         paired_at: SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0),
     };
     keychain_set(&profile.device_id, &paired.token)?;
-    save_profile(&app, &profile)?;
+    // Other Macs stay paired. Only an entry for this same Mac (same certificate) is replaced.
+    let replaced = update_store(&app, &state, |s| s.upsert(profile.clone()))?;
+    if let Some(old) = replaced {
+        // Pairing the same Mac again would leave this phone listed twice there, so drop the old pairing on both ends.
+        if let Some(old_token) = keychain_get(&old.device_id) {
+            unpair_on_mac(&client, &found, old.port, &old_token).await;
+        }
+        keychain_delete(&old.device_id);
+    }
     *state.conn.lock().unwrap() = Some(Conn { profile: profile.clone(), token: paired.token.into(), tls, client });
     *state.host.lock().unwrap() = Some(found);
     Ok(profile)
 }
 
+/// Asks a Mac to drop the device that owns `token` from its list. Best effort: the Mac may be off.
+async fn unpair_on_mac(client: &reqwest::Client, host: &str, port: u16, token: &str) {
+    let _ = client
+        .post(format!("{}/rpc", base(host, port)))
+        .bearer_auth(token)
+        .json(&json!({ "method": "device.unpair", "params": {} }))
+        .timeout(Duration::from_secs(3))
+        .send()
+        .await;
+}
+
+/// Every paired Mac and which one is in use.
 #[tauri::command]
-async fn remote_forget<R: Runtime>(app: AppHandle<R>, state: State<'_, Remote>) -> Result<(), String> {
+async fn remote_macs<R: Runtime>(app: AppHandle<R>, state: State<'_, Remote>) -> Result<Store, String> {
+    snapshot(&app, &state)
+}
+
+/// Makes another paired Mac the one the phone drives. No pairing code: its token is already in the Keychain.
+#[tauri::command]
+async fn remote_select<R: Runtime>(app: AppHandle<R>, state: State<'_, Remote>, device_id: String) -> Result<Profile, String> {
+    let profile = snapshot(&app, &state)?.find(&device_id).cloned().ok_or_else(|| "not_paired".to_string())?;
+    let token = keychain_get(&profile.device_id).ok_or_else(|| "not_paired".to_string())?;
+    let conn = build_conn(profile.clone(), token)?;
     disconnect_events(&state);
-    if let Ok(conn) = current(&app, &state) {
-        // Best effort: let the Mac drop this device from its list too.
-        let last_host = state.host.lock().unwrap().clone();
-        if let Some(h) = last_host {
-            let _ = conn
-                .client
-                .post(format!("{}/rpc", base(&h, conn.profile.port)))
-                .bearer_auth(&*conn.token)
-                .json(&json!({ "method": "device.unpair", "params": {} }))
-                .timeout(Duration::from_secs(3))
-                .send()
-                .await;
-        }
-        keychain_delete(&conn.profile.device_id);
-    }
-    *state.conn.lock().unwrap() = None;
+    update_store(&app, &state, |s| s.select(&device_id))?;
+    *state.conn.lock().unwrap() = Some(conn);
     *state.host.lock().unwrap() = None;
-    let _ = std::fs::remove_file(profile_path(&app)?);
-    Ok(())
+    Ok(profile)
+}
+
+/// Forgets one Mac (the active one by default) and returns what is left; the active Mac falls back to
+/// another paired one, if any.
+#[tauri::command]
+async fn remote_forget<R: Runtime>(app: AppHandle<R>, state: State<'_, Remote>, device_id: Option<String>) -> Result<Store, String> {
+    let before = snapshot(&app, &state)?;
+    let Some(id) = device_id.or_else(|| before.active.clone()) else { return Ok(before) };
+    let Some(profile) = before.find(&id).cloned() else { return Ok(before) };
+    let token = keychain_get(&id);
+
+    if before.active.as_deref() == Some(&id) {
+        disconnect_events(&state);
+        *state.conn.lock().unwrap() = None;
+        *state.host.lock().unwrap() = None;
+    }
+    let after = update_store(&app, &state, |s| {
+        s.remove(&id);
+        s.clone()
+    })?;
+    keychain_delete(&id);
+
+    if let Some(token) = token {
+        // Best effort, off the critical path: the Mac may be asleep, and forgetting must not wait for it.
+        tauri::async_runtime::spawn(async move {
+            let Ok(tls) = pinned_tls::client_config(&profile.fingerprint) else { return };
+            let Ok(client) = http_client(&tls) else { return };
+            if let Ok(host) = probe(&client, &profile.hosts, profile.port).await {
+                unpair_on_mac(&client, &host, profile.port, &token).await;
+            }
+        });
+    }
+    Ok(after)
 }
 
 enum RpcFailure {
@@ -352,18 +414,15 @@ async fn refresh_hosts<R: Runtime>(app: AppHandle<R>, conn: Conn, host: String) 
         return;
     }
     let state = app.state::<Remote>();
-    let profile = {
-        let mut slot = state.conn.lock().unwrap();
-        let Some(c) = slot.as_mut() else { return };
-        if c.profile.device_id != conn.profile.device_id {
-            return; // re-paired meanwhile
+    // The phone may have switched to another Mac while the request was in flight; the update goes to the
+    // Mac that answered either way, and the active connection only picks it up if it is still that one.
+    let Ok(Some(profile)) = update_store(&app, &state, |s| s.update_hosts(&conn.profile.device_id, hosts)) else { return };
+    if let Some(c) = state.conn.lock().unwrap().as_mut() {
+        if c.profile.device_id == profile.device_id {
+            c.profile.hosts = profile.hosts.clone();
         }
-        c.profile.hosts = hosts;
-        c.profile.clone()
-    };
-    if save_profile(&app, &profile).is_ok() {
-        let _ = app.emit(PROFILE, profile);
     }
+    let _ = app.emit(PROFILE, profile);
 }
 
 fn disconnect_events(state: &Remote) {
@@ -470,6 +529,8 @@ pub fn setup<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
         .manage(Remote::default())
         .invoke_handler(tauri::generate_handler![
             remote_profile,
+            remote_macs,
+            remote_select,
             remote_pair,
             remote_forget,
             remote_rpc,
