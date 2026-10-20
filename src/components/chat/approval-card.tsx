@@ -1,14 +1,14 @@
 import { useState } from "preact/hooks"
-import { ShieldQuestionIcon } from "lucide-react"
+import { ShieldAlertIcon, ShieldQuestionIcon } from "lucide-react"
 import { toast } from "sonner"
-import type { ApprovalDecision, ApprovalRequest } from "@shared/protocol"
+import type { ApprovalDecision, ApprovalNote, ApprovalRequest } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { DiffView, simpleDiff } from "./diff-view"
 import { rpc } from "@/lib/api"
 import { shortPath } from "@/lib/format"
-import { t } from "@/lib/i18n"
+import { t, type MessageKey } from "@/lib/i18n"
 import { appInfo } from "@/lib/store"
 
 function title(req: ApprovalRequest) {
@@ -24,6 +24,16 @@ function title(req: ApprovalRequest) {
           ? t("approval.killShell")
           : t("approval.callTool", { tool: req.toolName.replace(/^mcp__/, "").replace("__", " · ") })
   return (req.subagent ? t("approval.subagent") : "") + base
+}
+
+const NOTES: Record<ApprovalNote["code"], MessageKey> = {
+  protected_path: "approval.note.protected_path",
+  sensitive_read: "approval.note.sensitive_read",
+  critical_delete: "approval.note.critical_delete",
+  outside_project: "approval.note.outside_project",
+  review_blocked: "approval.note.review_blocked",
+  review_error: "approval.note.review_error",
+  review_paused: "approval.note.review_paused",
 }
 
 export function ApprovalCard({ req }: { req: ApprovalRequest }) {
@@ -46,6 +56,12 @@ export function ApprovalCard({ req }: { req: ApprovalRequest }) {
         <ShieldQuestionIcon className="size-4 text-warning" />
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{title(req)}</span>
       </div>
+      {req.note && (
+        <div className="flex gap-2 border-b bg-warning/5 px-4 py-2 text-xs text-muted-foreground">
+          <ShieldAlertIcon className="mt-0.5 size-3.5 shrink-0 text-warning" />
+          <span className="min-w-0 break-words">{t(NOTES[req.note.code], { detail: req.note.detail ?? "" })}</span>
+        </div>
+      )}
       <div className="max-h-72 overflow-auto bg-code">
         {req.kind === "edit" ? (
           <DiffView

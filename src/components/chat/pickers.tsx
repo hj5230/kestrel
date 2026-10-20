@@ -6,9 +6,9 @@ import {
   FilePenLineIcon,
   FolderIcon,
   FolderOpenIcon,
-  ListChecksIcon,
   ShieldCheckIcon,
   ShieldOffIcon,
+  SparklesIcon,
   Settings2Icon,
   EyeIcon,
 } from "lucide-react"
@@ -133,7 +133,7 @@ export function permissionModes(): { value: PermissionMode; label: string; desc:
   return [
     { value: "manual", label: t("perm.manual"), desc: t("perm.manual.desc"), icon: ShieldCheckIcon },
     { value: "acceptEdits", label: t("perm.acceptEdits"), desc: t("perm.acceptEdits.desc"), icon: FilePenLineIcon },
-    { value: "whitelist", label: t("perm.whitelist"), desc: t("perm.whitelist.desc"), icon: ListChecksIcon },
+    { value: "auto", label: t("perm.auto"), desc: t("perm.auto.desc"), icon: SparklesIcon },
     { value: "bypass", label: t("perm.bypass"), desc: t("perm.bypass.desc"), icon: ShieldOffIcon },
   ]
 }
