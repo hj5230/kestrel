@@ -8,6 +8,7 @@ import {
   CircleDashedIcon,
   CircleIcon,
   CircleCheckIcon,
+  CircleHelpIcon,
   ExternalLinkIcon,
   FileTextIcon,
   FilePenLineIcon,
@@ -28,12 +29,13 @@ import {
   XIcon,
   BanIcon,
 } from "lucide-react"
-import type { BashDetails, EditDetails, SubagentDetails, Todo, ToolCallBlock, ToolResultMsg } from "@shared/protocol"
+import type { AskDetails, BashDetails, EditDetails, SubagentDetails, Todo, ToolCallBlock, ToolResultMsg } from "@shared/protocol"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Spinner } from "@/components/ui/spinner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DiffView, simpleDiff } from "./diff-view"
+import { QuestionSummary } from "./question-card"
 import { formatDuration, shortPath } from "@/lib/format"
 import { highlight, languageFromPath } from "@/lib/markdown"
 import { appInfo } from "@/lib/store"
@@ -56,6 +58,7 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   web_search: GlobeIcon,
   todo_write: ListChecksIcon,
   task: BotIcon,
+  ask_user: CircleHelpIcon,
   search_sessions: HistoryIcon,
   read_session: MessagesSquareIcon,
   skill: SparklesIcon,
@@ -109,6 +112,8 @@ export function summary(call: ToolCallBlock): string {
       return a.session_id ?? ""
     case "task":
       return a.description ?? ""
+    case "ask_user":
+      return a.questions?.[0]?.question ?? a.title ?? ""
     case "skill":
       return a.name ?? ""
     case "memory_write":
@@ -316,6 +321,9 @@ export function ToolCallView({
   )
 
   if (call.name === "task") return <SubagentCard call={call} result={result} partial={partial} state={state} onOpen={onOpenSubagent} expand={expand} />
+  if (call.name === "ask_user" && (result?.details as AskDetails | undefined)?.questions) {
+    return <QuestionSummary details={result!.details as AskDetails} />
+  }
   if (call.name === "todo_write") {
     return (
       <div className="rounded-xl border bg-card px-3 py-2">
