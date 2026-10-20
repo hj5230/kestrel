@@ -1,6 +1,7 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { generateText } from "ai";
 import { languageModel } from "../providers";
+import { usageOf } from "../side-model";
 
 export function estimateTextTokens(s: string): number {
   let ascii = 0;
@@ -134,18 +135,7 @@ export async function summarize(opts: {
     abortSignal: opts.signal,
     maxRetries: 2,
   });
-  const u: any = res.usage ?? {};
-  const cacheRead = u.inputTokenDetails?.cacheReadTokens ?? 0;
-  const cacheWrite = u.inputTokenDetails?.cacheWriteTokens ?? 0;
-  return {
-    summary: res.text.trim(),
-    usage: {
-      input: u.inputTokenDetails?.noCacheTokens ?? Math.max(0, (u.inputTokens ?? 0) - cacheRead - cacheWrite),
-      output: u.outputTokens ?? 0,
-      cacheRead,
-      cacheWrite,
-    },
-  };
+  return { summary: res.text.trim(), usage: usageOf(res.usage) };
 }
 
 export function summaryMessage(summary: string): AgentMessage {

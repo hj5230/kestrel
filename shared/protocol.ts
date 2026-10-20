@@ -275,7 +275,10 @@ export interface AppSettings {
   defaultModelId: string;
   defaultThinking: ThinkingLevel;
   defaultPermissionMode: PermissionMode;
+  /** `providerId::modelId` that names new sessions; empty = the session's own model. */
   titleModel: string;
+  /** `providerId::modelId` that summarizes old turns when the context fills up; empty = the session's own model. */
+  compactModel: string;
   autoCompact: boolean;
   compactThreshold: number;
   keepRecentTokens: number;

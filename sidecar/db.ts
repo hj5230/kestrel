@@ -160,6 +160,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultThinking: "medium",
   defaultPermissionMode: "auto",
   titleModel: "",
+  compactModel: "",
   autoCompact: true,
   compactThreshold: 0.8,
   keepRecentTokens: 24000,

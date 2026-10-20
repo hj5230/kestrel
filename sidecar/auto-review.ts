@@ -12,6 +12,7 @@ import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { generateText, type LanguageModel } from "ai";
 import type { AppSettings } from "../shared/protocol";
 import { languageModel } from "./providers";
+import { parseModelSetting, usageOf, type Usage } from "./side-model";
 import type { KestrelTool } from "./tools/types";
 
 export interface ReviewResult {
@@ -138,33 +139,38 @@ export function describeAction(tool: KestrelTool, args: any, cwd: string): strin
 
 // ---------- the review ----------
 
-function parseModel(value: string): [string, string] | null {
-  const i = value.indexOf("::");
-  if (i <= 0) return null;
-  return [value.slice(0, i), value.slice(i + 2)];
-}
-
 /** A review model is configured. */
 export function reviewerConfigured(settings: AppSettings): boolean {
-  return !!parseModel(settings.autoModel ?? "");
+  return !!parseModelSetting(settings.autoModel);
 }
 
-export async function reviewAction(opts: { settings: AppSettings; transcript: string; action: string; signal?: AbortSignal }): Promise<ReviewResult> {
-  const picked = parseModel(opts.settings.autoModel ?? "");
+export interface ReviewOptions {
+  settings: AppSettings;
+  transcript: string;
+  action: string;
+  signal?: AbortSignal;
+  /** Called with the tokens of each model call, including when the review later fails. */
+  onUsage?: (usage: Usage) => void;
+}
+
+export async function reviewAction(opts: ReviewOptions): Promise<ReviewResult> {
+  const picked = parseModelSetting(opts.settings.autoModel);
   if (!picked) throw new Error("no auto-review model");
-  return reviewWith(languageModel(picked[0], picked[1]), opts);
+  return reviewWith(languageModel(picked.providerId, picked.modelId), opts);
 }
 
-export async function reviewWith(model: LanguageModel, opts: { settings: AppSettings; transcript: string; action: string; signal?: AbortSignal }): Promise<ReviewResult> {
+export async function reviewWith(model: LanguageModel, opts: ReviewOptions): Promise<ReviewResult> {
   const system = systemPrompt(opts.settings);
   const input = `<transcript>\n${opts.transcript || "(empty)"}\n</transcript>\n\n<action>\n${opts.action}\n</action>\n\n`;
   const within = (ms: number) => (opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(ms)]) : AbortSignal.timeout(ms));
 
   const first = await generateText({ model, system, prompt: input + STAGE1, temperature: 0, maxOutputTokens: 64, maxRetries: 1, abortSignal: within(25000) });
+  opts.onUsage?.(usageOf(first.usage));
   if (/^\W*ALLOW\b/i.test(first.text.trim())) return { block: false, reason: "", stage: 1 };
 
   // Flagged (or unreadable): look again with room to think.
   const second = await generateText({ model, system, prompt: input + STAGE2, temperature: 0, maxOutputTokens: 1200, maxRetries: 1, abortSignal: within(60000) });
+  opts.onUsage?.(usageOf(second.usage));
   const verdicts = [...second.text.matchAll(/VERDICT:\s*\**\s*(ALLOW|BLOCK)/gi)];
   if (!verdicts.length) throw new Error("the review model gave no verdict");
   const block = verdicts[verdicts.length - 1][1].toUpperCase() === "BLOCK";

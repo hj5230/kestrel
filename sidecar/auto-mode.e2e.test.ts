@@ -1,6 +1,7 @@
 // Runs real sessions against a scripted OpenAI-compatible server: one "agent" model that asks for
 // shell commands, one "reviewer" model that answers ALLOW/BLOCK. Checks the whole auto-mode path in
 // the runner: rules, review, deny-and-continue, the pause after repeated blocks, and fail-closed.
+import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
@@ -110,6 +111,12 @@ describe("auto mode, end to end", () => {
     expect(reviewerSaw.length).toBe(1);
     expect(asked).toEqual([]);
     expect(results[0].error).toBe(false);
+    // the review's tokens are billed to the review model
+    const db = new Database(store.dbPath, { readonly: true });
+    const rows = db.query("SELECT model_id AS model, input FROM usage_events WHERE purpose = 'review'").all() as any[];
+    db.close();
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]).toEqual({ model: "reviewer", input: 1 });
   }, 60000);
 
   test("a blocked action comes back to the agent as a result and does not run", async () => {
