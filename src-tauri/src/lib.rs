@@ -4,6 +4,8 @@
 mod desktop;
 #[cfg(mobile)]
 mod pinned_tls;
+#[cfg(any(mobile, test))]
+mod profiles;
 #[cfg(mobile)]
 mod remote;
 
