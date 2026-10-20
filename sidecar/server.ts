@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import type { AppInfo, McpServerConfig, ModelConfig, ProviderConfig, SessionInfo } from "../shared/protocol";
-import { dropRunner, getRunner, peekRunner, respondApproval, sessionDetail } from "./agent/runner";
+import { dropRunner, getRunner, peekRunner, respondApproval, respondQuestion, sessionDetail } from "./agent/runner";
 import { collectInstructions } from "./agent/prompt";
 import * as store from "./db";
 import { collapseHome, expandHome, HOME, SHELL, which } from "./env";
@@ -191,6 +191,12 @@ const handlers: Record<string, Handler> = {
 
   "approvals.respond": ({ id, decision, reason, pattern }) => {
     respondApproval(id, decision, reason, pattern);
+    return true;
+  },
+
+  /** `answers: null` dismisses the question. */
+  "questions.respond": ({ id, answers }) => {
+    respondQuestion(id, answers ?? null);
     return true;
   },
 

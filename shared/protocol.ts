@@ -196,11 +196,52 @@ export interface ApprovalNote {
 
 export type ApprovalDecision = "allow_once" | "allow_always" | "deny";
 
+/** A multiple-choice question the agent puts to the user (the `ask_user` tool). */
+export interface QuestionOption {
+  id: string;
+  label: string;
+  description?: string;
+  /** The agent's suggested choice, shown first and marked. */
+  recommended?: boolean;
+}
+
+export interface Question {
+  id: string;
+  prompt: string;
+  options: QuestionOption[];
+  allowMultiple?: boolean;
+}
+
+export interface QuestionRequest {
+  id: string;
+  sessionId: string;
+  toolCallId: string;
+  title?: string;
+  questions: Question[];
+  createdAt: number;
+}
+
+/** One answer per question: the chosen option ids and/or free text (every question also accepts "Other"). */
+export interface QuestionAnswer {
+  questionId: string;
+  optionIds: string[];
+  other?: string;
+}
+
+/** Stored on the `ask_user` tool result so the transcript can show what was asked and answered. */
+export interface AskDetails {
+  title?: string;
+  questions: Question[];
+  /** null: the user dismissed the questions without answering. */
+  answers: QuestionAnswer[] | null;
+}
+
 export interface SessionDetail {
   session: SessionInfo;
   messages: StoredMessage[];
   compactions: CompactionInfo[];
   approvals: ApprovalRequest[];
+  questions: QuestionRequest[];
   streaming: AssistantMsg | null;
   runningTools: Record<string, { toolName: string; args: any; partial: any; startedAt: number }>;
   queued: QueuedMessage[];
@@ -389,6 +430,8 @@ export type ServerEvent =
   | { type: "queue"; sessionId: string; queued: QueuedMessage[] }
   | { type: "approval_request"; request: ApprovalRequest }
   | { type: "approval_resolved"; sessionId: string; id: string }
+  | { type: "question_request"; request: QuestionRequest }
+  | { type: "question_resolved"; sessionId: string; id: string }
   | { type: "compaction"; sessionId: string; compaction: CompactionInfo }
   | { type: "compacting"; sessionId: string; active: boolean }
   | { type: "mcp_status"; servers: McpServerStatus[] }
