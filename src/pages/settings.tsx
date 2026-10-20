@@ -345,6 +345,13 @@ function Instructions({ s }: { s: AppSettings }) {
   )
 }
 
+/** A textarea that saves when it loses focus. */
+function BlurTextarea({ value, onCommit, placeholder, rows = 3 }: { value: string; onCommit: (v: string) => void; placeholder?: string; rows?: number }) {
+  const [v, setV] = useState(value)
+  useEffect(() => setV(value), [value])
+  return <Textarea rows={rows} value={v} placeholder={placeholder} className="text-sm" onInput={(e) => setV(e.currentTarget.value)} onBlur={() => v.trim() !== value.trim() && onCommit(v.trim())} />
+}
+
 function Permissions({ s }: { s: AppSettings }) {
   const restore = async () => {
     const d = await rpc<{ bashWhitelist: string[] }>("permissions.defaults")
@@ -372,6 +379,38 @@ function Permissions({ s }: { s: AppSettings }) {
             </button>
           ))}
         </div>
+      </Section>
+      <Section title={t("settings.autoReview")} desc={t("settings.autoReviewDesc")}>
+        <Panel>
+          <Row label={t("settings.autoModel")} desc={t("settings.autoModelDesc")}>
+            <Select value={s.autoModel || "__none"} onValueChange={(v) => save({ autoModel: v === "__none" ? "" : v })}>
+              <SelectTrigger size="sm" className="w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">{t("settings.autoModelNone")}</SelectItem>
+                {enabledModels.value.map((m) => (
+                  <SelectItem key={`${m.providerId}::${m.id}`} value={`${m.providerId}::${m.id}`}>
+                    {m.name} · {providerName(m.providerId)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Row>
+        </Panel>
+        {(
+          [
+            ["autoEnvironment", "settings.autoEnvironment", "settings.autoEnvironmentDesc", "settings.autoEnvironmentPlaceholder"],
+            ["autoBlockRules", "settings.autoBlock", "settings.autoBlockDesc", "settings.autoBlockPlaceholder"],
+            ["autoAllowRules", "settings.autoAllow", "settings.autoAllowDesc", "settings.autoAllowPlaceholder"],
+          ] as const
+        ).map(([key, title, desc, placeholder]) => (
+          <label key={key} className="grid gap-1.5">
+            <span className="text-sm font-medium">{t(title)}</span>
+            <span className="text-xs text-muted-foreground">{t(desc)}</span>
+            <BlurTextarea value={s[key]} onCommit={(v) => save({ [key]: v })} placeholder={t(placeholder)} />
+          </label>
+        ))}
       </Section>
       <Section
         title={`${t("settings.bashWhitelist")} (${s.bashWhitelist.length})`}

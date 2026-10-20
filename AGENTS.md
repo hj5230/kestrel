@@ -50,6 +50,7 @@ Guidance for coding agents (and people) working in this repository. See README.m
 ## Verifying
 
 - `npm run typecheck` for both the front end and the sidecar.
+- `npm test` for the sidecar tests (shell parser, permission rules, auto review, and an end-to-end run of auto mode against a scripted model server).
 - For UI changes:
   - Check the desktop window.
   - Check 375pt width with touch emulation in a browser: no horizontal overflow, targets of 44pt or more.

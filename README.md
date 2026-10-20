@@ -23,7 +23,7 @@ Tauri (Rust)                  sidecar (Bun, single binary kestrel-agent)        
 - Sessions: grouped by time or project, pin, archive, rename, fork, edit and resend, export to Markdown, full-text search (⌘K).
 - Chat: streaming output, reasoning, tool-call cards (command output, diffs, subagent progress), image input, steering/queueing, stop, retry.
 - Tools: read / write / edit / ls / glob / grep (ripgrep) / bash (with background processes) / web_fetch / web_search / todo_write / task (subagents) / search_sessions / read_session / skill / memory_search / memory_read / memory_write / memory_delete / MCP.
-- Permissions: Manual, Accept edits, White list and Bypass modes. A bash allowlist (low-risk command prefixes built in, editable in Settings); an approval can add the command prefix or MCP tool to the allowlist in one click, and a denial can carry a reason.
+- Permissions: Manual, Accept edits, Auto and Bypass modes; see [Permissions](#permissions). A denial can carry a reason.
 - English and Chinese UI, English by default.
 - Context: AGENTS.md / CLAUDE.md loaded level by level, a global instructions file, skills (SKILL.md) and custom `/` commands, auto-compaction with retry on context overflow.
 - Memory: notes the agent keeps across sessions, as Markdown files grouped by topic in `~/.kestrel/memory/<topic>/<name>.md` (types: user, feedback, project, reference). Each session starts with an index of one-line descriptions; the agent opens notes with `memory_read` and can save, replace and delete them itself (deleted notes go to `.trash`; secrets are refused; subagents are read-only). Browse, edit, move and delete them in Settings → Memory, or turn the feature or the agent's own saving off there.
@@ -46,6 +46,17 @@ npm run tauri build -- --bundles app
 ```
 
 `beforeBuildCommand` builds the front end, then compiles `src-tauri/binaries/kestrel-agent-<target>` with `bun build --compile`; it ships inside `Kestrel.app` as an externalBin.
+
+## Permissions
+
+Auto mode is the default. It asks as rarely as it safely can, in layers; each call stops at the first layer that can decide:
+
+1. **Always asks a person** (every mode but Bypass): reading credentials (`~/.ssh`, `~/.aws`, Kestrel's own data folder, …), writing startup files, git hooks or the agent's own settings, and deleting or moving `/`, the home folder or a folder directly under either. Paths are resolved through symlinks and compared case-insensitively.
+2. **Rules** (no model, no delay): reads and searches; edits inside the working folder; bash commands that a small shell parser (`sidecar/shell.ts`) can read and whose every part is clearly fine: the built-in or your own allowlist (per command, so `cd dir && git status 2>&1 | head` just works), `cd`, redirects into the project or `/dev/null`, `mkdir/touch/cp/mv/rm` inside the project, and wrappers like `timeout` or `nice`. Substitutions, subshells, heredocs and anything unparseable are never matched, and neither are allowlisted commands with flags that write or execute (`find -exec`, `git diff --output`, `rg --pre`, …).
+3. **Auto review** (Settings → Permissions → Auto review, needs a review model): everything else — other commands, edits outside the project, MCP tools, fetches with data in the URL — goes to a second model that reads the user's messages and the agent's tool calls, and nothing else, so the agent cannot argue with it and text planted in a page or file never reaches it. It answers ALLOW or BLOCK in two stages (a one-word verdict that leans towards BLOCK, then a short chain of thought only for what was flagged). A block goes back to the agent as the tool result with the reason and an instruction to find a safer way; after 3 blocks in a row, or 20 in a session, a person is asked and auto mode resumes once they approve something. If the review model cannot be reached, a person is asked.
+4. **A person**, with the reason shown on the approval card.
+
+Without a review model, step 3 is skipped and unclear calls are asked, so Auto then behaves like the old allowlist mode, minus the unsafe corners. With a review model, allowlist entries that would let any command through (`bash`, `python3`, `npm run`, `rm`, …) are ignored, and are never offered under "Always allow". The policy has three slots you can fill in (trusted environment, extra block rules, exceptions). Auto review is a safety net, not a security boundary; keep sensitive work in Manual mode.
 
 ## Mobile (iOS)
 
