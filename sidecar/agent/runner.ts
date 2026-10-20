@@ -25,6 +25,7 @@ import { createSession, newId } from "../sessions";
 import { discoverSkills, expandSlashCommand } from "../skills";
 import { createBashOutputTool, createBashTool, createKillShellTool, killSessionShells } from "../tools/bash";
 import { createEditTool, createGlobTool, createGrepTool, createLsTool, createReadTool, createWriteTool } from "../tools/fs-tools";
+import { memoryTools } from "../tools/memory";
 import { createReadSessionTool, createSearchSessionsTool, createSkillTool, createTaskTool, createTodoTool } from "../tools/meta";
 import type { KestrelTool, SubagentRequest, ToolContext } from "../tools/types";
 import { createWebFetchTool, createWebSearchTool } from "../tools/web";
@@ -218,6 +219,7 @@ export class SessionRunner {
     ];
     if (!subagent) tools.push(createTodoTool(ctx), createTaskTool(ctx));
     if (discoverSkills(this.info().cwd).length) tools.push(createSkillTool(ctx));
+    if (store.getSettings().memoryEnabled) tools.push(...memoryTools(ctx, { readOnly: subagent }));
     tools.push(...mcpTools());
     return tools;
   }

@@ -216,6 +216,26 @@ export interface SkillInfo {
   source: string;
 }
 
+/** What a memory is about; steers what the agent saves and how the settings page groups it. */
+export type MemoryType = "user" | "feedback" | "project" | "reference";
+
+export interface MemorySummary {
+  /** `topic/name`; stable key used by the agent tools and the settings page. */
+  id: string;
+  topic: string;
+  name: string;
+  type: MemoryType;
+  /** One line shown in the agent's index; decides whether the agent opens the memory. */
+  description: string;
+  /** Session that created it, when it was saved during a chat. */
+  source: string;
+  modifiedAt: number;
+}
+
+export interface MemoryEntry extends MemorySummary {
+  content: string;
+}
+
 export interface SlashCommandInfo {
   name: string;
   description: string;
@@ -242,6 +262,10 @@ export interface AppSettings {
   skillDirs: string[];
   disabledSkills: string[];
   commandDirs: string[];
+  /** Agent keeps notes across sessions (~/.kestrel/memory): reads them at start and can add, change and delete. */
+  memoryEnabled: boolean;
+  /** Agent may save on its own judgement; off means only when the user asks it to remember something. */
+  memoryAutoSave: boolean;
   proxyMode: "env" | "none" | "custom";
   proxyUrl: string;
   bashTimeoutSec: number;
@@ -332,6 +356,7 @@ export type ServerEvent =
   | { type: "compaction"; sessionId: string; compaction: CompactionInfo }
   | { type: "compacting"; sessionId: string; active: boolean }
   | { type: "mcp_status"; servers: McpServerStatus[] }
+  | { type: "memory_changed" }
   | { type: "notice"; sessionId?: string; level: "info" | "warn" | "error"; text: string }
   | { type: "run_finished"; sessionId: string; title: string; ok: boolean }
   | { type: "remote_status"; status: RemoteStatus };
