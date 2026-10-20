@@ -379,9 +379,9 @@ export function Composer({
             }
           }}
         />
-        <div className="flex items-center gap-0.5 px-2 pb-2">
-          {/* Pickers scroll sideways on narrow screens; stop/send stay pinned and always reachable. */}
-          <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div data-slot="composer-toolbar" className="flex items-center gap-0.5 px-2 pb-2">
+          {/* Phones wrap pickers in the touch layer; actions keep their own reserved space. */}
+          <div data-slot="composer-pickers" className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={t("composer.addImage")} onClick={() => fileInput.current?.click()}>

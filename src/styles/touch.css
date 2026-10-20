@@ -157,6 +157,19 @@
 /* Phones: menus, selects and popovers open as iOS-style bottom sheets instead of tiny floating
    panels. Radix positions them through a popper wrapper with inline styles, hence !important. */
 @media (pointer: coarse) and (max-width: 767px) {
+  /* Keep every composer setting visible without letting it displace send/stop. The actions
+     reserve their width first; long folder/model labels truncate within the remaining space. */
+  [data-slot="composer-toolbar"] {
+    align-items: flex-end;
+  }
+  [data-slot="composer-pickers"] {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  [data-slot="composer-pickers"] > .group\/button {
+    max-width: 100%;
+  }
+
   [data-radix-popper-content-wrapper]:has(
       > :is([data-slot="dropdown-menu-content"], [data-slot="select-content"], [data-slot="popover-content"])
     ) {
