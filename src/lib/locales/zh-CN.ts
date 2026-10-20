@@ -292,6 +292,8 @@ export const zhCN: Record<MessageKey, string> = {
   "settings.titleModel": "标题生成模型",
   "settings.titleModelDesc": "为新会话自动生成标题",
   "settings.titleSame": "与会话模型相同",
+  "settings.compactModel": "压缩模型",
+  "settings.compactModelDesc": "上下文将满时用来总结较早的对话。便宜、窗口大的模型就很合适。",
   "settings.notify": "完成时通知",
   "settings.notifyDesc": "窗口不在前台时，任务完成或需要确认会发送系统通知",
   "settings.context": "上下文管理",

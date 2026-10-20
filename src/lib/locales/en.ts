@@ -290,6 +290,8 @@ export const en = {
   "settings.titleModel": "Title model",
   "settings.titleModelDesc": "Generates titles for new sessions",
   "settings.titleSame": "Same as session model",
+  "settings.compactModel": "Compaction model",
+  "settings.compactModelDesc": "Summarizes older turns when the context fills up. A cheaper model with a large window works well.",
   "settings.notify": "Notify when done",
   "settings.notifyDesc": "Send a system notification when a task finishes or needs approval while the window is in the background",
   "settings.context": "Context management",

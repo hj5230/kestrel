@@ -82,7 +82,6 @@ function LinesEditor({ value, onCommit, placeholder, rows = 3 }: { value: string
 }
 
 function General({ s }: { s: AppSettings }) {
-  const titleValue = s.titleModel || "__session"
   return (
     <div className="grid gap-8">
       <Section title={t("settings.appearance")}>
@@ -173,21 +172,7 @@ function General({ s }: { s: AppSettings }) {
               </SelectContent>
             </Select>
           </Row>
-          <Row label={t("settings.titleModel")} desc={t("settings.titleModelDesc")}>
-            <Select value={titleValue} onValueChange={(v) => save({ titleModel: v === "__session" ? "" : v })}>
-              <SelectTrigger size="sm" className="w-56">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__session">{t("settings.titleSame")}</SelectItem>
-                {enabledModels.value.map((m) => (
-                  <SelectItem key={`${m.providerId}::${m.id}`} value={`${m.providerId}::${m.id}`}>
-                    {m.name} · {providerName(m.providerId)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Row>
+          <ModelRow label={t("settings.titleModel")} desc={t("settings.titleModelDesc")} value={s.titleModel} none={t("settings.titleSame")} onChange={(v) => save({ titleModel: v })} />
           <Row label={t("settings.notify")} desc={t("settings.notifyDesc")}>
             <Switch checked={s.notifyOnFinish} onCheckedChange={(v) => save({ notifyOnFinish: v })} />
           </Row>
@@ -208,6 +193,7 @@ function General({ s }: { s: AppSettings }) {
               onValueCommit={(v: number[]) => save({ compactThreshold: v[0] / 100 })}
             />
           </Row>
+          <ModelRow label={t("settings.compactModel")} desc={t("settings.compactModelDesc")} value={s.compactModel} none={t("settings.titleSame")} onChange={(v) => save({ compactModel: v })} />
           <Row label={t("settings.keepRecent")} desc={t("settings.keepRecentDesc")}>
             <Select value={String(s.keepRecentTokens)} onValueChange={(v) => save({ keepRecentTokens: Number(v) })}>
               <SelectTrigger size="sm" className="w-36">
@@ -346,6 +332,27 @@ function Instructions({ s }: { s: AppSettings }) {
 }
 
 /** A textarea that saves when it loses focus. */
+/** A model picker for a background task; an empty value means the `none` choice. */
+function ModelRow({ label, desc, value, none, onChange }: { label: string; desc?: string; value: string; none: string; onChange: (v: string) => void }) {
+  return (
+    <Row label={label} desc={desc}>
+      <Select value={value || "__none"} onValueChange={(v) => onChange(v === "__none" ? "" : v)}>
+        <SelectTrigger size="sm" className="w-56">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none">{none}</SelectItem>
+          {enabledModels.value.map((m) => (
+            <SelectItem key={`${m.providerId}::${m.id}`} value={`${m.providerId}::${m.id}`}>
+              {m.name} · {providerName(m.providerId)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Row>
+  )
+}
+
 function BlurTextarea({ value, onCommit, placeholder, rows = 3 }: { value: string; onCommit: (v: string) => void; placeholder?: string; rows?: number }) {
   const [v, setV] = useState(value)
   useEffect(() => setV(value), [value])
@@ -382,21 +389,7 @@ function Permissions({ s }: { s: AppSettings }) {
       </Section>
       <Section title={t("settings.autoReview")} desc={t("settings.autoReviewDesc")}>
         <Panel>
-          <Row label={t("settings.autoModel")} desc={t("settings.autoModelDesc")}>
-            <Select value={s.autoModel || "__none"} onValueChange={(v) => save({ autoModel: v === "__none" ? "" : v })}>
-              <SelectTrigger size="sm" className="w-56">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none">{t("settings.autoModelNone")}</SelectItem>
-                {enabledModels.value.map((m) => (
-                  <SelectItem key={`${m.providerId}::${m.id}`} value={`${m.providerId}::${m.id}`}>
-                    {m.name} · {providerName(m.providerId)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Row>
+          <ModelRow label={t("settings.autoModel")} desc={t("settings.autoModelDesc")} value={s.autoModel} none={t("settings.autoModelNone")} onChange={(v) => save({ autoModel: v })} />
         </Panel>
         {(
           [
