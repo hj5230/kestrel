@@ -12,7 +12,7 @@ import type {
 } from "@shared/protocol"
 import { connectEvents, disconnectEvents, onConnection, onRevoked, onServerEvent, rpc } from "./api"
 import { setLang, t } from "./i18n"
-import { forgetMac, getPairedMac, onPairedMacChanged, type PairedMac } from "./pairing"
+import { forgetMac, getPairedMac, listMacs, onPairedMacChanged, selectMac, type PairedMac } from "./pairing"
 import { isMobileApp, isTauri } from "./platform"
 
 export type Route =
@@ -58,6 +58,10 @@ export const paletteOpen = signal(false)
 export const remoteStatus = signal<RemoteStatus | null>(null)
 /** Mobile: the Mac this phone controls; null = not paired yet, undefined = still loading. */
 export const pairedMac = signal<PairedMac | null | undefined>(undefined)
+/** Mobile: every paired Mac, for switching between them. */
+export const pairedMacs = signal<PairedMac[]>([])
+/** Mobile: the pairing screen is open to add another Mac while one is already in use. */
+export const addingMac = signal(false)
 /** Mobile: the Mac removed this phone; it has to pair again. */
 export const deviceRevoked = signal(false)
 export const newSessionOpen = signal(false)
@@ -176,6 +180,7 @@ function handleEvents() {
   if (isMobileApp) {
     void onPairedMacChanged((mac) => {
       if (pairedMac.value?.deviceId === mac.deviceId) pairedMac.value = mac
+      pairedMacs.value = pairedMacs.value.map((m) => (m.deviceId === mac.deviceId ? mac : m))
     })
   }
   onConnection((c) => {
@@ -270,7 +275,9 @@ export async function boot() {
   bootError.value = null
   try {
     if (isMobileApp) {
-      pairedMac.value = await getPairedMac()
+      const [active, all] = await Promise.all([getPairedMac(), listMacs().catch(() => null)])
+      pairedMac.value = active
+      pairedMacs.value = all?.macs ?? (active ? [active] : [])
       if (!pairedMac.value) return
     }
     const [info, s] = await Promise.all([rpc<AppInfo>("app.info"), rpc<AppSettings>("settings.get")])
@@ -291,23 +298,58 @@ export async function boot() {
   }
 }
 
-/** Mobile: start using a freshly paired Mac. */
-export function adoptPairedMac(mac: PairedMac) {
+/** Forget everything shown for the previous Mac; the next one loads from scratch. */
+function resetForMacChange() {
   disconnectEvents()
-  pairedMac.value = mac
-  deviceRevoked.value = false
-  settings.value = null
-  void boot()
-}
-
-/** Mobile: drop the pairing and go back to the pairing screen. */
-export async function unpairMac() {
-  disconnectEvents()
-  await forgetMac().catch(() => {})
+  connected.value = false
   settings.value = null
   sessions.value = []
   details.clear()
   route.value = { name: "home" }
   deviceRevoked.value = false
-  pairedMac.value = null
+  bootError.value = null
+}
+
+/** Mobile: start using a freshly paired Mac. */
+export function adoptPairedMac(mac: PairedMac) {
+  resetForMacChange()
+  pairedMac.value = mac
+  addingMac.value = false
+  pairedMacs.value = [...pairedMacs.value.filter((m) => m.deviceId !== mac.deviceId), mac]
+  void boot()
+}
+
+/** Mobile: move to another paired Mac without pairing again. */
+export async function switchMac(deviceId: string) {
+  if (deviceId === pairedMac.value?.deviceId && !deviceRevoked.value) {
+    addingMac.value = false
+    return
+  }
+  try {
+    const mac = await selectMac(deviceId)
+    resetForMacChange()
+    pairedMac.value = mac
+    addingMac.value = false
+    void boot()
+  } catch (e: any) {
+    toast.error(String(e?.message ?? e))
+  }
+}
+
+/** Mobile: forget one paired Mac. If it was the one in use, the phone moves to another, or to the pairing screen. */
+export async function forgetPairedMac(deviceId: string) {
+  const wasActive = pairedMac.value?.deviceId === deviceId
+  const left = await forgetMac(deviceId).catch(() => null)
+  if (!left) return
+  pairedMacs.value = left.macs
+  if (!wasActive) return
+  resetForMacChange()
+  pairedMac.value = left.macs.find((m) => m.deviceId === left.active) ?? null
+  if (pairedMac.value) void boot()
+}
+
+/** Mobile: forget the Mac in use. */
+export async function unpairMac() {
+  const id = pairedMac.value?.deviceId
+  if (id) await forgetPairedMac(id)
 }

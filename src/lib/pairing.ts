@@ -12,6 +12,12 @@ export interface PairedMac {
   pairedAt: number
 }
 
+/** Every Mac this phone is paired with; `active` is the deviceId of the one in use. */
+export interface PairedMacs {
+  active: string | null
+  macs: PairedMac[]
+}
+
 export function getPairedMac(): Promise<PairedMac | null> {
   return invoke<PairedMac | null>("remote_profile")
 }
@@ -22,8 +28,18 @@ export function pairWithMac(link: string, deviceName: string): Promise<PairedMac
   return invoke<PairedMac>("remote_pair", { link: found ? found[0] : link.trim(), deviceName })
 }
 
-export function forgetMac(): Promise<void> {
-  return invoke("remote_forget")
+export function listMacs(): Promise<PairedMacs> {
+  return invoke<PairedMacs>("remote_macs")
+}
+
+/** Switch to another paired Mac. Its token is already stored, so no pairing code is needed. */
+export function selectMac(deviceId: string): Promise<PairedMac> {
+  return invoke<PairedMac>("remote_select", { deviceId })
+}
+
+/** Forget one Mac (the active one when no id is given); resolves with the Macs that remain. */
+export function forgetMac(deviceId?: string): Promise<PairedMacs> {
+  return invoke<PairedMacs>("remote_forget", { deviceId: deviceId ?? null })
 }
 
 /** The native side learned new addresses for the paired Mac after connecting. */
