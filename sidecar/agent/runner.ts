@@ -2,6 +2,7 @@ import { Agent, type AgentMessage } from "@mariozechner/pi-agent-core";
 import { isContextOverflow, type ImageContent, type Message } from "@mariozechner/pi-ai";
 import { generateText } from "ai";
 import fs from "node:fs";
+import path from "node:path";
 import type {
   ApprovalDecision,
   ApprovalRequest,
@@ -19,7 +20,8 @@ import { emit } from "../hub";
 import { createVercelStreamFn } from "../llm/vercel-stream";
 import { mcpStatuses, mcpTools } from "../mcp";
 import { st } from "../i18n";
-import { evaluatePermission } from "../permissions";
+import { buildTranscript, describeAction, partsFromMessages, reviewAction, reviewerConfigured } from "../auto-review";
+import { evaluatePermission, isBroadEntry, type PermissionResult } from "../permissions";
 import { languageModel, resolveModel, toPiModel } from "../providers";
 import { createSession, newId } from "../sessions";
 import { discoverSkills, expandSlashCommand } from "../skills";
@@ -312,11 +314,74 @@ export class SessionRunner {
 
   // ---------- permissions ----------
 
+  /** Auto-review bookkeeping, shared by the session and its subagents. */
+  private gate = { consecutive: 0, total: 0, paused: false };
+
+  private root(): SessionRunner {
+    return this.parent ? this.parent.root() : this;
+  }
+
+  /** What the reviewer reads: the user's words and the agent's tool calls, nothing else. */
+  private reviewTranscript(): string {
+    const own = this.agent.state.messages;
+    if (!this.parent) return buildTranscript(partsFromMessages(own));
+    const rootParts = partsFromMessages(this.root().agent.state.messages).filter((p) => p.role !== "tool_call");
+    return buildTranscript([...rootParts, ...partsFromMessages(own, { firstUserIsTask: true })]);
+  }
+
+  /** Auto mode: the reviewer decides. Returns a block result, or null to let the call run; falls back to asking a person. */
+  private async autoReview(tool: KestrelTool, args: unknown, perm: PermissionResult, signal?: AbortSignal): Promise<{ block: true; reason: string } | PermissionResult | null> {
+    const gate = this.root().gate;
+    if (gate.paused) return { ...perm, action: "ask", note: { code: "review_paused" } };
+    try {
+      const r = await reviewAction({
+        settings: store.getSettings(),
+        transcript: this.reviewTranscript(),
+        action: describeAction(tool, args, this.info().cwd),
+        signal,
+      });
+      if (!r.block) {
+        gate.consecutive = 0;
+        return null;
+      }
+      gate.consecutive++;
+      gate.total++;
+      if (gate.consecutive < 3 && gate.total < 20) {
+        return {
+          block: true,
+          reason:
+            `Auto review blocked this action: ${r.reason} ` +
+            "Treat this as a boundary, not an obstacle: do not retry it, reword it, split it into smaller steps or run it another way. " +
+            "Pick a clearly safer approach that still serves the user's request, or ask the user how to proceed.",
+        };
+      }
+      // Too many blocks: stop and hand this one to a person. Approving it resumes auto mode.
+      gate.paused = true;
+      gate.consecutive = 0;
+      if (gate.total >= 20) gate.total = 0;
+      return { ...perm, action: "ask", note: { code: "review_blocked", detail: r.reason } };
+    } catch (e: any) {
+      if (signal?.aborted) return { block: true, reason: "Operation aborted by the user." };
+      return { ...perm, action: "ask", note: { code: "review_error", detail: String(e?.message ?? e).slice(0, 200) } };
+    }
+  }
+
   private async beforeToolCall(ctx: { toolCall: any; args: unknown }, signal?: AbortSignal) {
     const tool = (this.agent.state.tools as KestrelTool[]).find((t) => t.name === ctx.toolCall.name);
     if (!tool) return undefined;
     const s = this.info();
-    const perm = evaluatePermission(tool, ctx.args, s.permissionMode, store.getSettings());
+    const settings = store.getSettings();
+    let perm = evaluatePermission(tool, ctx.args, s.permissionMode, settings, {
+      cwd: s.cwd,
+      dataDir: path.dirname(store.dbPath),
+      reviewer: reviewerConfigured(settings),
+    });
+    if (perm.action === "review") {
+      const out = await this.autoReview(tool, ctx.args, perm, signal);
+      if (out === null) return undefined;
+      if ("block" in out) return out;
+      perm = out;
+    }
     if (perm.action === "allow") return undefined;
     if (perm.action === "deny") return { block: true, reason: perm.reason };
 
@@ -331,6 +396,7 @@ export class SessionRunner {
       detail: perm.detail,
       subagent: !!this.parent,
       whitelistSuggestion: perm.suggestion,
+      note: perm.note ?? null,
       createdAt: Date.now(),
     };
     const decision = await new Promise<{ decision: ApprovalDecision; reason?: string; pattern?: string }>((resolve) => {
@@ -365,8 +431,11 @@ export class SessionRunner {
         reason: `The user denied this tool call.${decision.reason ? ` User's note: ${decision.reason}` : ""} Do not retry the same call; adjust your approach or ask the user how to proceed.`,
       };
     }
+    // A person approved something: auto mode picks up again.
+    this.root().gate = { ...this.root().gate, paused: false, consecutive: 0 };
     const pattern = (decision.pattern ?? perm.suggestion ?? "").trim();
-    if (decision.decision === "allow_always" && pattern) {
+    // A rule that lets any command through (`bash`, `rm`, `python3`, …) is never saved.
+    if (decision.decision === "allow_always" && pattern && !(perm.kind === "bash" && isBroadEntry(pattern))) {
       const settings = store.getSettings();
       const key = perm.kind === "bash" ? "bashWhitelist" : "toolWhitelist";
       if (!settings[key].includes(pattern)) store.saveSettings({ [key]: [...settings[key], pattern] });
