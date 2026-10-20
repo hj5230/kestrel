@@ -9,6 +9,7 @@ import { collapseHome, expandHome, HOME, SHELL, which } from "./env";
 import { emit, subscribe } from "./hub";
 import { st } from "./i18n";
 import { mcpStatuses, removeMcp, restartMcp } from "./mcp";
+import { deleteMemory, getMemory, listMemories, writeMemory, type MemoryInput } from "./memory";
 import { DEFAULT_BASH_WHITELIST } from "./permissions";
 import { fetchRemoteModels, modelDefaults, PROVIDER_PRESETS } from "./providers";
 import { createSession, exportMarkdown, forkSession, newId } from "./sessions";
@@ -223,6 +224,23 @@ const handlers: Record<string, Handler> = {
 
   "skills.list": ({ cwd }) => discoverSkills(expandHome(cwd || store.getSettings().defaultCwd), true),
   "commands.list": ({ cwd }) => listSlashCommands(expandHome(cwd || store.getSettings().defaultCwd)),
+
+  "memory.list": () => listMemories(),
+  "memory.get": ({ id }: { id: string }) => {
+    const m = getMemory(id);
+    if (!m) throw new Error(`No memory ${id}`);
+    return m;
+  },
+  "memory.save": ({ input, from }: { input: MemoryInput; from?: string }) => {
+    const { entry } = writeMemory(input, { from });
+    emit({ type: "memory_changed" });
+    return entry;
+  },
+  "memory.delete": ({ id }: { id: string }) => {
+    deleteMemory(id);
+    emit({ type: "memory_changed" });
+    return true;
+  },
 
   "permissions.defaults": () => ({ bashWhitelist: DEFAULT_BASH_WHITELIST }),
 

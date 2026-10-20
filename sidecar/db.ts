@@ -166,6 +166,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   skillDirs: ["~/.kestrel/skills", "~/.claude/skills", "~/.agents/skills"],
   disabledSkills: [],
   commandDirs: ["~/.kestrel/commands", "~/.claude/commands"],
+  memoryEnabled: true,
+  memoryAutoSave: true,
   proxyMode: "env",
   proxyUrl: "",
   bashTimeoutSec: 120,
