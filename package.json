@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit && tsc --noEmit -p sidecar",
+    "test": "bun test sidecar",
     "sidecar": "bun run sidecar/main.ts --dev",
     "build:sidecar": "bash scripts/build-sidecar.sh",
     "ios:sim": "tauri ios build --target aarch64-sim --debug",
