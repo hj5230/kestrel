@@ -22,11 +22,12 @@ Tauri (Rust)                  sidecar (Bun, single binary kestrel-agent)        
 
 - Sessions: grouped by time or project, pin, archive, rename, fork, edit and resend, export to Markdown, full-text search (⌘K).
 - Chat: streaming output, reasoning, tool-call cards (command output, diffs, subagent progress), image input, steering/queueing, stop, retry.
-- Tools: read / write / edit / ls / glob / grep (ripgrep) / bash (with background processes) / web_fetch / web_search / todo_write / task (subagents) / search_sessions / read_session / skill / memory_search / memory_read / memory_write / memory_delete / MCP.
+- Tools: read / write / edit / ls / glob / grep (ripgrep) / bash (with background processes) / web_fetch / web_search / todo_write / task (subagents) / ask_user / search_sessions / read_session / skill / memory_search / memory_read / memory_write / memory_delete / MCP.
 - Permissions: Manual, Accept edits, Auto and Bypass modes; see [Permissions](#permissions). A denial can carry a reason.
 - English and Chinese UI, English by default.
 - Context: AGENTS.md / CLAUDE.md loaded level by level, a global instructions file, skills (SKILL.md) and custom `/` commands, auto-compaction with retry on context overflow.
 - Memory: notes the agent keeps across sessions, as Markdown files grouped by topic in `~/.kestrel/memory/<topic>/<name>.md` (types: user, feedback, project, reference). Each session starts with an index of one-line descriptions; the agent opens notes with `memory_read` and can save, replace and delete them itself (deleted notes go to `.trash`; secrets are refused; subagents are read-only). Browse, edit, move and delete them in Settings → Memory, or turn the feature or the agent's own saving off there.
+- Asking you: with `ask_user` the agent puts multiple-choice questions (single or multi-select, its recommendation first, plus a free-text "Other") to you in a card above the input and waits; it also covers proposals that need a go-ahead. Skip dismisses it and the agent carries on. The question and your answers stay in the transcript. Subagents can't ask; they report back to the agent that launched them.
 - Past conversations beyond this app: `search_sessions` / `read_session` also search the sessions that Claude Code (`~/.claude/projects`), Codex (`~/.codex/sessions`) and Cursor (`~/.cursor/projects`) keep on this Mac, read-only. A background index (`history.db` next to Kestrel's database, rebuilt from the originals, incremental after the first pass) holds only what you said and what the assistant answered, not tool output or helper/subagent threads. Turn each app on or off, or rebuild the index, in Settings → Memory.
 - Usage: cost, tokens, cache hits, model ranking, tool calls and active hours (ECharts).
 

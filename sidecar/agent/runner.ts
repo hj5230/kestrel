@@ -8,6 +8,9 @@ import type {
   ApprovalRequest,
   AssistantMsg,
   ChatMessage,
+  Question,
+  QuestionAnswer,
+  QuestionRequest,
   QueuedMessage,
   SessionDetail,
   SessionInfo,
@@ -27,6 +30,7 @@ import { costOf, parseModelSetting, recordSideUsage, sideModel, usageOf } from "
 import { createSession, newId } from "../sessions";
 import { discoverSkills, expandSlashCommand } from "../skills";
 import { createBashOutputTool, createBashTool, createKillShellTool, killSessionShells } from "../tools/bash";
+import { createAskUserTool, sanitizeAnswers } from "../tools/ask";
 import { createEditTool, createGlobTool, createGrepTool, createLsTool, createReadTool, createWriteTool } from "../tools/fs-tools";
 import { memoryTools } from "../tools/memory";
 import { createReadSessionTool, createSearchSessionsTool, createSkillTool, createTaskTool, createTodoTool } from "../tools/meta";
@@ -43,6 +47,13 @@ interface PendingApproval {
   owner: SessionRunner;
 }
 const approvals = new Map<string, PendingApproval>();
+
+interface PendingQuestion {
+  request: QuestionRequest;
+  resolve: (answers: QuestionAnswer[] | null) => void;
+  owner: SessionRunner;
+}
+const pendingQuestions = new Map<string, PendingQuestion>();
 
 export function getRunner(id: string): SessionRunner {
   let r = runners.get(id);
@@ -73,6 +84,13 @@ export function respondApproval(id: string, decision: ApprovalDecision, reason?:
   p.resolve({ decision, reason, pattern });
 }
 
+/** `null` dismisses the question. */
+export function respondQuestion(id: string, answers: QuestionAnswer[] | null) {
+  const p = pendingQuestions.get(id);
+  if (!p) throw new Error(st("questionExpired"));
+  p.resolve(answers);
+}
+
 export function sessionDetail(id: string): SessionDetail {
   const info = store.getSession(id);
   if (!info) throw new Error(st("sessionNotFound"));
@@ -82,6 +100,7 @@ export function sessionDetail(id: string): SessionDetail {
     messages: store.loadMessages(id),
     compactions: store.listCompactions(id),
     approvals: [...approvals.values()].filter((a) => a.request.sessionId === id).map((a) => a.request),
+    questions: [...pendingQuestions.values()].filter((q) => q.request.sessionId === id).map((q) => q.request),
     streaming: r?.streaming ?? null,
     runningTools: r?.runningTools ?? {},
     queued: r?.queued.map(({ id, text, mode }) => ({ id, text, mode })) ?? [],
@@ -204,6 +223,7 @@ export class SessionRunner {
         this.emitSession();
       },
       runSubagent: (req, signal, onProgress) => this.runSubagent(req, signal, onProgress),
+      ask: (req, signal) => this.ask(req, signal),
     };
     const tools: KestrelTool[] = [
       createReadTool(ctx),
@@ -220,7 +240,8 @@ export class SessionRunner {
       createSearchSessionsTool(ctx),
       createReadSessionTool(),
     ];
-    if (!subagent) tools.push(createTodoTool(ctx), createTaskTool(ctx));
+    // Subagents can't talk to the user; they report back to the agent that launched them.
+    if (!subagent) tools.push(createTodoTool(ctx), createTaskTool(ctx), createAskUserTool(ctx));
     if (discoverSkills(this.info().cwd).length) tools.push(createSkillTool(ctx));
     if (store.getSettings().memoryEnabled) tools.push(...memoryTools(ctx, { readOnly: subagent }));
     tools.push(...mcpTools());
@@ -369,6 +390,41 @@ export class SessionRunner {
     }
   }
 
+  /** The session shows "waiting" while anything (an approval or a question) needs the user. */
+  private syncWaiting() {
+    const id = this.rootId;
+    const waiting = [...approvals.values()].some((a) => a.request.sessionId === id) || [...pendingQuestions.values()].some((q) => q.request.sessionId === id);
+    const root = store.getSession(id);
+    if (!root || (waiting ? root.status === "waiting" : root.status !== "waiting")) return;
+    store.updateSession(id, { status: waiting ? "waiting" : "running" });
+    const next = store.getSession(id);
+    if (next) emit({ type: "session_updated", session: next });
+  }
+
+  /** The `ask_user` tool: show the questions, wait for the answers. Null when dismissed or aborted. */
+  private async ask(req: { toolCallId: string; title?: string; questions: Question[] }, signal?: AbortSignal): Promise<QuestionAnswer[] | null> {
+    const request: QuestionRequest = { id: newId("qn_"), sessionId: this.rootId, createdAt: Date.now(), ...req };
+    const answers = await new Promise<QuestionAnswer[] | null>((resolve) => {
+      if (signal?.aborted) return resolve(null);
+      const onAbort = () => resolve(null);
+      signal?.addEventListener("abort", onAbort, { once: true });
+      pendingQuestions.set(request.id, {
+        request,
+        owner: this,
+        resolve: (a) => {
+          signal?.removeEventListener("abort", onAbort);
+          resolve(a);
+        },
+      });
+      this.syncWaiting();
+      emit({ type: "question_request", request });
+    });
+    pendingQuestions.delete(request.id);
+    emit({ type: "question_resolved", sessionId: this.rootId, id: request.id });
+    this.syncWaiting();
+    return answers && sanitizeAnswers(req.questions, answers);
+  }
+
   private async beforeToolCall(ctx: { toolCall: any; args: unknown }, signal?: AbortSignal) {
     const tool = (this.agent.state.tools as KestrelTool[]).find((t) => t.name === ctx.toolCall.name);
     if (!tool) return undefined;
@@ -413,19 +469,12 @@ export class SessionRunner {
           resolve(d);
         },
       });
-      store.updateSession(this.rootId, { status: "waiting" });
+      this.syncWaiting();
       emit({ type: "approval_request", request });
-      const root = store.getSession(this.rootId);
-      if (root) emit({ type: "session_updated", session: root });
     });
     approvals.delete(request.id);
     emit({ type: "approval_resolved", sessionId: this.rootId, id: request.id });
-    const stillWaiting = [...approvals.values()].some((a) => a.request.sessionId === this.rootId);
-    if (!stillWaiting) {
-      store.updateSession(this.rootId, { status: "running" });
-      const root = store.getSession(this.rootId);
-      if (root) emit({ type: "session_updated", session: root });
-    }
+    this.syncWaiting();
 
     if (decision.decision === "deny") {
       if (decision.reason === "aborted") return { block: true, reason: "Operation aborted by the user." };
@@ -670,6 +719,7 @@ export class SessionRunner {
 
   abort() {
     for (const a of approvals.values()) if (a.owner === this) a.resolve({ decision: "deny", reason: "aborted" });
+    for (const q of pendingQuestions.values()) if (q.owner === this) q.resolve(null);
     this.agent.clearAllQueues();
     this.queued = [];
     this.emitQueue();

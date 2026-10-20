@@ -1,6 +1,6 @@
 import type { AgentTool, AgentToolResult, AgentToolUpdateCallback } from "@mariozechner/pi-agent-core";
 import type { Static, TSchema } from "typebox";
-import type { AppSettings, Todo } from "../../shared/protocol";
+import type { AppSettings, Question, QuestionAnswer, Todo } from "../../shared/protocol";
 
 export type ToolCategory = "read" | "edit" | "exec" | "network" | "mcp" | "meta";
 
@@ -20,6 +20,8 @@ export interface ToolContext {
   readFiles: Map<string, number>;
   setTodos: (todos: Todo[]) => void;
   runSubagent: (req: SubagentRequest, signal: AbortSignal | undefined, onProgress: (details: any) => void) => Promise<string>;
+  /** Put questions to the user and wait. Resolves to null when they dismiss it or the run is aborted. */
+  ask: (req: { toolCallId: string; title?: string; questions: Question[] }, signal: AbortSignal | undefined) => Promise<QuestionAnswer[] | null>;
 }
 
 export const text = (t: string) => [{ type: "text" as const, text: t }];
