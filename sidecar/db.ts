@@ -161,6 +161,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultPermissionMode: "auto",
   titleModel: "",
   compactModel: "",
+  historySources: ["claude-code", "codex", "cursor"],
   autoCompact: true,
   compactThreshold: 0.8,
   keepRecentTokens: 24000,

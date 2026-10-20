@@ -279,6 +279,8 @@ export interface AppSettings {
   titleModel: string;
   /** `providerId::modelId` that summarizes old turns when the context fills up; empty = the session's own model. */
   compactModel: string;
+  /** Other apps whose conversations the agent may search: "claude-code", "codex", "cursor". */
+  historySources: string[];
   autoCompact: boolean;
   compactThreshold: number;
   keepRecentTokens: number;
@@ -417,4 +419,22 @@ export interface SubagentDetails {
   status: "running" | "done" | "error";
   lastActivity: string;
   toolCalls: number;
+}
+
+export interface HistorySourceStatus {
+  id: string;
+  label: string;
+  /** Where the app keeps its sessions, `~`-shortened. */
+  root: string;
+  found: boolean;
+  enabled: boolean;
+  sessions: number;
+  messages: number;
+}
+
+/** Progress of indexing other apps' conversations (see `AppSettings.historySources`). */
+export interface HistoryStatus {
+  sources: HistorySourceStatus[];
+  indexing: boolean;
+  progress: { done: number; total: number };
 }
