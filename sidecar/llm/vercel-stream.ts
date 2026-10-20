@@ -11,6 +11,7 @@ import {
   type ToolCall,
   type Usage,
 } from "@mariozechner/pi-ai";
+import { estimateMessageTokens, estimateTextTokens } from "../agent/compaction";
 
 export type ModelResolver = (model: Model<any>) => {
   model: LanguageModel;
@@ -26,6 +27,23 @@ const emptyUsage = (): Usage => ({
   totalTokens: 0,
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 });
+
+/**
+ * Some providers (notably subscription proxies) stream no token counts at all. Rather than book a
+ * turn as free and empty, count it the same rough way compaction does, and say so on the usage.
+ */
+function estimateUsage(output: AssistantMessage, context: Context) {
+  const tools = (context.tools ?? []).map((t) => [t.name, t.description, t.parameters]);
+  const input =
+    estimateTextTokens(context.systemPrompt ?? "") +
+    (tools.length ? estimateTextTokens(JSON.stringify(tools)) : 0) +
+    context.messages.reduce((n, m) => n + estimateMessageTokens(m as any), 0);
+  const out = estimateMessageTokens(output as any);
+  output.usage.input = input;
+  output.usage.output = out;
+  output.usage.totalTokens = input + out;
+  (output.usage as Usage & { estimated?: boolean }).estimated = true;
+}
 
 function encodeMeta(meta: unknown): string | undefined {
   if (!meta || typeof meta !== "object" || Object.keys(meta as object).length === 0) return undefined;
@@ -316,6 +334,7 @@ export function createVercelStreamFn(resolve: ModelResolver) {
           }
         }
         if (output.content.some((c) => c.type === "toolCall") && stopReason === "stop") stopReason = "toolUse";
+        if (!failure && !options?.signal?.aborted && output.usage.totalTokens === 0 && output.content.length) estimateUsage(output, context);
         output.usage.cost = calculateCost(model, output.usage);
         if (options?.signal?.aborted) {
           output.stopReason = "aborted";

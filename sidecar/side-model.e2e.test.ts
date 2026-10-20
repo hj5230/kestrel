@@ -75,3 +75,15 @@ test("with nothing chosen (or a removed provider) they fall back to the session'
   await runner.compact({ auto: false, full: true });
   expect(sideCalls).toEqual(["main", "main"]);
 }, 30000);
+
+test("a stream that reports no tokens is counted by estimate, and marked as such", async () => {
+  const info = createSession({ cwd: project, providerId: "mock", modelId: "main", permissionMode: "auto" });
+  await getRunner(info.id).sendAndWait("a question whose reply streams without usage");
+  const reply = store.loadMessages(info.id).map((m) => m.message as any).find((m) => m.role === "assistant");
+  expect(reply.usage.estimated).toBe(true);
+  expect(reply.usage.input).toBeGreaterThan(10);
+  expect(reply.usage.output).toBeGreaterThan(0);
+  const s = store.getSession(info.id)!;
+  expect(s.usage.input).toBeGreaterThan(0);
+  expect(s.usage.contextTokens).toBeGreaterThan(0);
+}, 30000);
