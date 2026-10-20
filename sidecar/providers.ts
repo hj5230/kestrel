@@ -7,7 +7,9 @@ import { getModels, getProviders, type Model } from "@mariozechner/pi-ai";
 import type { LanguageModel } from "ai";
 import type { ModelConfig, ProviderConfig, ProviderKind, RemoteModel } from "../shared/protocol";
 import * as store from "./db";
-import { getShellEnv } from "./env";
+import fs from "node:fs";
+import path from "node:path";
+import { getShellEnv, HOME } from "./env";
 import { st } from "./i18n";
 
 export const PROVIDER_PRESETS: Record<ProviderKind, { name: string; baseUrl: string; needsKey: boolean }> = {
@@ -133,13 +135,17 @@ function allKnownModels(): Model<any>[] {
   return catalog;
 }
 
+/** `claude-opus-5-5[1m]`: proxies mark the long-context variant with a suffix. */
+const LONG_CONTEXT = /\[1m\]$/i;
+
 export function lookupKnownModel(kind: ProviderKind, id: string): Model<any> | null {
   const piProv = PI_PROVIDER[kind];
   const pool = allKnownModels();
   const preferred = piProv ? pool.filter((m) => m.provider === piProv) : [];
-  const bare = id.includes("/") && kind !== "openrouter" ? id.split("/").pop()! : id;
+  const plain = id.replace(LONG_CONTEXT, "");
+  const bare = plain.includes("/") && kind !== "openrouter" ? plain.split("/").pop()! : plain;
   for (const list of [preferred, pool]) {
-    const exact = list.find((m) => m.id === id) ?? list.find((m) => m.id === bare);
+    const exact = list.find((m) => m.id === plain) ?? list.find((m) => m.id === bare);
     if (exact) return exact;
   }
   const undated = bare.replace(/-\d{4}-?\d{2}-?\d{2}$/, "").replace(/-\d{8}$/, "");
@@ -150,13 +156,51 @@ export function lookupKnownModel(kind: ProviderKind, id: string): Model<any> | n
   return null;
 }
 
+interface CodexModel {
+  contextWindow: number;
+  vision: boolean;
+  reasoning: boolean;
+}
+
+let codexCache: { mtime: number; models: Map<string, CodexModel> } | null = null;
+
+/**
+ * What the Codex CLI knows about its own models (`~/.codex/models_cache.json`, refreshed by Codex).
+ * Proxies that serve a ChatGPT subscription use the same model ids, and the pi-ai catalog lags them.
+ */
+function codexModel(id: string): CodexModel | null {
+  const file = path.join(HOME, ".codex", "models_cache.json");
+  let mtime: number;
+  try {
+    mtime = fs.statSync(file).mtimeMs;
+  } catch {
+    return null;
+  }
+  if (!codexCache || codexCache.mtime !== mtime) {
+    const models = new Map<string, CodexModel>();
+    try {
+      for (const m of JSON.parse(fs.readFileSync(file, "utf8")).models ?? []) {
+        if (typeof m?.slug !== "string" || !(m.context_window > 0)) continue;
+        models.set(m.slug, {
+          contextWindow: m.context_window,
+          vision: Array.isArray(m.input_modalities) && m.input_modalities.includes("image"),
+          reasoning: Array.isArray(m.supported_reasoning_levels) && m.supported_reasoning_levels.length > 0,
+        });
+      }
+    } catch {}
+    codexCache = { mtime, models };
+  }
+  return codexCache.models.get(id.split("/").pop()!) ?? null;
+}
+
 export function modelDefaults(kind: ProviderKind, id: string, name?: string, contextHint?: number): Omit<ModelConfig, "providerId"> {
   const known = lookupKnownModel(kind, id);
+  const long = LONG_CONTEXT.test(id);
   if (known) {
     return {
       id,
       name: name || known.name,
-      contextWindow: known.contextWindow,
+      contextWindow: long ? Math.max(known.contextWindow, 1_000_000) : known.contextWindow,
       maxTokens: known.maxTokens,
       reasoning: known.reasoning,
       vision: known.input.includes("image"),
@@ -165,13 +209,16 @@ export function modelDefaults(kind: ProviderKind, id: string, name?: string, con
     };
   }
   const lower = id.toLowerCase();
+  const codex = codexModel(id);
+  const claude = /(^|\/)claude-/.test(lower);
   return {
     id,
     name: name || id,
-    contextWindow: contextHint || 128000,
+    // the endpoint's own figure first, then what we can tell from the id
+    contextWindow: contextHint || (long ? 1_000_000 : codex?.contextWindow || (claude ? 200_000 : 128000)),
     maxTokens: 16384,
-    reasoning: /reason|think|o\d|gpt-5|r1|qwq|claude|gemini-2\.5|gemini-3/.test(lower),
-    vision: /vision|gpt-4o|gpt-5|claude|gemini|vl/.test(lower),
+    reasoning: codex?.reasoning ?? /reason|think|o\d|gpt-[5-9]|r1|qwq|claude|gemini-2\.5|gemini-3/.test(lower),
+    vision: codex?.vision ?? /vision|gpt-4o|gpt-[5-9]|claude|gemini|vl/.test(lower),
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     enabled: true,
   };
