@@ -1,7 +1,8 @@
 import os from "node:os";
 import path from "node:path";
-import { openDb } from "./db";
+import { getSettings, openDb } from "./db";
 import { resolveShellEnv } from "./env";
+import { openHistoryDb, setHistorySources, syncHistory } from "./history";
 import { startMcp, stopAllMcp } from "./mcp";
 import { killAllShells } from "./tools/bash";
 import { initRemote, shutdownRemote } from "./remote";
@@ -24,6 +25,11 @@ const envReady = resolveShellEnv();
 const server = startServer({ port, token, dataDir, dev });
 console.log(`KESTREL_READY ${JSON.stringify({ port: server.port, token })}`);
 initRemote(dataDir);
+
+// Conversations from other apps on this Mac, indexed in the background shortly after start
+openHistoryDb(path.join(dataDir, dev ? "history-dev.db" : "history.db"));
+setHistorySources(getSettings().historySources);
+setTimeout(() => syncHistory().catch(() => {}), 3000);
 
 envReady.then(() => startMcp()).catch(() => {});
 

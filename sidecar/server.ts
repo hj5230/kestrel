@@ -13,6 +13,7 @@ import { deleteMemory, getMemory, listMemories, writeMemory, type MemoryInput } 
 import { DEFAULT_BASH_WHITELIST } from "./permissions";
 import { fetchRemoteModels, modelDefaults, PROVIDER_PRESETS } from "./providers";
 import { createSession, exportMarkdown, forkSession, newId } from "./sessions";
+import { historyStatus, rebuildHistory, setHistorySources, syncHistory } from "./history";
 import { discoverSkills, listSlashCommands } from "./skills";
 import type { Server, WebSocketHandler } from "bun";
 import { generateText } from "ai";
@@ -69,7 +70,19 @@ const handlers: Record<string, Handler> = {
   },
 
   "settings.get": () => store.getSettings(),
-  "settings.update": (patch) => store.saveSettings(patch),
+  "settings.update": (patch) => {
+    const s = store.saveSettings(patch);
+    if ("historySources" in patch) {
+      setHistorySources(s.historySources);
+      syncHistory().catch(() => {});
+    }
+    return s;
+  },
+  "history.status": () => historyStatus(),
+  "history.rebuild": () => {
+    rebuildHistory().catch(() => {});
+    return true;
+  },
 
   "providers.presets": () => PROVIDER_PRESETS,
   "providers.list": () => store.listProviders(),
