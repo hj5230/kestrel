@@ -322,6 +322,8 @@ export const en = {
   "settings.proxy.none": "No proxy",
   "settings.proxy.custom": "Custom",
   "settings.proxyUrl": "Proxy URL",
+  "settings.tavilyKey": "Tavily API key",
+  "settings.tavilyKeyDesc": "Turns on the web search tool; without a key the model does not get it. Get a key at tavily.com",
   "settings.skillDirs": "Skill folders",
   "settings.skillDirsDesc": "Each subfolder holds a SKILL.md (Claude Code / Agent Skills format). The project's .kestrel/skills, .claude/skills and .agents/skills are loaded too.",
   "settings.commandDirs": "Custom command folders",
