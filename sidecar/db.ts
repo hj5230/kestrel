@@ -175,6 +175,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   memoryAutoSave: true,
   proxyMode: "env",
   proxyUrl: "",
+  tavilyApiKey: "",
   bashTimeoutSec: 120,
   bashWhitelist: DEFAULT_BASH_WHITELIST,
   toolWhitelist: [],

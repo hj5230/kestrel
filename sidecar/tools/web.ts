@@ -1,6 +1,7 @@
+// Network tools: web_fetch reads a page, web_search (Tavily) finds pages. Neither runs JavaScript.
 import { Type } from "typebox";
 import { proxiedFetch } from "../providers";
-import { defineTool, text, type KestrelTool } from "./types";
+import { defineTool, text, type KestrelTool, type ToolContext } from "./types";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
 
@@ -86,53 +87,20 @@ interface SearchResult {
   snippet: string;
 }
 
-function strip(s: string) {
-  return decode(s.replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
+const TAVILY_URL = "https://api.tavily.com/search";
+
+/** Tavily puts the reason in `detail.error` (or a bare string) on failure. */
+function tavilyError(status: number, raw: string) {
+  let reason = "";
+  try {
+    const j = JSON.parse(raw);
+    reason = typeof j?.detail === "string" ? j.detail : (j?.detail?.error ?? j?.error ?? "");
+  } catch {}
+  return new Error(`Tavily search failed (HTTP ${status})${reason ? `: ${reason}` : ""}`);
 }
 
-async function searchBing(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
-  const res = await proxiedFetch(`https://www.bing.com/search?q=${encodeURIComponent(query)}&setlang=zh-Hans&count=15`, {
-    headers: { "User-Agent": UA, "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8" },
-    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
-  });
-  const html = await res.text();
-  const out: SearchResult[] = [];
-  const blocks = html.split(/<li class="b_algo"/).slice(1);
-  for (const b of blocks) {
-    const a = b.match(/<h2[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
-    if (!a) continue;
-    let url = decode(a[1]);
-    const u = url.match(/[?&]u=a1([^&]+)/);
-    if (u) {
-      try {
-        url = Buffer.from(u[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
-      } catch {}
-    }
-    const snip = b.match(/<p[^>]*>([\s\S]*?)<\/p>/i)?.[1] ?? b.match(/class="b_caption"[^>]*>([\s\S]*?)<\/div>/i)?.[1] ?? "";
-    out.push({ title: strip(a[2]), url, snippet: strip(snip).slice(0, 300) });
-  }
-  return out;
-}
-
-async function searchDuckDuckGo(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
-  const res = await proxiedFetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
-    headers: { "User-Agent": UA },
-    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
-  });
-  const html = await res.text();
-  const out: SearchResult[] = [];
-  const re = /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html))) {
-    let url = decode(m[1]);
-    const uddg = url.match(/uddg=([^&]+)/);
-    if (uddg) url = decodeURIComponent(uddg[1]);
-    out.push({ title: strip(m[2]), url, snippet: strip(m[3]).slice(0, 300) });
-  }
-  return out;
-}
-
-export function createWebSearchTool(): KestrelTool {
+/** Only registered while a Tavily key is configured (see Runner.buildTools), so the model never sees a tool that cannot work. */
+export function createWebSearchTool(ctx: Pick<ToolContext, "settings">): KestrelTool {
   return defineTool({
     name: "web_search",
     label: "Web search",
@@ -145,26 +113,32 @@ export function createWebSearchTool(): KestrelTool {
       limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 20 })),
     }),
     async execute(_id, params, signal) {
-      let results: SearchResult[] = [];
-      let engine = "bing";
-      const errors: string[] = [];
+      const key = ctx.settings().tavilyApiKey.trim();
+      if (!key) throw new Error("Web search is not configured: no Tavily API key in settings.");
+      const res = await proxiedFetch(TAVILY_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ query: params.query, max_results: params.limit ?? 10, search_depth: "basic" }),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000),
+      });
+      const raw = await res.text();
+      if (!res.ok) throw tavilyError(res.status, raw);
+      let data: any;
       try {
-        results = await searchBing(params.query, signal);
-      } catch (e: any) {
-        errors.push(`bing: ${e.message}`);
+        data = JSON.parse(raw);
+      } catch {
+        throw new Error("Tavily returned a response that is not JSON.");
       }
-      if (!results.length) {
-        engine = "duckduckgo";
-        try {
-          results = await searchDuckDuckGo(params.query, signal);
-        } catch (e: any) {
-          errors.push(`duckduckgo: ${e.message}`);
-        }
-      }
-      if (!results.length) throw new Error(`No results. ${errors.join("; ")}`);
-      const shown = results.slice(0, params.limit ?? 10);
-      const body = shown.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`).join("\n\n");
-      return { content: text(body), details: { engine, results: shown } };
+      const results: SearchResult[] = (Array.isArray(data?.results) ? data.results : [])
+        .filter((r: any) => r?.url)
+        .map((r: any) => ({
+          title: String(r.title ?? r.url).replace(/\s+/g, " ").trim(),
+          url: String(r.url),
+          snippet: String(r.content ?? "").replace(/\s+/g, " ").trim().slice(0, 500),
+        }));
+      if (!results.length) return { content: text("No results."), details: { results } };
+      const body = results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`).join("\n\n");
+      return { content: text(body), details: { results } };
     },
   });
 }
