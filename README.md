@@ -22,7 +22,7 @@ Tauri (Rust)                  sidecar (Bun, single binary kestrel-agent)        
 
 - Sessions: grouped by time or project, pin, archive, rename, fork, edit and resend, export to Markdown, full-text search (⌘K).
 - Chat: streaming output, reasoning, tool-call cards (command output, diffs, subagent progress), image input, steering/queueing, stop, retry.
-- Tools: read / write / edit / ls / glob / grep (ripgrep) / bash (with background processes) / web_fetch / web_search / todo_write / task (subagents) / ask_user / search_sessions / read_session / skill / memory_search / memory_read / memory_write / memory_delete / MCP.
+- Tools: read / write / edit / ls / glob / grep (ripgrep) / bash (with background processes) / web_fetch / web_search (Tavily, only when a key is set in Settings) / todo_write / task (subagents) / ask_user / search_sessions / read_session / skill / memory_search / memory_read / memory_write / memory_delete / MCP.
 - Permissions: Manual, Accept edits, Auto and Bypass modes; see [Permissions](#permissions). A denial can carry a reason.
 - English and Chinese UI, English by default.
 - Context: AGENTS.md / CLAUDE.md loaded level by level, a global instructions file, skills (SKILL.md) and custom `/` commands, auto-compaction with retry on context overflow.
