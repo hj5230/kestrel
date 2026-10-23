@@ -337,6 +337,8 @@ export interface AppSettings {
   memoryAutoSave: boolean;
   proxyMode: "env" | "none" | "custom";
   proxyUrl: string;
+  /** Tavily API key. The web_search tool exists only while this is set. */
+  tavilyApiKey: string;
   bashTimeoutSec: number;
   bashWhitelist: string[];
   toolWhitelist: string[];

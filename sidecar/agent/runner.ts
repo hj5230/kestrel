@@ -236,12 +236,12 @@ export class SessionRunner {
       createBashOutputTool(ctx),
       createKillShellTool(ctx),
       createWebFetchTool(),
-      createWebSearchTool(),
       createSearchSessionsTool(ctx),
       createReadSessionTool(),
     ];
     // Subagents can't talk to the user; they report back to the agent that launched them.
     if (!subagent) tools.push(createTodoTool(ctx), createTaskTool(ctx), createAskUserTool(ctx));
+    if (store.getSettings().tavilyApiKey.trim()) tools.push(createWebSearchTool(ctx));
     if (discoverSkills(this.info().cwd).length) tools.push(createSkillTool(ctx));
     if (store.getSettings().memoryEnabled) tools.push(...memoryTools(ctx, { readOnly: subagent }));
     tools.push(...mcpTools());
