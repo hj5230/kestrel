@@ -324,6 +324,8 @@ export const zhCN: Record<MessageKey, string> = {
   "settings.proxy.none": "不使用代理",
   "settings.proxy.custom": "自定义",
   "settings.proxyUrl": "代理地址",
+  "settings.tavilyKey": "Tavily API Key",
+  "settings.tavilyKeyDesc": "填写后启用网页搜索工具；未填写时不会提供给模型。在 tavily.com 获取 Key",
   "settings.skillDirs": "技能目录",
   "settings.skillDirsDesc": "每个子目录包含一个 SKILL.md（兼容 Claude Code / Agent Skills 格式）。项目内的 .kestrel/skills、.claude/skills、.agents/skills 也会被加载。",
   "settings.commandDirs": "自定义命令目录",

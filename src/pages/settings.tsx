@@ -237,6 +237,17 @@ function General({ s }: { s: AppSettings }) {
               <BlurInput className="w-64 font-mono text-xs" placeholder="http://127.0.0.1:7890" value={s.proxyUrl} onCommit={(v) => save({ proxyUrl: v.trim() })} />
             </Row>
           )}
+          <Row label={t("settings.tavilyKey")} desc={t("settings.tavilyKeyDesc")}>
+            <BlurInput
+              type="password"
+              autoComplete="off"
+              spellcheck={false}
+              className="w-64 font-mono text-xs"
+              placeholder="tvly-…"
+              value={s.tavilyApiKey}
+              onCommit={(v) => save({ tavilyApiKey: v.trim() })}
+            />
+          </Row>
         </Panel>
       </Section>
     </div>
