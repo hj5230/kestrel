@@ -50,7 +50,7 @@ function ModelList({
   return (
     <Command>
       <CommandInput placeholder={t("picker.searchModels")} />
-      <CommandList className="max-h-80">
+      <CommandList className="max-h-80" onTouchMove={blurOnScroll}>
         <CommandEmpty>{t("picker.noModels")}</CommandEmpty>
         {groups.map(({ p, models }) => (
           <CommandGroup key={p.id} heading={p.name}>
@@ -85,17 +85,25 @@ function ModelList({
   )
 }
 
-/** A popover on desktop, a bottom sheet on touch, where a floating panel ends up behind the keyboard. */
-function Panel({
+/** A popover on desktop, a bottom sheet on touch, where a floating panel ends up behind the keyboard.
+ *  The sheet rides on top of the keyboard (--kb) and never grabs focus on open, so the keyboard only
+ *  appears when the search field is tapped. */
+export function Panel({
   open,
   onOpenChange,
   align = "start",
+  side,
+  popoverClassName = "w-80 p-0",
+  sheetClassName = "p-0",
   trigger,
   children,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   align?: "start" | "end"
+  side?: "top" | "bottom"
+  popoverClassName?: string
+  sheetClassName?: string
   trigger: ComponentChildren
   children: ComponentChildren
 }) {
@@ -103,7 +111,13 @@ function Panel({
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetTrigger asChild>{trigger}</SheetTrigger>
-        <SheetContent side="bottom" showCloseButton={false} className="max-h-[75vh] gap-0 rounded-t-2xl p-0">
+        <SheetContent
+          side="bottom"
+          showCloseButton={false}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          style={{ bottom: "var(--kb, 0px)", maxHeight: "min(75vh, calc(var(--app-height, 100vh) - 24px))" }}
+          className={cn("gap-0 overflow-y-auto overscroll-contain rounded-t-2xl", "[html.keyboard-open_&]:pb-0", sheetClassName)}
+        >
           {children}
         </SheetContent>
       </Sheet>
@@ -112,11 +126,17 @@ function Panel({
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align={align}>
+      <PopoverContent className={popoverClassName} align={align} side={side}>
         {children}
       </PopoverContent>
     </Popover>
   )
+}
+
+/** Scrolling a list is how people dismiss the keyboard on iOS; the search field keeps focus otherwise. */
+const blurOnScroll = () => {
+  const el = document.activeElement
+  if (el instanceof HTMLElement && el.matches("input, textarea")) el.blur()
 }
 
 export function ModelPicker({
@@ -320,7 +340,7 @@ export function CwdBrowser({ value, onChange, onDone }: { value: string; onChang
   return (
         <Command shouldFilter={false}>
           <CommandInput placeholder={t("picker.pathPlaceholder")} value={query} onValueChange={setQuery} />
-          <CommandList className="max-h-80">
+          <CommandList className="max-h-80" onTouchMove={blurOnScroll}>
             {query && (
               <CommandGroup heading={t("picker.useTyped")}>
                 <CommandItem value={`__typed ${query}`} onSelect={() => choose(query)}>
