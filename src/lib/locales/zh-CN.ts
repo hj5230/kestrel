@@ -199,6 +199,8 @@ export const zhCN: Record<MessageKey, string> = {
   "chat.editing": "正在编辑消息，发送后将从这里重新生成",
 
   "msg.editResend": "编辑并重新发送",
+  "msg.showMore": "展开",
+  "msg.showLess": "收起",
   "msg.fork": "从这里分叉新会话",
   "msg.thinking": "思考中",
   "msg.thoughts": "思考过程",

@@ -197,6 +197,8 @@ export const en = {
   "chat.editing": "Editing a message — sending will regenerate from here",
 
   "msg.editResend": "Edit and resend",
+  "msg.showMore": "Show more",
+  "msg.showLess": "Show less",
   "msg.fork": "Fork a new session from here",
   "msg.thinking": "Thinking",
   "msg.thoughts": "Thoughts",

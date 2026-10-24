@@ -1,6 +1,8 @@
-import { useState } from "preact/hooks"
+import type { ComponentChildren } from "preact"
+import { useLayoutEffect, useRef, useState } from "preact/hooks"
 import {
   BrainIcon,
+  ChevronDownIcon,
   ChevronRightIcon,
   CopyIcon,
   GitBranchIcon,
@@ -58,6 +60,47 @@ function userImages(m: UserMsg) {
   return m.content.filter((c) => c.type === "image") as { data: string; mimeType: string }[]
 }
 
+/** Taller than this and a message folds, showing a fade and "Show more". */
+const FOLD_PX = 240
+/** Folding is skipped when it would hide less than this: a button to reveal two lines isn't worth it. */
+const FOLD_SLACK_PX = 32
+
+function Foldable({ children }: { children: ComponentChildren }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
+  const [tall, setTall] = useState(false)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    // scrollHeight is the natural height whether or not the fold is applied, so this can't flip back and forth
+    const measure = () => setTall(el.scrollHeight > FOLD_PX + FOLD_SLACK_PX)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const folded = tall && !open
+  return (
+    <>
+      <div ref={ref} className={cn("relative", folded && "overflow-hidden")} style={folded ? { maxHeight: FOLD_PX } : undefined}>
+        {children}
+        {folded && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-muted to-transparent" />}
+      </div>
+      {tall && (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+          className="mt-1.5 flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground pointer-coarse:min-h-10"
+        >
+          <ChevronDownIcon className={cn("size-3.5 transition-transform", open && "rotate-180")} />
+          {open ? t("msg.showLess") : t("msg.showMore")}
+        </button>
+      )}
+    </>
+  )
+}
+
 export function UserMessage({
   stored,
   canEdit,
@@ -95,7 +138,7 @@ export function UserMessage({
             isCommand && "font-mono text-[13px]",
           )}
         >
-          {text}
+          <Foldable>{text}</Foldable>
         </div>
       )}
       <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/user:opacity-100 pointer-coarse:opacity-100">
