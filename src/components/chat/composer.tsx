@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { rpc, type StagedFile } from "@/lib/api"
-import { pickPaths } from "@/lib/attach"
+import { pickFilePaths } from "@/lib/attach"
 import { settings } from "@/lib/store"
 import { isMobileApp, isTauri, isTouch } from "@/lib/platform"
 import { cn } from "@/lib/utils"
@@ -271,15 +271,19 @@ export function Composer({
     stage(next.filter((f) => f.size <= FILE_ATTACHMENT_MAX_BYTES).map((file) => ({ name: file.name, size: file.size, file })))
   }
 
-  /** Images and files are different dialogs. The webview's file input mixes them, so the app uses the system one. */
-  const choose = async (kind: "image" | "file") => {
+  /** Images use the webview's input, which offers Take Photo and the library on iOS and arrives as pixels for the model. Other files use the system document picker. */
+  const chooseImage = () => {
+    setAddOpen(false)
+    imageInput.current?.click()
+  }
+  const chooseFile = async () => {
     setAddOpen(false)
     if (!isTauri) {
-      ;(kind === "image" ? imageInput : fileInput).current?.click()
+      fileInput.current?.click()
       return
     }
     try {
-      const paths = await pickPaths(kind)
+      const paths = await pickFilePaths()
       if (!paths?.length) return
       stage(paths.map((path) => ({ name: path.split(/[/\\]/).pop() || path, path })))
     } catch (e: any) {
@@ -356,7 +360,7 @@ export function Composer({
       <button
         type="button"
         className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-accent pointer-coarse:min-h-11"
-        onClick={() => choose("image")}
+        onClick={chooseImage}
       >
         <ImagePlusIcon className="size-4 text-muted-foreground" />
         {t("composer.addImage")}
@@ -364,7 +368,7 @@ export function Composer({
       <button
         type="button"
         className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-accent pointer-coarse:min-h-11"
-        onClick={() => choose("file")}
+        onClick={chooseFile}
       >
         <PaperclipIcon className="size-4 text-muted-foreground" />
         {t("composer.addFile")}
