@@ -21,6 +21,8 @@ export type Language = "en" | "zh-CN";
 
 export type TranscriptView = "answer" | "compact" | "detailed" | "verbose";
 
+export const FILE_ATTACHMENT_MAX_BYTES = 100 * 1024 * 1024;
+
 export interface ProviderConfig {
   id: string;
   kind: ProviderKind;
@@ -106,6 +108,12 @@ export interface ImageBlock {
   data: string;
   mimeType: string;
 }
+export interface FileAttachment {
+  path: string;
+  name: string;
+  mimeType: string;
+  size: number;
+}
 export interface ToolCallBlock {
   type: "toolCall";
   id: string;
@@ -126,6 +134,8 @@ export interface UsageData {
 export interface UserMsg {
   role: "user";
   content: string | (TextBlock | ImageBlock)[];
+  files?: FileAttachment[];
+  display?: string;
   timestamp: number;
 }
 export interface AssistantMsg {
@@ -251,6 +261,7 @@ export interface QueuedMessage {
   id: string;
   text: string;
   mode: "steer" | "followUp";
+  files?: FileAttachment[];
 }
 
 export interface McpServerConfig {

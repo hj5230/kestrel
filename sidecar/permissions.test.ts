@@ -207,6 +207,27 @@ describe("edits and reads in every mode", () => {
     expect(evaluatePermission(READ, { path: "~/.ssh/id_rsa" }, "bypass", settings(), ctx).action).toBe("allow");
   });
 
+  test("reads under dataDir/uploads are allowed, but traversal into sensitive paths is blocked", () => {
+    const uploadFile = path.join(ctx.dataDir, "uploads", "session123", "notes.txt");
+    const dbFile = path.join(ctx.dataDir, "kestrel.db");
+    const remoteKey = path.join(ctx.dataDir, "remote", "key.pem");
+    expect(evaluatePermission(READ, { path: uploadFile }, "auto", settings(), ctx).action).toBe("allow");
+    expect(evaluatePermission(READ, { path: dbFile }, "auto", settings(), ctx).action).toBe("ask");
+    expect(evaluatePermission(READ, { path: remoteKey }, "auto", settings(), ctx).action).toBe("ask");
+    expect(evaluatePermission(READ, { path: path.join(ctx.dataDir, "uploads", "..", "remote", "key.pem") }, "auto", settings(), ctx).action).toBe("ask");
+  });
+
+  test("a symlink at the uploads folder does not make its target readable", () => {
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), "kestrel-uploads-link-"));
+    fs.mkdirSync(path.join(base, "remote"), { recursive: true });
+    fs.writeFileSync(path.join(base, "remote", "key.pem"), "secret");
+    fs.symlinkSync(path.join(base, "remote"), path.join(base, "uploads"));
+    const c = { ...ctx, dataDir: base };
+    expect(evaluatePermission(READ, { path: path.join(base, "remote", "key.pem") }, "auto", settings(), c).action).toBe("ask");
+    expect(evaluatePermission(READ, { path: path.join(base, "uploads", "key.pem") }, "auto", settings(), c).action).toBe("ask");
+    fs.rmSync(base, { recursive: true, force: true });
+  });
+
   test("manual and acceptEdits still ask for commands", () => {
     expect(run("ls", "manual").action).toBe("ask");
     expect(run("ls", "acceptEdits").action).toBe("ask");

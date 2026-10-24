@@ -466,13 +466,20 @@ export function setContextTokens(id: string, tokens: number) {
   db.run("UPDATE sessions SET context_tokens = ? WHERE id = ?", [tokens, id]);
 }
 
-export function deleteSession(id: string) {
+export function deleteSession(id: string): string[] {
+  const deleted: string[] = [];
+  const walk = (sessionId: string) => {
+    const children = db.query("SELECT id FROM sessions WHERE parent_id = ? AND kind = 'subagent'").all(sessionId) as { id: string }[];
+    for (const c of children) walk(c.id);
+    db.run("DELETE FROM messages_fts WHERE session_id = ?", [sessionId]);
+    const res = db.run("DELETE FROM sessions WHERE id = ?", [sessionId]);
+    // An id that matches no session must not be reported as deleted: the caller removes files by these ids.
+    if (res.changes > 0) deleted.push(sessionId);
+  };
   db.transaction(() => {
-    const children = db.query("SELECT id FROM sessions WHERE parent_id = ? AND kind = 'subagent'").all(id) as { id: string }[];
-    for (const c of children) deleteSession(c.id);
-    db.run("DELETE FROM messages_fts WHERE session_id = ?", [id]);
-    db.run("DELETE FROM sessions WHERE id = ?", [id]);
+    walk(id);
   })();
+  return deleted;
 }
 
 // ---------- messages ----------
@@ -539,6 +546,15 @@ export function copyMessages(fromSession: string, toSession: string, uptoSeq: nu
        SELECT ?, cut_seq, summary, tokens_before, auto, created_at FROM compactions WHERE session_id = ? AND cut_seq <= ?`,
       [toSession, fromSession, uptoSeq],
     );
+  })();
+}
+
+export function rewriteSessionPathPrefix(sessionId: string, fromPrefix: string, toPrefix: string) {
+  db.transaction(() => {
+    db.run("UPDATE messages SET data = REPLACE(data, ?, ?) WHERE session_id = ?", [fromPrefix, toPrefix, sessionId]);
+    db.run("UPDATE messages_fts SET text = REPLACE(text, ?, ?) WHERE session_id = ?", [fromPrefix, toPrefix, sessionId]);
+    // The summary quotes attachment paths too, so a fork has to retarget it or it keeps pointing at the source session.
+    db.run("UPDATE compactions SET summary = REPLACE(summary, ?, ?) WHERE session_id = ?", [fromPrefix, toPrefix, sessionId]);
   })();
 }
 

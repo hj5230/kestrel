@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import type { AppInfo, McpServerConfig, ModelConfig, ProviderConfig, SessionInfo } from "../shared/protocol";
+import type { AppInfo, FileAttachment, McpServerConfig, ModelConfig, ProviderConfig, SessionInfo } from "../shared/protocol";
 import { dropRunner, getRunner, peekRunner, respondApproval, respondQuestion, sessionDetail } from "./agent/runner";
 import { collectInstructions } from "./agent/prompt";
 import * as store from "./db";
@@ -15,6 +15,7 @@ import { fetchRemoteModels, modelDefaults, PROVIDER_PRESETS } from "./providers"
 import { createSession, exportMarkdown, forkSession, newId } from "./sessions";
 import { historyStatus, rebuildHistory, setHistorySources, syncHistory } from "./history";
 import { discoverSkills, listSlashCommands } from "./skills";
+import { describeLocalFiles, removeSessionUploads, storeUpload, UploadError } from "./uploads";
 import type { Server, WebSocketHandler } from "bun";
 import { generateText } from "ai";
 import { languageModel } from "./providers";
@@ -143,12 +144,13 @@ const handlers: Record<string, Handler> = {
   },
   "sessions.delete": ({ id }) => {
     dropRunner(id);
-    store.deleteSession(id);
+    const deleted = store.deleteSession(id);
+    for (const sessionId of deleted) removeSessionUploads(appInfo.dataDir, sessionId);
     emit({ type: "session_deleted", id });
     return true;
   },
   "sessions.fork": ({ id, seq }) => {
-    const s = forkSession(id, seq);
+    const s = forkSession(id, seq, appInfo.dataDir);
     emit({ type: "session_updated", session: s });
     return s;
   },
@@ -164,8 +166,8 @@ const handlers: Record<string, Handler> = {
     };
   },
 
-  "chat.send": async ({ sessionId, text, images, mode }) => {
-    await getRunner(sessionId).send(text, images ?? [], mode ?? "auto");
+  "chat.send": async ({ sessionId, text, images, files, mode }: { sessionId: string; text: string; images?: any[]; files?: FileAttachment[]; mode?: "auto" | "steer" | "followUp" }) => {
+    await getRunner(sessionId).send(text, images ?? [], files ?? [], mode ?? "auto");
     return true;
   },
   "chat.abort": ({ sessionId }) => {
@@ -176,8 +178,8 @@ const handlers: Record<string, Handler> = {
     await getRunner(sessionId).retry();
     return true;
   },
-  "chat.edit": async ({ sessionId, seq, text, images }) => {
-    await getRunner(sessionId).editAndResend(seq, text, images ?? []);
+  "chat.edit": async ({ sessionId, seq, text, images, files }: { sessionId: string; seq: number; text: string; images?: any[]; files?: FileAttachment[] }) => {
+    await getRunner(sessionId).editAndResend(seq, text, images ?? [], files ?? []);
     return true;
   },
   "chat.compact": async ({ sessionId, instructions }) => {
@@ -295,6 +297,10 @@ const handlers: Record<string, Handler> = {
     fs.writeFileSync(expandHome(p), content);
     return true;
   },
+  "files.describe": ({ paths }: { paths: string[] }) => {
+    if (!Array.isArray(paths) || !paths.length) return [];
+    return describeLocalFiles(paths);
+  },
   "fs.recentDirs": () => {
     const rows = store.listSessions({}).map((s) => s.cwd);
     return [...new Set(rows)].slice(0, 12).map(collapseHome);
@@ -317,7 +323,9 @@ export function registerHandlers(extra: Record<string, Handler>) {
 }
 
 // A paired phone gets the full agent API, but must not be able to pair or revoke devices.
-const localOnly = (method: string) => method.startsWith("remote.");
+// files.describe turns an arbitrary path into a file's name and size, so it stays on the desktop:
+// a paired phone uploads through /upload instead, and must not be able to probe the Mac's files.
+const localOnly = (method: string) => method.startsWith("remote.") || method === "files.describe";
 
 async function dispatch(body: any, caller: Caller, headers: Record<string, string>): Promise<Response> {
   const method = String(body?.method ?? "");
@@ -333,7 +341,33 @@ async function dispatch(body: any, caller: Caller, headers: Record<string, strin
   }
 }
 
-/** Serves /events, /rpc and /health for a caller that has already been authenticated. */
+async function upload(req: Request, headers: Record<string, string>): Promise<Response> {
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    return Response.json({ error: "invalid multipart body" }, { status: 400, headers });
+  }
+  const sessionId = String(form.get("sessionId") ?? "");
+  const file = form.get("file");
+  if (!(file instanceof File)) return Response.json({ error: st("uploadMissingFile") }, { status: 400, headers });
+  try {
+    const result = await storeUpload({
+      dataDir: appInfo.dataDir,
+      sessionId,
+      fileName: file.name || "file",
+      mimeType: file.type || undefined,
+      stream: file.stream(),
+      sizeHint: Number.isFinite(file.size) ? file.size : undefined,
+    });
+    return Response.json(result, { headers });
+  } catch (e: any) {
+    if (e instanceof UploadError) return Response.json({ error: e.message }, { status: e.status, headers });
+    return Response.json({ error: e?.message ?? String(e) }, { status: 500, headers });
+  }
+}
+
+/** Serves /events, /rpc, /upload and /health for a caller that has already been authenticated. */
 export async function handleApi(
   req: Request,
   server: Server<SocketData>,
@@ -354,6 +388,7 @@ export async function handleApi(
     }
     return dispatch(body, caller, headers);
   }
+  if (url.pathname === "/upload" && req.method === "POST") return upload(req, headers);
   if (url.pathname === "/health") return new Response("ok", { headers });
   return new Response("not found", { status: 404, headers });
 }

@@ -8,6 +8,7 @@ import type {
   ApprovalRequest,
   AssistantMsg,
   ChatMessage,
+  FileAttachment,
   Question,
   QuestionAnswer,
   QuestionRequest,
@@ -105,7 +106,7 @@ export function sessionDetail(id: string): SessionDetail {
     questions: [...pendingQuestions.values()].filter((q) => q.request.sessionId === id).map((q) => q.request),
     streaming: r?.streaming ?? null,
     runningTools: r?.runningTools ?? {},
-    queued: r?.queued.map(({ id, text, mode }) => ({ id, text, mode })) ?? [],
+    queued: r?.queued.map(({ id, text, mode, files }) => ({ id, text, mode, files })) ?? [],
   };
 }
 
@@ -132,6 +133,28 @@ function usageCost(u: any) {
     cacheWrite: u?.cacheWrite ?? 0,
     cost: u?.cost?.total ?? 0,
   };
+}
+
+function formatFileSize(size: number): string {
+  if (!Number.isFinite(size) || size <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = size;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  const rounded = value >= 10 || unit === 0 ? Math.round(value) : Math.round(value * 10) / 10;
+  return `${rounded} ${units[unit]}`;
+}
+
+function fileAttachmentMarkdown(files: FileAttachment[]): string {
+  return files
+    .map(
+      (file) =>
+        `[Attached file]\n- path: ${file.path}\n- name: ${file.name}\n- type: ${file.mimeType || "application/octet-stream"}\n- size: ${formatFileSize(file.size)}`,
+    )
+    .join("\n\n");
 }
 
 export class SessionRunner {
@@ -205,7 +228,7 @@ export class SessionRunner {
   }
 
   private emitQueue() {
-    emit({ type: "queue", sessionId: this.id, queued: this.queued.map(({ id, text, mode }) => ({ id, text, mode })) });
+    emit({ type: "queue", sessionId: this.id, queued: this.queued.map(({ id, text, mode, files }) => ({ id, text, mode, files })) });
   }
 
   private loadCompaction() {
@@ -685,21 +708,25 @@ export class SessionRunner {
     return p;
   }
 
-  async send(text: string, images: ImageContent[] = [], mode: "auto" | "steer" | "followUp" = "auto"): Promise<void> {
+  async send(text: string, images: ImageContent[] = [], files: FileAttachment[] = [], mode: "auto" | "steer" | "followUp" = "auto"): Promise<void> {
     const cwd = this.info().cwd;
     const expanded = text.startsWith("/") ? expandSlashCommand(cwd, text) : null;
-    const body = expanded ?? text;
+    const bodyBase = expanded ?? text;
+    const body = files.length ? `${bodyBase}${bodyBase ? "\n\n" : ""}${fileAttachmentMarkdown(files)}` : bodyBase;
     const msg: any = {
       role: "user",
       content: images.length ? [{ type: "text", text: body }, ...images] : body,
       timestamp: Date.now(),
     };
+    if (files.length) msg.files = files;
+    // display is only for showing a slash command instead of its expansion. The attachment block stays in the
+    // text, so the transcript and the export both show the file instead of hiding it behind the typed text.
     if (expanded) msg.display = text;
     if (this.busy) {
       const qmode = mode === "followUp" ? "followUp" : "steer";
       if (qmode === "followUp" || this.compacting) this.agent.followUp(msg);
       else this.agent.steer(msg);
-      this.queued.push({ id: newId("q_"), text, mode: qmode, ts: msg.timestamp, msg });
+      this.queued.push({ id: newId("q_"), text, mode: qmode, files, ts: msg.timestamp, msg });
       this.emitQueue();
       return;
     }
@@ -762,7 +789,7 @@ export class SessionRunner {
     this.start(() => this.agent.continue()).catch(() => {});
   }
 
-  async editAndResend(seq: number, text: string, images: ImageContent[] = []) {
+  async editAndResend(seq: number, text: string, images: ImageContent[] = [], files: FileAttachment[] = []) {
     if (this.busy) throw new Error(st("sessionBusy"));
     const msgs = this.agent.state.messages;
     if (seq < 0 || seq >= msgs.length || (msgs[seq] as any).role !== "user") throw new Error(st("onlyUserEdit"));
@@ -770,7 +797,7 @@ export class SessionRunner {
     this.agent.state.messages = msgs.slice(0, seq);
     this.loadCompaction();
     emit({ type: "messages_reset", sessionId: this.id });
-    await this.send(text, images);
+    await this.send(text, images, files);
   }
 
   async manualCompact(instructions?: string) {

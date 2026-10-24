@@ -1,8 +1,10 @@
 import fs from "node:fs";
+import path from "node:path";
 import type { ChatMessage, SessionInfo } from "../shared/protocol";
 import * as store from "./db";
 import { expandHome } from "./env";
 import { dateLocale, st } from "./i18n";
+import { sessionUploadDir } from "./uploads";
 
 export function newId(prefix = ""): string {
   return prefix + crypto.randomUUID().replace(/-/g, "").slice(0, 16);
@@ -51,7 +53,7 @@ export function createSession(input: Partial<SessionInfo> = {}): SessionInfo {
   return store.getSession(info.id)!;
 }
 
-export function forkSession(sourceId: string, uptoSeq: number): SessionInfo {
+export function forkSession(sourceId: string, uptoSeq: number, dataDir?: string): SessionInfo {
   const src = store.getSession(sourceId);
   if (!src) throw new Error(st("sessionNotFound"));
   const info = createSession({
@@ -63,6 +65,17 @@ export function forkSession(sourceId: string, uptoSeq: number): SessionInfo {
     title: `${src.title || st("untitled")}${st("forkSuffix")}`,
   });
   store.copyMessages(sourceId, info.id, uptoSeq);
+  if (dataDir) {
+    const sourceDir = sessionUploadDir(dataDir, sourceId);
+    const targetDir = sessionUploadDir(dataDir, info.id);
+    const sourcePrefix = sourceDir.endsWith(path.sep) ? sourceDir : sourceDir + path.sep;
+    const targetPrefix = targetDir.endsWith(path.sep) ? targetDir : targetDir + path.sep;
+    if (fs.existsSync(sourceDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+      fs.cpSync(sourceDir, targetDir, { recursive: true, force: false, errorOnExist: false });
+      store.rewriteSessionPathPrefix(info.id, sourcePrefix, targetPrefix);
+    }
+  }
   store.updateSession(info.id, { todos: src.todos }, true);
   return store.getSession(info.id)!;
 }

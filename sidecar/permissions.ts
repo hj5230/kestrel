@@ -242,6 +242,7 @@ class Paths {
   readonly cwd: string;
   readonly cwdReal: string;
   readonly scopes: string[];
+  private readonly uploads: string;
   private readonly sensitive: string[];
   private readonly protectedPaths: string[];
 
@@ -249,6 +250,8 @@ class Paths {
     this.cwd = cwd;
     this.cwdReal = realPath(cwd);
     this.scopes = [this.cwdReal, realPath(os.tmpdir()), "/private/tmp", "/tmp"];
+    // The literal folder, not its realpath: resolving it would let a symlink placed at `uploads` move this exception onto whatever the link points at.
+    this.uploads = path.join(realPath(dataDir), "uploads");
     this.sensitive = sensitiveRoots(dataDir);
     this.protectedPaths = protectedRoots(dataDir);
   }
@@ -260,6 +263,9 @@ class Paths {
   /** Reading it would expose credentials. `.pub` keys are fine. */
   sensitiveRead(abs: string, real = realPath(abs)): boolean {
     if (/\.pub$/i.test(abs)) return false;
+    // Only a file that really sits inside the uploads folder is exempt. A symlink inside it resolves to
+    // somewhere else, so it falls through to the normal check instead of inheriting the exemption.
+    if (isUnder(lower(real), lower(this.uploads))) return false;
     return hit(abs, real, this.sensitive);
   }
 
