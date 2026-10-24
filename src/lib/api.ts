@@ -143,10 +143,38 @@ export function rpc<T = any>(method: string, params: unknown = {}): Promise<T> {
   return transport.rpc(method, params) as Promise<T>
 }
 
-/** Sends a file to the desktop's per-session upload folder. The phone has no such path. */
+/** A file waiting to be stored with the session: either bytes from the page, or a path from the native picker. */
+export interface StagedFile {
+  name: string
+  size?: number
+  file?: File
+  path?: string
+}
+
+/** Sends a file to the desktop's per-session upload folder over HTTP. */
 export async function uploadFile(sessionId: string, file: File): Promise<FileAttachment> {
   if (!transport.upload) throw new RpcError("File upload is not available on this device")
   return transport.upload(sessionId, file)
+}
+
+/** The phone picked a file locally; the shell reads it and posts it to the paired Mac. */
+async function uploadFromPhone(sessionId: string, path: string): Promise<FileAttachment> {
+  const { invoke } = await import("@tauri-apps/api/core")
+  try {
+    return await invoke<FileAttachment>("remote_upload", { sessionId, path })
+  } catch (e) {
+    throw new RpcError(String(e))
+  }
+}
+
+/** Turns whatever the composer is holding into stored attachments on the Mac that owns the session. */
+export async function stageAttachments(sessionId: string, files: StagedFile[]): Promise<FileAttachment[]> {
+  const out: FileAttachment[] = []
+  for (const f of files) {
+    if (f.file) out.push(await uploadFile(sessionId, f.file))
+    else if (f.path) out.push(isMobileApp ? await uploadFromPhone(sessionId, f.path) : await rpc<FileAttachment>("files.import", { sessionId, path: f.path }))
+  }
+  return out
 }
 
 // ---------- event stream ----------

@@ -35,7 +35,7 @@ import { ViewPicker } from "./view-picker"
 import { ModelControl, PermissionPicker } from "./pickers"
 import { ContextMeter } from "./context-meter"
 import { TodoList } from "./tool-call"
-import { rpc, uploadFile } from "@/lib/api"
+import { rpc, stageAttachments, type StagedFile } from "@/lib/api"
 import { isMobileApp } from "@/lib/platform"
 import { downloadText } from "@/lib/download"
 import { shortPath } from "@/lib/format"
@@ -118,14 +118,13 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const model = findModel(s.providerId, s.modelId)
   const update = (patch: Partial<SessionInfo>) => rpc("sessions.update", { id: s.id, patch }).catch((e) => toast.error(e.message))
 
-  const send = async (text: string, images: Attachment[], files: File[]) => {
+  const send = async (text: string, images: Attachment[], files: StagedFile[]) => {
     if (!editing && !enabledModels.value.length) {
       toast.error(t("chat.addProviderFirst"))
       return false
     }
     const imgs = images.map(({ data, mimeType }) => ({ type: "image", data, mimeType }))
-    const uploaded = []
-    for (const file of files) uploaded.push(await uploadFile(s.id, file))
+    const uploaded = await stageAttachments(s.id, files)
     follow()
     if (editing) {
       await rpc("chat.edit", { sessionId: s.id, seq: editing.seq, text, images: imgs, files: uploaded })
@@ -318,7 +317,6 @@ export function ChatView({ sessionId }: { sessionId: string }) {
                 onSubmit={send}
                 onAbort={() => rpc("chat.abort", { sessionId: s.id })}
                 onBuiltin={onBuiltin}
-                allowFiles={!isMobileApp}
                 folder={s.messageCount === 0 ? { value: shortPath(s.cwd, appInfo.value?.home), onChange: (cwd) => update({ cwd }) } : undefined}
                 toolbarStart={<PermissionPicker value={s.permissionMode} onChange={(v: PermissionMode) => update({ permissionMode: v })} />}
                 toolbarEnd={

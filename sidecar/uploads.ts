@@ -195,6 +195,33 @@ export async function storeUpload(params: {
   };
 }
 
+/** Copy a file the user just picked on this Mac into the session's upload folder. */
+export function importLocalFile(dataDir: string, sessionId: string, source: string): FileAttachment {
+  const abs = path.resolve(String(source));
+  let info: fs.Stats;
+  try {
+    info = fs.statSync(abs);
+  } catch {
+    throw new UploadError(st("uploadInvalidPath"), 400);
+  }
+  if (!info.isFile()) throw new UploadError(st("uploadNotFile"), 400);
+  if (info.size > FILE_ATTACHMENT_MAX_BYTES) throw new UploadError(st("uploadTooLarge"), 413);
+  const dir = prepareUploadDir(dataDir, sessionId);
+  const target = uniquePath(dir, sanitizeUploadName(path.basename(abs)));
+  try {
+    fs.copyFileSync(abs, target.filePath);
+  } catch (e) {
+    fs.rmSync(target.filePath, { force: true });
+    throw e;
+  }
+  return {
+    path: target.filePath,
+    name: target.fileName,
+    mimeType: inferMimeType(target.fileName),
+    size: info.size,
+  };
+}
+
 export function describeLocalFiles(paths: string[]): FileAttachment[] {
   return paths.map((p) => {
     const abs = path.resolve(String(p));

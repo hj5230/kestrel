@@ -7,9 +7,10 @@ import { Kbd } from "@/components/ui/kbd"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { rpc } from "@/lib/api"
+import { rpc, type StagedFile } from "@/lib/api"
+import { pickPaths } from "@/lib/attach"
 import { settings } from "@/lib/store"
-import { isTouch } from "@/lib/platform"
+import { isMobileApp, isTauri, isTouch } from "@/lib/platform"
 import { cn } from "@/lib/utils"
 import { t, type MessageKey } from "@/lib/i18n"
 import { CwdBrowser } from "./pickers"
@@ -61,7 +62,6 @@ export function Composer({
   folder,
   toolbarStart,
   toolbarEnd,
-  allowFiles = false,
   draftKey,
   history = [],
   placeholder,
@@ -73,7 +73,7 @@ export function Composer({
   cwd: string
   running?: boolean
   disabled?: boolean
-  onSubmit: (text: string, images: Attachment[], files: File[]) => Promise<boolean | void> | boolean | void
+  onSubmit: (text: string, images: Attachment[], files: StagedFile[]) => Promise<boolean | void> | boolean | void
   onAbort?: () => void
   onBuiltin?: (name: string, args: string) => boolean
   /** Where this task runs. Omitted once a session has messages, since the folder is fixed by then. */
@@ -82,8 +82,6 @@ export function Composer({
   toolbarStart?: ComponentChildren
   /** Sits before the send button. The model and its reasoning effort. */
   toolbarEnd?: ComponentChildren
-  /** File attachments upload to the desktop. The phone has no upload path yet. */
-  allowFiles?: boolean
   draftKey?: string
   history?: string[]
   placeholder?: string
@@ -101,7 +99,7 @@ export function Composer({
     }
   })
   const [images, setImages] = useState<Attachment[]>([])
-  const [attachments, setAttachments] = useState<File[]>([])
+  const [attachments, setAttachments] = useState<StagedFile[]>([])
   const [addOpen, setAddOpen] = useState(false)
   const [pickingFolder, setPickingFolder] = useState(false)
   const [commands, setCommands] = useState<SlashCommandInfo[]>([])
@@ -262,12 +260,31 @@ export function Composer({
     }
   }
 
+  const stage = (next: StagedFile[]) => {
+    if (next.length) setAttachments((cur) => [...cur, ...next].slice(0, 8))
+  }
+
   const addAttachments = (list: FileList | File[]) => {
     const next = [...list].filter((f) => !f.type.startsWith("image/"))
     const tooBig = next.filter((f) => f.size > FILE_ATTACHMENT_MAX_BYTES)
     if (tooBig.length) toast.error(t("composer.fileTooLarge"))
-    const ok = next.filter((f) => f.size <= FILE_ATTACHMENT_MAX_BYTES)
-    if (ok.length) setAttachments((cur) => [...cur, ...ok].slice(0, 8))
+    stage(next.filter((f) => f.size <= FILE_ATTACHMENT_MAX_BYTES).map((file) => ({ name: file.name, size: file.size, file })))
+  }
+
+  /** Images and files are different dialogs. The webview's file input mixes them, so the app uses the system one. */
+  const choose = async (kind: "image" | "file") => {
+    setAddOpen(false)
+    if (!isTauri) {
+      ;(kind === "image" ? imageInput : fileInput).current?.click()
+      return
+    }
+    try {
+      const paths = await pickPaths(kind)
+      if (!paths?.length) return
+      stage(paths.map((path) => ({ name: path.split(/[/\\]/).pop() || path, path })))
+    } catch (e: any) {
+      toast.error(e?.message ?? String(e))
+    }
   }
 
   const onKeyDown = (e: KeyboardEvent) => {
@@ -339,27 +356,19 @@ export function Composer({
       <button
         type="button"
         className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-accent pointer-coarse:min-h-11"
-        onClick={() => {
-          setAddOpen(false)
-          imageInput.current?.click()
-        }}
+        onClick={() => choose("image")}
       >
         <ImagePlusIcon className="size-4 text-muted-foreground" />
         {t("composer.addImage")}
       </button>
-      {allowFiles && (
-        <button
-          type="button"
-          className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-accent pointer-coarse:min-h-11"
-          onClick={() => {
-            setAddOpen(false)
-            fileInput.current?.click()
-          }}
-        >
-          <PaperclipIcon className="size-4 text-muted-foreground" />
-          {t("composer.addFile")}
-        </button>
-      )}
+      <button
+        type="button"
+        className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-accent pointer-coarse:min-h-11"
+        onClick={() => choose("file")}
+      >
+        <PaperclipIcon className="size-4 text-muted-foreground" />
+        {t("composer.addFile")}
+      </button>
       {folder && (
         <button
           type="button"
@@ -443,7 +452,7 @@ export function Composer({
           setDragging(false)
           if (e.dataTransfer?.files) {
             addImages(e.dataTransfer.files)
-            if (allowFiles) addAttachments(e.dataTransfer.files)
+            if (!isMobileApp) addAttachments(e.dataTransfer.files)
           }
         }}
       >
@@ -465,7 +474,7 @@ export function Composer({
               <div key={`${file.name}-${i}`} className="flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs">
                 <FileIcon className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="max-w-40 truncate">{file.name}</span>
-                <span className="shrink-0 text-muted-foreground">{formatSize(file.size)}</span>
+                {file.size != null && <span className="shrink-0 text-muted-foreground">{formatSize(file.size)}</span>}
                 <button type="button" onClick={() => setAttachments(attachments.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-foreground pointer-coarse:-m-1 pointer-coarse:p-1">
                   <XIcon className="size-3" />
                 </button>

@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { Composer, type Attachment } from "@/components/chat/composer"
 import { ModelControl, PermissionPicker } from "@/components/chat/pickers"
-import { rpc, uploadFile } from "@/lib/api"
-import { isMobileApp } from "@/lib/platform"
+import { rpc, stageAttachments, type StagedFile } from "@/lib/api"
 import { shortPath } from "@/lib/format"
 import { appInfo, enabledModels, findModel, openSession, route, settings } from "@/lib/store"
 import { t } from "@/lib/i18n"
@@ -30,11 +29,10 @@ export function HomeView() {
   const m = findModel(model.providerId, model.modelId)
   const noModels = enabledModels.value.length === 0
 
-  const start = async (text: string, images: Attachment[], files: File[]) => {
+  const start = async (text: string, images: Attachment[], files: StagedFile[]) => {
     const session = await rpc<SessionInfo>("sessions.create", { cwd, providerId: model.providerId, modelId: model.modelId, thinking, permissionMode: perm })
     try {
-      const uploaded = []
-      for (const file of files) uploaded.push(await uploadFile(session.id, file))
+      const uploaded = await stageAttachments(session.id, files)
       await rpc("chat.send", {
         sessionId: session.id,
         text,
@@ -74,7 +72,6 @@ export function HomeView() {
             draftKey="home"
             onSubmit={start}
             placeholder={t("home.placeholder")}
-            allowFiles={!isMobileApp}
             folder={{ value: cwd, onChange: setCwd }}
             toolbarStart={<PermissionPicker value={perm} onChange={setPerm} />}
             toolbarEnd={

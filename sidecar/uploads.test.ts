@@ -6,7 +6,7 @@ import { FILE_ATTACHMENT_MAX_BYTES } from "../shared/protocol";
 import * as store from "./db";
 import { createSession, forkSession } from "./sessions";
 import { startServer } from "./server";
-import { removeSessionUploads, sanitizeUploadName, sessionUploadDir, storeUpload, uploadRoot } from "./uploads";
+import { importLocalFile, removeSessionUploads, sanitizeUploadName, sessionUploadDir, storeUpload, uploadRoot } from "./uploads";
 
 const streamOf = (text: string) =>
   new ReadableStream<Uint8Array>({
@@ -97,6 +97,17 @@ describe("upload validation helpers", () => {
 });
 
 describe("upload safety", () => {
+  test("a file picked on this Mac is copied into the session folder", () => {
+    const src = path.join(project, "picked.txt")
+    fs.writeFileSync(src, "picked")
+    const att = importLocalFile(dataDir, sessionId, src)
+    expect(att.name).toBe("picked.txt")
+    expect(att.size).toBe(6)
+    expect(fs.readFileSync(att.path, "utf8")).toBe("picked")
+    expect(att.path.startsWith(sessionUploadDir(dataDir, sessionId) + path.sep)).toBe(true)
+    expect(() => importLocalFile(dataDir, sessionId, project)).toThrow()
+  })
+
   test("a symlinked session folder is refused and nothing is written through it", async () => {
     const outside = fs.mkdtempSync(path.join(os.tmpdir(), "kestrel-upload-outside-"));
     fs.writeFileSync(path.join(outside, "keep.txt"), "keep");

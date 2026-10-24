@@ -15,7 +15,7 @@ import { fetchRemoteModels, modelDefaults, PROVIDER_PRESETS } from "./providers"
 import { createSession, exportMarkdown, forkSession, newId } from "./sessions";
 import { historyStatus, rebuildHistory, setHistorySources, syncHistory } from "./history";
 import { discoverSkills, listSlashCommands } from "./skills";
-import { describeLocalFiles, removeSessionUploads, storeUpload, UploadError } from "./uploads";
+import { describeLocalFiles, importLocalFile, removeSessionUploads, storeUpload, UploadError } from "./uploads";
 import type { Server, WebSocketHandler } from "bun";
 import { generateText } from "ai";
 import { languageModel } from "./providers";
@@ -301,6 +301,8 @@ const handlers: Record<string, Handler> = {
     if (!Array.isArray(paths) || !paths.length) return [];
     return describeLocalFiles(paths);
   },
+  /** Copies a file the desktop user picked into the session. A phone uploads bytes instead; it must not name Mac paths. */
+  "files.import": ({ sessionId, path: filePath }: { sessionId: string; path: string }) => importLocalFile(appInfo.dataDir, sessionId, filePath),
   "fs.recentDirs": () => {
     const rows = store.listSessions({}).map((s) => s.cwd);
     return [...new Set(rows)].slice(0, 12).map(collapseHome);
@@ -325,7 +327,7 @@ export function registerHandlers(extra: Record<string, Handler>) {
 // A paired phone gets the full agent API, but must not be able to pair or revoke devices.
 // files.describe turns an arbitrary path into a file's name and size, so it stays on the desktop:
 // a paired phone uploads through /upload instead, and must not be able to probe the Mac's files.
-const localOnly = (method: string) => method.startsWith("remote.") || method === "files.describe";
+const localOnly = (method: string) => method.startsWith("remote.") || method === "files.describe" || method === "files.import";
 
 async function dispatch(body: any, caller: Caller, headers: Record<string, string>): Promise<Response> {
   const method = String(body?.method ?? "");
