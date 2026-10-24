@@ -1,4 +1,4 @@
-import type { ServerEvent } from "@shared/protocol"
+import type { FileAttachment, ServerEvent } from "@shared/protocol"
 import { isMobileApp, isTauri } from "./platform"
 
 export { isTauri }
@@ -17,6 +17,7 @@ interface Transport {
   rpc(method: string, params: unknown): Promise<unknown>
   /** Resolves once the event stream is live; `onClose` fires when it drops. */
   openEvents(onEvent: (e: ServerEvent) => void, onClose: (code?: number) => void): Promise<() => void>
+  upload?(sessionId: string, file: File): Promise<FileAttachment>
 }
 
 function httpTransport(): Transport {
@@ -82,6 +83,16 @@ function httpTransport(): Transport {
         ws.close()
       }
     },
+    async upload(sessionId, file) {
+      await backend()
+      const form = new FormData()
+      form.set("sessionId", sessionId)
+      form.set("file", file)
+      const res = await fetch(`${base}/upload`, { method: "POST", headers: { "x-kestrel-token": token }, body: form })
+      const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+      if (!res.ok || body.error) throw new RpcError(body.error ?? `HTTP ${res.status}`)
+      return body as FileAttachment
+    },
   }
 }
 
@@ -130,6 +141,12 @@ const transport = isMobileApp ? nativeTransport() : httpTransport()
 
 export function rpc<T = any>(method: string, params: unknown = {}): Promise<T> {
   return transport.rpc(method, params) as Promise<T>
+}
+
+/** Sends a file to the desktop's per-session upload folder. The phone has no such path. */
+export async function uploadFile(sessionId: string, file: File): Promise<FileAttachment> {
+  if (!transport.upload) throw new RpcError("File upload is not available on this device")
+  return transport.upload(sessionId, file)
 }
 
 // ---------- event stream ----------

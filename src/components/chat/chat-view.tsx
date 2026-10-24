@@ -32,16 +32,16 @@ import { QuestionCard } from "./question-card"
 import { userText } from "./messages"
 import { Transcript } from "./transcript"
 import { ViewPicker } from "./view-picker"
-import { CwdPicker, ModelPicker, PermissionPicker, ThinkingPicker } from "./pickers"
+import { ModelControl, PermissionPicker } from "./pickers"
 import { ContextMeter } from "./context-meter"
 import { TodoList } from "./tool-call"
-import { rpc } from "@/lib/api"
+import { rpc, uploadFile } from "@/lib/api"
+import { isMobileApp } from "@/lib/platform"
 import { downloadText } from "@/lib/download"
 import { shortPath } from "@/lib/format"
 import { appInfo, createSession, detailSignal, enabledModels, findModel, loadDetail, openSession, settings } from "@/lib/store"
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom"
 import { useMediaQuery } from "@/hooks/use-media-query"
-import { isMobileApp } from "@/lib/platform"
 import { cn } from "@/lib/utils"
 import { t } from "@/lib/i18n"
 
@@ -118,19 +118,21 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const model = findModel(s.providerId, s.modelId)
   const update = (patch: Partial<SessionInfo>) => rpc("sessions.update", { id: s.id, patch }).catch((e) => toast.error(e.message))
 
-  const send = async (text: string, images: Attachment[]) => {
-    const imgs = images.map(({ data, mimeType }) => ({ type: "image", data, mimeType }))
-    follow()
-    if (editing) {
-      await rpc("chat.edit", { sessionId: s.id, seq: editing.seq, text, images: imgs })
-      setEditing(null)
-      return
-    }
-    if (!enabledModels.value.length) {
+  const send = async (text: string, images: Attachment[], files: File[]) => {
+    if (!editing && !enabledModels.value.length) {
       toast.error(t("chat.addProviderFirst"))
       return false
     }
-    await rpc("chat.send", { sessionId: s.id, text, images: imgs })
+    const imgs = images.map(({ data, mimeType }) => ({ type: "image", data, mimeType }))
+    const uploaded = []
+    for (const file of files) uploaded.push(await uploadFile(s.id, file))
+    follow()
+    if (editing) {
+      await rpc("chat.edit", { sessionId: s.id, seq: editing.seq, text, images: imgs, files: uploaded })
+      setEditing(null)
+      return
+    }
+    await rpc("chat.send", { sessionId: s.id, text, images: imgs, files: uploaded })
   }
 
   const fork = async (seq: number) => {
@@ -316,13 +318,17 @@ export function ChatView({ sessionId }: { sessionId: string }) {
                 onSubmit={send}
                 onAbort={() => rpc("chat.abort", { sessionId: s.id })}
                 onBuiltin={onBuiltin}
-                toolbar={
-                  <>
-                    <PermissionPicker value={s.permissionMode} onChange={(v: PermissionMode) => update({ permissionMode: v })} />
-                    <ModelPicker providerId={s.providerId} modelId={s.modelId} onChange={(providerId, modelId) => update({ providerId, modelId })} />
-                    {model?.reasoning && <ThinkingPicker value={s.thinking} onChange={(v: ThinkingLevel) => update({ thinking: v })} />}
-                    {s.messageCount === 0 && <CwdPicker value={shortPath(s.cwd, appInfo.value?.home)} onChange={(cwd) => update({ cwd })} />}
-                  </>
+                allowFiles={!isMobileApp}
+                folder={s.messageCount === 0 ? { value: shortPath(s.cwd, appInfo.value?.home), onChange: (cwd) => update({ cwd }) } : undefined}
+                toolbarStart={<PermissionPicker value={s.permissionMode} onChange={(v: PermissionMode) => update({ permissionMode: v })} />}
+                toolbarEnd={
+                  <ModelControl
+                    providerId={s.providerId}
+                    modelId={s.modelId}
+                    onChange={(providerId, modelId) => update({ providerId, modelId })}
+                    thinking={model?.reasoning ? s.thinking : null}
+                    onThinking={(v: ThinkingLevel) => update({ thinking: v })}
+                  />
                 }
               />
             </div>

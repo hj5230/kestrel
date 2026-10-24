@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact"
 import { useEffect, useState } from "preact/hooks"
 import {
   BrainIcon,
@@ -15,6 +16,7 @@ import {
 import type { PermissionMode, ThinkingLevel } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command"
 import {
   DropdownMenu,
@@ -25,12 +27,97 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { rpc } from "@/lib/api"
-import { isDesktopApp } from "@/lib/platform"
+import { isDesktopApp, isTouch } from "@/lib/platform"
 import { pickDirectory } from "@/lib/download"
 import { basename, formatTokens, shortPath } from "@/lib/format"
 import { appInfo, enabledModels, findModel, providers, route } from "@/lib/store"
 import { cn } from "@/lib/utils"
 import { t, type MessageKey } from "@/lib/i18n"
+
+function ModelList({
+  providerId,
+  modelId,
+  onChange,
+}: {
+  providerId: string
+  modelId: string
+  onChange: (providerId: string, modelId: string) => void
+}) {
+  const groups = providers.value
+    .filter((p) => p.enabled)
+    .map((p) => ({ p, models: enabledModels.value.filter((m) => m.providerId === p.id) }))
+    .filter((g) => g.models.length)
+  return (
+    <Command>
+      <CommandInput placeholder={t("picker.searchModels")} />
+      <CommandList className="max-h-80">
+        <CommandEmpty>{t("picker.noModels")}</CommandEmpty>
+        {groups.map(({ p, models }) => (
+          <CommandGroup key={p.id} heading={p.name}>
+            {models.map((m) => (
+              <CommandItem
+                key={m.id}
+                value={`${p.name} ${m.name} ${m.id}`}
+                onSelect={() => onChange(m.providerId, m.id)}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="truncate">{m.name}</div>
+                  <div className="truncate text-[11px] text-muted-foreground">
+                    {m.id} · {t("picker.context", { n: formatTokens(m.contextWindow) })}
+                    {m.reasoning ? ` · ${t("picker.reasoning")}` : ""}
+                    {m.vision ? ` · ${t("picker.vision")}` : ""}
+                  </div>
+                </div>
+                {m.providerId === providerId && m.id === modelId && <CheckIcon className="size-4" />}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ))}
+        <CommandSeparator />
+        <CommandGroup>
+          <CommandItem onSelect={() => onChange("", "")}>
+            <Settings2Icon />
+            {t("picker.manage")}
+          </CommandItem>
+        </CommandGroup>
+      </CommandList>
+    </Command>
+  )
+}
+
+/** A popover on desktop, a bottom sheet on touch, where a floating panel ends up behind the keyboard. */
+function Panel({
+  open,
+  onOpenChange,
+  align = "start",
+  trigger,
+  children,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  align?: "start" | "end"
+  trigger: ComponentChildren
+  children: ComponentChildren
+}) {
+  if (isTouch) {
+    return (
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetTrigger asChild>{trigger}</SheetTrigger>
+        <SheetContent side="bottom" showCloseButton={false} className="max-h-[75vh] gap-0 rounded-t-2xl p-0">
+          {children}
+        </SheetContent>
+      </Sheet>
+    )
+  }
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align={align}>
+        {children}
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 export function ModelPicker({
   providerId,
@@ -43,67 +130,101 @@ export function ModelPicker({
 }) {
   const [open, setOpen] = useState(false)
   const current = findModel(providerId, modelId)
-  const groups = providers.value
-    .filter((p) => p.enabled)
-    .map((p) => ({ p, models: enabledModels.value.filter((m) => m.providerId === p.id) }))
-    .filter((g) => g.models.length)
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+    <Panel
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
         <Button variant="ghost" size="sm" className="max-w-56 gap-1 px-2 text-muted-foreground hover:text-foreground">
           <span className="truncate">{current?.name ?? (modelId || t("picker.selectModel"))}</span>
           <ChevronDownIcon className="opacity-60" />
         </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="start">
-        <Command>
-          <CommandInput placeholder={t("picker.searchModels")} />
-          <CommandList className="max-h-80">
-            <CommandEmpty>{t("picker.noModels")}</CommandEmpty>
-            {groups.map(({ p, models }) => (
-              <CommandGroup key={p.id} heading={p.name}>
-                {models.map((m) => (
-                  <CommandItem
-                    key={m.id}
-                    value={`${p.name} ${m.name} ${m.id}`}
-                    onSelect={() => {
-                      onChange(m.providerId, m.id)
-                      setOpen(false)
-                    }}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate">{m.name}</div>
-                      <div className="truncate text-[11px] text-muted-foreground">
-                        {m.id} · {t("picker.context", { n: formatTokens(m.contextWindow) })}
-                        {m.reasoning ? ` · ${t("picker.reasoning")}` : ""}
-                        {m.vision ? ` · ${t("picker.vision")}` : ""}
-                      </div>
-                    </div>
-                    {m.providerId === providerId && m.id === modelId && <CheckIcon className="size-4" />}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            ))}
-            <CommandSeparator />
-            <CommandGroup>
-              <CommandItem
-                onSelect={() => {
-                  setOpen(false)
-                  route.value = { name: "settings", tab: "models" }
-                }}
-              >
-                <Settings2Icon />
-                {t("picker.manage")}
-              </CommandItem>
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+      }
+    >
+      <ModelList
+        providerId={providerId}
+        modelId={modelId}
+        onChange={(p, m) => {
+          setOpen(false)
+          if (!p) route.value = { name: "settings", tab: "models" }
+          else onChange(p, m)
+        }}
+      />
+    </Panel>
   )
 }
 
 const THINKING: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"]
+
+/** The model and its reasoning effort as one button. The effort only shows for a model that supports it. */
+export function ModelControl({
+  providerId,
+  modelId,
+  onChange,
+  thinking,
+  onThinking,
+}: {
+  providerId: string
+  modelId: string
+  onChange: (providerId: string, modelId: string) => void
+  thinking: ThinkingLevel | null
+  onThinking: (v: ThinkingLevel) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const current = findModel(providerId, modelId)
+  return (
+    <Panel
+      open={open}
+      onOpenChange={setOpen}
+      align="end"
+      trigger={
+        <Button variant="ghost" size="sm" className="max-w-[42vw] gap-1 px-2 text-muted-foreground hover:text-foreground pointer-coarse:min-h-10 sm:max-w-56">
+          <span className="truncate">{current?.name ?? (modelId || t("picker.selectModel"))}</span>
+          {thinking && (
+            <>
+              <span className="hidden shrink-0 sm:inline">· {t(`thinking.${thinking}` as MessageKey)}</span>
+              <span className="size-1.5 shrink-0 rounded-full bg-current opacity-70 sm:hidden" />
+            </>
+          )}
+          <ChevronDownIcon className="opacity-60" />
+        </Button>
+      }
+    >
+      <ModelList
+        providerId={providerId}
+        modelId={modelId}
+        onChange={(p, m) => {
+          setOpen(false)
+          if (!p) route.value = { name: "settings", tab: "models" }
+          else onChange(p, m)
+        }}
+      />
+      {thinking && (
+        <div className="border-t p-2.5">
+          <div className="mb-1.5 text-xs text-muted-foreground">{t("picker.thinking")}</div>
+          <div className="flex flex-wrap gap-1">
+            {THINKING.map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => {
+                  onThinking(v)
+                  setOpen(false)
+                }}
+                className={cn(
+                  "rounded-md px-2 py-1 text-xs pointer-coarse:min-h-10",
+                  v === thinking ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {t(`thinking.${v}` as MessageKey)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </Panel>
+  )
+}
 
 export function ThinkingPicker({ value, onChange }: { value: ThinkingLevel; onChange: (v: ThinkingLevel) => void }) {
   const label = t(`thinking.${value}` as MessageKey)
@@ -149,7 +270,7 @@ export function PermissionPicker({ value, onChange }: { value: PermissionMode; o
           variant="ghost"
           size="sm"
           className={cn(
-            "gap-1 px-2 text-muted-foreground hover:text-foreground",
+            "gap-1 px-2 text-muted-foreground hover:text-foreground pointer-coarse:min-h-10",
             value === "bypass" && "text-destructive hover:text-destructive",
           )}
         >
@@ -174,15 +295,15 @@ export function PermissionPicker({ value, onChange }: { value: PermissionMode; o
   )
 }
 
-export function CwdPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [open, setOpen] = useState(false)
+/** The folder browser itself, so it can sit inside another panel instead of its own popover. */
+export function CwdBrowser({ value, onChange, onDone }: { value: string; onChange: (v: string) => void; onDone?: () => void }) {
   const [query, setQuery] = useState("")
   const [recent, setRecent] = useState<string[]>([])
   const [suggest, setSuggest] = useState<string[]>([])
   const home = appInfo.value?.home
   useEffect(() => {
-    if (open) rpc<string[]>("fs.recentDirs").then(setRecent)
-  }, [open])
+    rpc<string[]>("fs.recentDirs").then(setRecent)
+  }, [])
   useEffect(() => {
     if (!query.includes("/") && !query.startsWith("~")) {
       setSuggest([])
@@ -193,19 +314,10 @@ export function CwdPicker({ value, onChange }: { value: string; onChange: (v: st
   }, [query])
   const choose = (p: string) => {
     onChange(p)
-    setOpen(false)
     setQuery("")
+    onDone?.()
   }
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="max-w-60 gap-1 px-2 text-muted-foreground hover:text-foreground" title={value}>
-          <FolderIcon />
-          <span className="truncate">{basename(value) || "~"}</span>
-          <ChevronDownIcon className="opacity-60" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-96 p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput placeholder={t("picker.pathPlaceholder")} value={query} onValueChange={setQuery} />
           <CommandList className="max-h-80">
@@ -257,6 +369,22 @@ export function CwdPicker({ value, onChange }: { value: string; onChange: (v: st
             )}
           </CommandList>
         </Command>
+  )
+}
+
+export function CwdPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="sm" title={value} className="max-w-60 gap-1 px-2 text-muted-foreground hover:text-foreground">
+          <FolderIcon />
+          <span className="truncate">{basename(value) || "~"}</span>
+          <ChevronDownIcon className="opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[min(24rem,calc(100vw-1.5rem))] p-0" align="start">
+        {open && <CwdBrowser value={value} onChange={onChange} onDone={() => setOpen(false)} />}
       </PopoverContent>
     </Popover>
   )

@@ -1,15 +1,18 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks"
 import type { ComponentChildren } from "preact"
-import { ArrowUpIcon, FileIcon, ImagePlusIcon, SparklesIcon, SquareIcon, TerminalSquareIcon, XIcon, ZapIcon } from "lucide-react"
-import type { SlashCommandInfo } from "@shared/protocol"
+import { ArrowUpIcon, ChevronLeftIcon, FileIcon, FolderIcon, ImagePlusIcon, PaperclipIcon, PlusIcon, SparklesIcon, SquareIcon, TerminalSquareIcon, XIcon, ZapIcon } from "lucide-react"
+import { FILE_ATTACHMENT_MAX_BYTES, type SlashCommandInfo } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { rpc } from "@/lib/api"
 import { settings } from "@/lib/store"
 import { isTouch } from "@/lib/platform"
 import { cn } from "@/lib/utils"
 import { t, type MessageKey } from "@/lib/i18n"
+import { CwdBrowser } from "./pickers"
 import { toast } from "sonner"
 
 export interface Attachment {
@@ -28,6 +31,12 @@ interface MenuItem {
 
 const KIND_ICON = { builtin: TerminalSquareIcon, prompt: ZapIcon, skill: SparklesIcon, file: FileIcon }
 
+
+function formatSize(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
+  return `${Math.round((n / (1024 * 1024)) * 10) / 10} MB`
+}
 
 function readImage(file: File): Promise<Attachment> {
   return new Promise((resolve, reject) => {
@@ -49,7 +58,10 @@ export function Composer({
   onSubmit,
   onAbort,
   onBuiltin,
-  toolbar,
+  folder,
+  toolbarStart,
+  toolbarEnd,
+  allowFiles = false,
   draftKey,
   history = [],
   placeholder,
@@ -61,10 +73,17 @@ export function Composer({
   cwd: string
   running?: boolean
   disabled?: boolean
-  onSubmit: (text: string, images: Attachment[]) => Promise<boolean | void> | boolean | void
+  onSubmit: (text: string, images: Attachment[], files: File[]) => Promise<boolean | void> | boolean | void
   onAbort?: () => void
   onBuiltin?: (name: string, args: string) => boolean
-  toolbar?: ComponentChildren
+  /** Where this task runs. Omitted once a session has messages, since the folder is fixed by then. */
+  folder?: { value: string; onChange: (v: string) => void }
+  /** Sits next to the add button. The permission mode. */
+  toolbarStart?: ComponentChildren
+  /** Sits before the send button. The model and its reasoning effort. */
+  toolbarEnd?: ComponentChildren
+  /** File attachments upload to the desktop. The phone has no upload path yet. */
+  allowFiles?: boolean
   draftKey?: string
   history?: string[]
   placeholder?: string
@@ -82,6 +101,9 @@ export function Composer({
     }
   })
   const [images, setImages] = useState<Attachment[]>([])
+  const [attachments, setAttachments] = useState<File[]>([])
+  const [addOpen, setAddOpen] = useState(false)
+  const [pickingFolder, setPickingFolder] = useState(false)
   const [commands, setCommands] = useState<SlashCommandInfo[]>([])
   const [files, setFiles] = useState<string[]>([])
   const [menuIndex, setMenuIndex] = useState(0)
@@ -90,6 +112,7 @@ export function Composer({
   const [histIdx, setHistIdx] = useState(-1)
   const [dragging, setDragging] = useState(false)
   const ta = useRef<HTMLTextAreaElement>(null)
+  const imageInput = useRef<HTMLInputElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const sendKey = settings.value?.sendKey ?? "enter"
 
@@ -195,7 +218,7 @@ export function Composer({
 
   const submit = async () => {
     const value = text.trim()
-    if ((!value && !images.length) || disabled) return
+    if ((!value && !images.length && !attachments.length) || disabled) return
     const builtin = /^\/(\S+)\s*([\s\S]*)$/.exec(value)
     if (builtin && onBuiltin && onBuiltin(builtin[1], builtin[2])) {
       setText("")
@@ -204,27 +227,31 @@ export function Composer({
     }
     const prevText = text
     const prevImages = images
+    const prevFiles = attachments
     setText("")
     latestText.current = ""
     persistDraft("")
     setImages([])
+    setAttachments([])
     setHistIdx(-1)
     try {
-      const ok = await onSubmit(value, prevImages)
+      const ok = await onSubmit(value, prevImages, prevFiles)
       if (ok === false) {
         setText(prevText)
         persistDraft(prevText)
         setImages(prevImages)
+        setAttachments(prevFiles)
       }
     } catch (e: any) {
       toast.error(e?.message ?? String(e))
       setText(prevText)
       persistDraft(prevText)
       setImages(prevImages)
+      setAttachments(prevFiles)
     }
   }
 
-  const addFiles = async (list: FileList | File[]) => {
+  const addImages = async (list: FileList | File[]) => {
     const imgs = [...list].filter((f) => f.type.startsWith("image/"))
     if (!imgs.length) return
     try {
@@ -233,6 +260,14 @@ export function Composer({
     } catch (e: any) {
       toast.error(e.message)
     }
+  }
+
+  const addAttachments = (list: FileList | File[]) => {
+    const next = [...list].filter((f) => !f.type.startsWith("image/"))
+    const tooBig = next.filter((f) => f.size > FILE_ATTACHMENT_MAX_BYTES)
+    if (tooBig.length) toast.error(t("composer.fileTooLarge"))
+    const ok = next.filter((f) => f.size <= FILE_ATTACHMENT_MAX_BYTES)
+    if (ok.length) setAttachments((cur) => [...cur, ...ok].slice(0, 8))
   }
 
   const onKeyDown = (e: KeyboardEvent) => {
@@ -292,7 +327,78 @@ export function Composer({
     }
   }
 
-  const canSend = (text.trim().length > 0 || images.length > 0) && !disabled
+  const canSend = (text.trim().length > 0 || images.length > 0 || attachments.length > 0) && !disabled
+
+  const addButton = (
+    <Button variant="ghost" size="icon-sm" className="text-muted-foreground pointer-coarse:min-h-10 pointer-coarse:min-w-10" aria-label={t("composer.add")}>
+      <PlusIcon />
+    </Button>
+  )
+  const addItems = (
+    <div className="grid p-1">
+      <button
+        type="button"
+        className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-accent pointer-coarse:min-h-11"
+        onClick={() => {
+          setAddOpen(false)
+          imageInput.current?.click()
+        }}
+      >
+        <ImagePlusIcon className="size-4 text-muted-foreground" />
+        {t("composer.addImage")}
+      </button>
+      {allowFiles && (
+        <button
+          type="button"
+          className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-accent pointer-coarse:min-h-11"
+          onClick={() => {
+            setAddOpen(false)
+            fileInput.current?.click()
+          }}
+        >
+          <PaperclipIcon className="size-4 text-muted-foreground" />
+          {t("composer.addFile")}
+        </button>
+      )}
+      {folder && (
+        <button
+          type="button"
+          className="flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-accent pointer-coarse:min-h-11"
+          onClick={() => setPickingFolder(true)}
+        >
+          <FolderIcon className="size-4 shrink-0 text-muted-foreground" />
+          <span className="shrink-0">{t("composer.folder")}</span>
+          <span className="min-w-0 flex-1 truncate text-right text-xs text-muted-foreground">{folder.value || "~"}</span>
+        </button>
+      )}
+    </div>
+  )
+  const closeAdd = (open: boolean) => {
+    setAddOpen(open)
+    if (!open) setPickingFolder(false)
+  }
+  const addPanel = pickingFolder && folder ? (
+    <div>
+      <button
+        type="button"
+        className="flex items-center gap-1.5 px-2.5 py-2 text-sm text-muted-foreground hover:text-foreground pointer-coarse:min-h-11"
+        onClick={() => setPickingFolder(false)}
+      >
+        <ChevronLeftIcon className="size-4" />
+        {t("composer.folder")}
+      </button>
+      <CwdBrowser
+        value={folder.value}
+        onChange={folder.onChange}
+        onDone={() => {
+          setPickingFolder(false)
+          setAddOpen(false)
+        }}
+      />
+    </div>
+  ) : (
+    addItems
+  )
 
   return (
     <div className="relative">
@@ -335,10 +441,13 @@ export function Composer({
         onDrop={(e) => {
           e.preventDefault()
           setDragging(false)
-          if (e.dataTransfer?.files) addFiles(e.dataTransfer.files)
+          if (e.dataTransfer?.files) {
+            addImages(e.dataTransfer.files)
+            if (allowFiles) addAttachments(e.dataTransfer.files)
+          }
         }}
       >
-        {images.length > 0 && (
+        {(images.length > 0 || attachments.length > 0) && (
           <div className="flex flex-wrap gap-2 px-3 pt-3">
             {images.map((img, i) => (
               <div key={i} className="group/img relative">
@@ -348,6 +457,16 @@ export function Composer({
                   onClick={() => setImages(images.filter((_, j) => j !== i))}
                   className="absolute -top-1.5 -right-1.5 hidden size-5 items-center justify-center rounded-full border bg-background shadow group-hover/img:flex pointer-coarse:-top-2.5 pointer-coarse:-right-2.5 pointer-coarse:flex pointer-coarse:size-7"
                 >
+                  <XIcon className="size-3" />
+                </button>
+              </div>
+            ))}
+            {attachments.map((file, i) => (
+              <div key={`${file.name}-${i}`} className="flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs">
+                <FileIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="max-w-40 truncate">{file.name}</span>
+                <span className="shrink-0 text-muted-foreground">{formatSize(file.size)}</span>
+                <button type="button" onClick={() => setAttachments(attachments.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-foreground pointer-coarse:-m-1 pointer-coarse:p-1">
                   <XIcon className="size-3" />
                 </button>
               </div>
@@ -374,35 +493,51 @@ export function Composer({
               const imgs = [...items].filter((f) => f.type.startsWith("image/"))
               if (imgs.length) {
                 e.preventDefault()
-                addFiles(imgs)
+                addImages(imgs)
               }
             }
           }}
         />
-        <div data-slot="composer-toolbar" className="flex items-center gap-0.5 px-2 pb-2">
-          {/* Phones wrap pickers in the touch layer; actions keep their own reserved space. */}
-          <div data-slot="composer-pickers" className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={t("composer.addImage")} onClick={() => fileInput.current?.click()}>
-                  <ImagePlusIcon />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{t("composer.addImage")}</TooltipContent>
-            </Tooltip>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                if (e.currentTarget.files) addFiles(e.currentTarget.files)
-                e.currentTarget.value = ""
-              }}
-            />
-            {toolbar}
-          </div>
+        <div data-slot="composer-toolbar" className="flex items-center gap-0.5 px-1.5 pb-1.5">
+          {isTouch ? (
+            <Sheet open={addOpen} onOpenChange={closeAdd}>
+              <SheetTrigger asChild>{addButton}</SheetTrigger>
+              <SheetContent side="bottom" showCloseButton={false} className="max-h-[75vh] gap-0 rounded-t-2xl p-1">
+                {addPanel}
+              </SheetContent>
+            </Sheet>
+          ) : (
+            <Popover open={addOpen} onOpenChange={closeAdd}>
+              <PopoverTrigger asChild>{addButton}</PopoverTrigger>
+              <PopoverContent align="start" side="top" className={cn("p-0", pickingFolder ? "w-[min(24rem,calc(100vw-1.5rem))]" : "w-64")}>
+                {addPanel}
+              </PopoverContent>
+            </Popover>
+          )}
+          <input
+            ref={imageInput}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.currentTarget.files) addImages(e.currentTarget.files)
+              e.currentTarget.value = ""
+            }}
+          />
+          <input
+            ref={fileInput}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.currentTarget.files) addAttachments(e.currentTarget.files)
+              e.currentTarget.value = ""
+            }}
+          />
+          {toolbarStart}
+          <div className="min-w-0 flex-1" />
+          {toolbarEnd}
           <div className="flex shrink-0 items-center gap-1.5 pl-1">
             {running && (
               <Tooltip>

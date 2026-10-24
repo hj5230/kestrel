@@ -4,8 +4,9 @@ import type { PermissionMode, SessionInfo, ThinkingLevel } from "@shared/protoco
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { Composer, type Attachment } from "@/components/chat/composer"
-import { CwdPicker, ModelPicker, PermissionPicker, ThinkingPicker } from "@/components/chat/pickers"
-import { rpc } from "@/lib/api"
+import { ModelControl, PermissionPicker } from "@/components/chat/pickers"
+import { rpc, uploadFile } from "@/lib/api"
+import { isMobileApp } from "@/lib/platform"
 import { shortPath } from "@/lib/format"
 import { appInfo, enabledModels, findModel, openSession, route, settings } from "@/lib/store"
 import { t } from "@/lib/i18n"
@@ -29,10 +30,22 @@ export function HomeView() {
   const m = findModel(model.providerId, model.modelId)
   const noModels = enabledModels.value.length === 0
 
-  const start = async (text: string, images: Attachment[]) => {
+  const start = async (text: string, images: Attachment[], files: File[]) => {
     const session = await rpc<SessionInfo>("sessions.create", { cwd, providerId: model.providerId, modelId: model.modelId, thinking, permissionMode: perm })
+    try {
+      const uploaded = []
+      for (const file of files) uploaded.push(await uploadFile(session.id, file))
+      await rpc("chat.send", {
+        sessionId: session.id,
+        text,
+        images: images.map(({ data, mimeType }) => ({ type: "image", data, mimeType })),
+        files: uploaded,
+      })
+    } catch (e) {
+      await rpc("sessions.delete", { id: session.id }).catch(() => {})
+      throw e
+    }
     openSession(session.id)
-    await rpc("chat.send", { sessionId: session.id, text, images: images.map(({ data, mimeType }) => ({ type: "image", data, mimeType })) })
   }
 
   return (
@@ -61,13 +74,17 @@ export function HomeView() {
             draftKey="home"
             onSubmit={start}
             placeholder={t("home.placeholder")}
-            toolbar={
-              <>
-                <CwdPicker value={cwd} onChange={setCwd} />
-                <PermissionPicker value={perm} onChange={setPerm} />
-                <ModelPicker providerId={model.providerId} modelId={model.modelId} onChange={(providerId, modelId) => setModel({ providerId, modelId })} />
-                {m?.reasoning && <ThinkingPicker value={thinking} onChange={setThinking} />}
-              </>
+            allowFiles={!isMobileApp}
+            folder={{ value: cwd, onChange: setCwd }}
+            toolbarStart={<PermissionPicker value={perm} onChange={setPerm} />}
+            toolbarEnd={
+              <ModelControl
+                providerId={model.providerId}
+                modelId={model.modelId}
+                onChange={(providerId, modelId) => setModel({ providerId, modelId })}
+                thinking={m?.reasoning ? thinking : null}
+                onThinking={setThinking}
+              />
             }
           />
         </div>
