@@ -48,7 +48,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Kbd } from "@/components/ui/kbd"
-import { Logo } from "@/components/logo"
 import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
@@ -237,7 +236,6 @@ export function AppSidebar() {
       <SidebarHeader className="gap-3 pt-0">
         <div data-tauri-drag-region={isDesktopApp || undefined} className={cn("shrink-0", isMobileApp ? "h-[max(0.5rem,env(safe-area-inset-top))]" : "h-9")} />
         <div className="flex items-center gap-2 px-1.5">
-          <Logo className="size-7" />
           <span className="font-semibold tracking-tight">Kestrel</span>
           <div className="ml-auto flex items-center">
             <Tooltip>

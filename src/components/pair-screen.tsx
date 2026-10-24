@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Spinner } from "@/components/ui/spinner"
-import { Logo } from "@/components/logo"
 import { t } from "@/lib/i18n"
 import { defaultDeviceName, describePairingError, pairingErrorDetail, pairWithMac, scanPairingCode } from "@/lib/pairing"
 import { adoptPairedMac, addingMac, deviceRevoked, pairedMac, pairedMacs, switchMac } from "@/lib/store"
@@ -55,7 +54,6 @@ export function PairScreen() {
           </Button>
         )}
         <div className="flex flex-col items-center gap-3 text-center">
-          <Logo className="size-14" />
           <h1 className="text-2xl font-semibold tracking-tight">{addingMac.value ? t("pair.addTitle") : t("pair.title")}</h1>
           <p className="text-sm text-muted-foreground">{addingMac.value ? t("pair.addSub") : t("pair.sub")}</p>
         </div>
