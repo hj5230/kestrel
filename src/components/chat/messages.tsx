@@ -5,6 +5,7 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   CopyIcon,
+  FileIcon,
   GitBranchIcon,
   PencilIcon,
   RotateCcwIcon,
@@ -45,14 +46,20 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
+/** The runner appends one "[Attached file]" block per file to the text the model sees. The transcript shows chips instead. */
+const ATTACHED_BLOCK = /\n*\[Attached file\]\n- path: [\s\S]*$/
+
 export function userText(m: UserMsg): string {
   const display = (m as any).display
   if (display) return display
-  if (typeof m.content === "string") return m.content
-  return m.content
-    .filter((c) => c.type === "text")
-    .map((c: any) => c.text)
-    .join("\n")
+  const raw =
+    typeof m.content === "string"
+      ? m.content
+      : m.content
+          .filter((c) => c.type === "text")
+          .map((c: any) => c.text)
+          .join("\n")
+  return m.files?.length ? raw.replace(ATTACHED_BLOCK, "") : raw
 }
 
 function userImages(m: UserMsg) {
@@ -129,6 +136,16 @@ export function UserMessage({
               </button>
             )
           })}
+        </div>
+      )}
+      {m.files && m.files.length > 0 && (
+        <div className="flex flex-wrap justify-end gap-2">
+          {m.files.map((f, i) => (
+            <div key={i} className="flex max-w-64 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs">
+              <FileIcon className="size-3.5 shrink-0 text-muted-foreground" />
+              <span className="truncate">{f.name}</span>
+            </div>
+          ))}
         </div>
       )}
       {text && (
