@@ -164,9 +164,23 @@ fn describe(e: &(dyn std::error::Error + 'static)) -> String {
     out
 }
 
+fn probe_hosts(hosts: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    // The simulator uses this Mac's loopback, but it cannot resolve Bonjour names such as `grid.local`.
+    #[cfg(all(target_os = "ios", target_abi = "sim"))]
+    out.push("127.0.0.1".to_string());
+    for h in hosts {
+        if !out.iter().any(|e| e == h) {
+            out.push(h.clone());
+        }
+    }
+    out
+}
+
 /// First address that completes a pinned TLS handshake and answers HTTP. Any status counts:
 /// /health needs auth, so a 401 still proves this is our Mac. On failure, says why per address.
 async fn probe(client: &reqwest::Client, hosts: &[String], port: u16) -> Result<String, String> {
+    let hosts = probe_hosts(hosts);
     if hosts.is_empty() {
         return Err("unreachable: no addresses".into());
     }
