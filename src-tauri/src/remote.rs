@@ -499,6 +499,46 @@ fn remote_events_disconnect(state: State<'_, Remote>) {
     disconnect_events(&state);
 }
 
+/// iOS puts a shortcut bar (with the up/down arrows and the checkmark) above the keyboard for every
+/// text field inside a WKWebView, and there is no way to turn it off from the page. wry builds the
+/// webview as its own `WryWebView` subclass whose `inputAccessoryView` returns whatever a builder
+/// stored in the object's ivars produces, so a builder that returns nil removes the bar.
+///
+/// The builder lives in a field of `wry`'s private ivar struct, which this fills in after the fact.
+/// `WryWebViewIvars` mirrors that struct field for field, so if wry rearranges it this stops
+/// compiling instead of writing to the wrong place. The slot is only written while it is still
+/// empty, so nothing else holds a reference to it.
+#[cfg(target_os = "ios")]
+fn hide_keyboard_bar(webview: *mut objc2::runtime::AnyObject) {
+    use std::{collections::HashMap, sync::Mutex};
+
+    use objc2::{define_class, rc::Retained, DefinedClass, MainThreadOnly};
+    use objc2_foundation::{NSObjectProtocol, NSUUID};
+    use objc2_ui_kit::UIView;
+
+    /// Same fields, in the same order, as `wry::wkwebview::WryWebViewIvars` on iOS.
+    struct WryWebViewIvars {
+        _is_child: bool,
+        input_accessory_view_builder: Option<Box<dyn Fn(&UIView) -> Option<Retained<UIView>> + 'static>>,
+        _custom_protocol_task_ids: Mutex<HashMap<usize, Retained<NSUUID>>>,
+    }
+
+    // A class defined here only so its ivar offset can stand in for wry's: both store their ivars the
+    // same way, right after the superclass, so the offset depends on UIView and not on the subclass.
+    define_class!(
+        #[unsafe(super(UIView))]
+        #[thread_kind = MainThreadOnly]
+        #[ivars = WryWebViewIvars]
+        struct OffsetProbe;
+    );
+    unsafe impl NSObjectProtocol for OffsetProbe {}
+
+    let ivars = unsafe { &mut *(webview as *mut WryWebViewIvars).byte_add(OffsetProbe::__ivars_offset() as usize) };
+    if ivars.input_accessory_view_builder.is_none() {
+        ivars.input_accessory_view_builder = Some(Box::new(|_| None));
+    }
+}
+
 /// Let the page draw edge to edge. By default the WKWebView's scroll view insets its content by
 /// the safe areas, which shrinks the layout viewport (fixed elements stop short of the bottom);
 /// the frontend already pads for the notch and home indicator with `env(safe-area-inset-*)`.
@@ -511,6 +551,8 @@ fn edge_to_edge<R: Runtime>(app: &tauri::App<R>) {
         let wk = webview.inner() as *mut AnyObject;
         let scroll: *mut AnyObject = msg_send![wk, scrollView];
         let _: () = msg_send![scroll, setContentInsetAdjustmentBehavior: UI_SCROLL_VIEW_CONTENT_INSET_ADJUSTMENT_NEVER];
+        #[cfg(target_os = "ios")]
+        hide_keyboard_bar(wk);
     });
 }
 
