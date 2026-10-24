@@ -28,6 +28,7 @@ import { evaluatePermission, isBroadEntry, type PermissionResult } from "../perm
 import { languageModel, resolveModel, toPiModel } from "../providers";
 import { costOf, parseModelSetting, recordSideUsage, sideModel, usageOf } from "../side-model";
 import { createSession, newId } from "../sessions";
+import { clampTitle } from "../titles";
 import { discoverSkills, expandSlashCommand } from "../skills";
 import { createBashOutputTool, createBashTool, createKillShellTool, killSessionShells } from "../tools/bash";
 import { createAskUserTool, sanitizeAnswers } from "../tools/ask";
@@ -588,7 +589,7 @@ export class SessionRunner {
     const text: string =
       firstUser.display ??
       (typeof firstUser.content === "string" ? firstUser.content : firstUser.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n"));
-    const fallback = text.replace(/\s+/g, " ").trim().slice(0, 40) || st("untitled");
+    const fallback = clampTitle(text, st("untitled")) || st("untitled");
     this.titlePending = true;
     let side: ReturnType<typeof sideModel>;
     try {
@@ -600,14 +601,17 @@ export class SessionRunner {
     generateText({
       model: languageModel(side.providerId, side.modelId),
       system:
-        "Generate a concise title for the conversation that starts with the user's message below. Use the user's language. At most 16 Chinese characters or 7 English words. No quotes, no punctuation at the end. Output only the title.",
+        "Write a very short title for the conversation that starts with the user's message below. Use the user's language. " +
+        "Hard limit: 12 Chinese characters, or 4 English words (about 24 characters); shorter is better. " +
+        "Name the topic as a noun phrase, not a sentence: no 'Help me…', no quotes, no punctuation at the end. " +
+        "Examples: 重构解析器 / 修复登录超时 / Parser refactor / Login timeout fix. Output only the title.",
       prompt: text.slice(0, 3000),
       maxRetries: 1,
       abortSignal: AbortSignal.timeout(30000),
     })
       .then((r) => {
         recordSideUsage(this.id, "title", side, usageOf(r.usage));
-        return r.text.replace(/^["'「『#\s]+|["'」』。.\s]+$/g, "").split("\n")[0].slice(0, 60) || fallback;
+        return clampTitle(r.text, fallback);
       })
       .catch(() => fallback)
       .then((title) => {

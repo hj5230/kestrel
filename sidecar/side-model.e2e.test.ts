@@ -26,12 +26,12 @@ beforeAll(() => {
       const body: any = await req.json();
       if (body.stream) return sse([chunk({ role: "assistant", content: "hello there" }), chunk({}, "stop")]);
       sideCalls.push(body.model);
-      const text = body.model === "cheap" ? "Cheap output" : "Expensive output";
+      const text = body.model === "cheap" ? "Cheap output" : body.model === "verbose" ? "标题：帮我梳理一下这个仓库的构建流程并且修复所有失败的测试用例。" : "Expensive output";
       return Response.json({ id: "t", object: "chat.completion", created: 1, model: body.model, choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: "stop" }], usage: { prompt_tokens: 1000, completion_tokens: 100, total_tokens: 1100 } });
     },
   });
   store.upsertProvider({ id: "mock", kind: "openai-compatible", name: "mock", baseUrl: `http://127.0.0.1:${server.port}/v1`, apiKey: "x", headers: {}, enabled: true, createdAt: Date.now() });
-  for (const [id, price] of [["main", 3], ["cheap", 1]] as const) {
+  for (const [id, price] of [["main", 3], ["cheap", 1], ["verbose", 1]] as const) {
     store.upsertModel({ providerId: "mock", id, name: id, contextWindow: 100000, maxTokens: 4096, reasoning: false, vision: false, cost: { input: price, output: price, cacheRead: 0, cacheWrite: 0 }, enabled: true });
   }
 });
@@ -74,6 +74,14 @@ test("with nothing chosen (or a removed provider) they fall back to the session'
   for (let i = 0; i < 50 && !store.getSession(info.id)?.title; i++) await Bun.sleep(50);
   await runner.compact({ auto: false, full: true });
   expect(sideCalls).toEqual(["main", "main"]);
+}, 30000);
+
+test("a title the model makes too long is cut to fit the sidebar", async () => {
+  store.saveSettings({ titleModel: "mock::verbose" });
+  const info = createSession({ cwd: project, providerId: "mock", modelId: "main", permissionMode: "auto" });
+  await getRunner(info.id).sendAndWait("please tidy up the build");
+  for (let i = 0; i < 50 && !store.getSession(info.id)?.title; i++) await Bun.sleep(50);
+  expect(store.getSession(info.id)?.title).toBe("帮我梳理一下这个仓库的构");
 }, 30000);
 
 test("a stream that reports no tokens is counted by estimate, and marked as such", async () => {
