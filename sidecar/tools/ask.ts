@@ -37,12 +37,13 @@ export function createAskUserTool(ctx: ToolContext): KestrelTool {
     label: "Ask the user",
     category: "meta",
     description:
-      "Ask the user one or more multiple-choice questions and wait for the answers. Use it to settle a decision that is the user's to make: " +
-      "ambiguous requirements, a choice between approaches, or a proposal that needs a go-ahead before you do something large or hard to undo. " +
-      "Don't use it for things you can find out yourself or for routine confirmations; the permission system already asks before risky tool calls. " +
-      "Put the option you recommend first and set recommended on it. Each question automatically also offers an 'Other' free-text answer, so don't add one. " +
-      "Keep the questions few and the options short; put the trade-offs in each option's description. " +
-      "To propose a plan, summarise it in your message first, then ask with options such as 'Go ahead' and 'Change something'.",
+      "Ask the user one or more multiple-choice questions and wait for the answers. This is how you ask the user anything: whenever you would end your reply " +
+      "with a question, or need a decision, call this as the last action of the turn instead, after writing your message (the message and the question are shown together; don't repeat the question in the text). " +
+      "Use it for unclear or two-way requirements, a choice between approaches, and a plan or proposal that needs a go-ahead before something large or hard to undo " +
+      "(summarise the plan in your message, then offer options such as 'Go ahead' and 'Change something'). " +
+      "Don't use it for things you can find out yourself, small choices you can just make and mention, or permission for ordinary tool calls; the permission system handles those. " +
+      "Put the option you recommend first and set recommended on it. Each question also offers a free-text 'Other', so don't add one. " +
+      "Keep the questions few and the options short; put the trade-offs in each option's description.",
     parameters: Type.Object({
       title: Type.Optional(Type.String({ description: "Short heading for the whole set, e.g. 'Before I refactor the parser'" })),
       questions: Type.Array(

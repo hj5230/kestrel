@@ -34,7 +34,9 @@ export function createMemoryReadTool(): KestrelTool {
     name: "memory_read",
     label: "Read memory",
     category: "meta",
-    description: "Read one saved note in full by its id (topic/name, as listed in the memory index or by memory_search).",
+    description:
+      "Read one saved note in full by its id (topic/name, as listed in the memory index or by memory_search). " +
+      "Call it at the start of a task for every note whose description is even plausibly related: anything about the user, a person, project or place with a note, or a standing preference. Several can be read in parallel.",
     parameters: Type.Object({ id: Type.String({ description: "topic/name" }) }),
     async execute(_id, params) {
       const m = getMemory(params.id);
@@ -52,6 +54,10 @@ export function createMemoryWriteTool(ctx: ToolContext): KestrelTool {
     category: "meta",
     description:
       "Save a note that future sessions should know, or replace an existing one (same topic and name). " +
+      // with auto-save off the system prompt says to save only when asked, so the tool must not say otherwise
+      (ctx.settings().memoryAutoSave
+        ? "Call it as soon as the user states a preference, corrects you, or shares a lasting fact or decision, before your final message of the turn; don't wait to be asked. "
+        : "Save only when the user explicitly asks you to remember something. ") +
       "To update a note, memory_read it first and send its full revised content: this replaces the old content entirely. " +
       "Keep notes short and about one thing. Never store secrets, tokens or passwords.",
     parameters: Type.Object({
