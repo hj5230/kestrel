@@ -466,13 +466,19 @@ export function setContextTokens(id: string, tokens: number) {
   db.run("UPDATE sessions SET context_tokens = ? WHERE id = ?", [tokens, id]);
 }
 
-export function deleteSession(id: string) {
+export function deleteSession(id: string): string[] {
+  const deleted: string[] = [];
+  const walk = (sessionId: string) => {
+    const children = db.query("SELECT id FROM sessions WHERE parent_id = ? AND kind = 'subagent'").all(sessionId) as { id: string }[];
+    for (const c of children) walk(c.id);
+    db.run("DELETE FROM messages_fts WHERE session_id = ?", [sessionId]);
+    db.run("DELETE FROM sessions WHERE id = ?", [sessionId]);
+    deleted.push(sessionId);
+  };
   db.transaction(() => {
-    const children = db.query("SELECT id FROM sessions WHERE parent_id = ? AND kind = 'subagent'").all(id) as { id: string }[];
-    for (const c of children) deleteSession(c.id);
-    db.run("DELETE FROM messages_fts WHERE session_id = ?", [id]);
-    db.run("DELETE FROM sessions WHERE id = ?", [id]);
+    walk(id);
   })();
+  return deleted;
 }
 
 // ---------- messages ----------
@@ -539,6 +545,13 @@ export function copyMessages(fromSession: string, toSession: string, uptoSeq: nu
        SELECT ?, cut_seq, summary, tokens_before, auto, created_at FROM compactions WHERE session_id = ? AND cut_seq <= ?`,
       [toSession, fromSession, uptoSeq],
     );
+  })();
+}
+
+export function rewriteSessionPathPrefix(sessionId: string, fromPrefix: string, toPrefix: string) {
+  db.transaction(() => {
+    db.run("UPDATE messages SET data = REPLACE(data, ?, ?) WHERE session_id = ?", [fromPrefix, toPrefix, sessionId]);
+    db.run("UPDATE messages_fts SET text = REPLACE(text, ?, ?) WHERE session_id = ?", [fromPrefix, toPrefix, sessionId]);
   })();
 }
 

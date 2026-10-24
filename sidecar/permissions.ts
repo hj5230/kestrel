@@ -242,6 +242,7 @@ class Paths {
   readonly cwd: string;
   readonly cwdReal: string;
   readonly scopes: string[];
+  private readonly uploads: string;
   private readonly sensitive: string[];
   private readonly protectedPaths: string[];
 
@@ -249,6 +250,7 @@ class Paths {
     this.cwd = cwd;
     this.cwdReal = realPath(cwd);
     this.scopes = [this.cwdReal, realPath(os.tmpdir()), "/private/tmp", "/tmp"];
+    this.uploads = realPath(path.join(dataDir, "uploads"));
     this.sensitive = sensitiveRoots(dataDir);
     this.protectedPaths = protectedRoots(dataDir);
   }
@@ -260,6 +262,10 @@ class Paths {
   /** Reading it would expose credentials. `.pub` keys are fine. */
   sensitiveRead(abs: string, real = realPath(abs)): boolean {
     if (/\.pub$/i.test(abs)) return false;
+    const absInUploads = isUnder(lower(abs), lower(this.uploads));
+    const realInUploads = isUnder(lower(real), lower(this.uploads));
+    if (realInUploads) return false;
+    if (absInUploads) return true;
     return hit(abs, real, this.sensitive);
   }
 
