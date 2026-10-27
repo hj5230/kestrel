@@ -375,6 +375,7 @@ export const en = {
   "models.baseUrl": "Base URL",
   "models.headers": "Custom headers",
   "models.headersDesc": "One per line, as “Name: value”.",
+  "models.amazonQDesc": "Use an API key accepted by this regional Amazon Q / CodeWhisperer endpoint. Models and capabilities are discovered using your key; no key prefix is required. USD token prices are unavailable.",
   "models.addedKnown": "Added {name} and imported {n} known models",
   "models.addedPick": "Added {name} — click “Add models” to choose models",
   "models.savedFetchFailed": "Saved, but fetching the model list failed: {msg}",

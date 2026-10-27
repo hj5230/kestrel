@@ -203,6 +203,7 @@ export function createVercelStreamFn(resolve: ModelResolver) {
           reasoning: asked?.reasoning,
           providerOptions: {
             ...resolved.providerOptions, ...asked?.providerOptions,
+            ...(resolved.kind === "amazon-q" && options?.sessionId ? { "amazon-q": { ...resolved.providerOptions?.["amazon-q"], ...asked?.providerOptions?.["amazon-q"], conversationId: options.sessionId } } : {}),
           },
         } as any);
 

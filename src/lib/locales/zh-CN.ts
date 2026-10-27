@@ -377,6 +377,7 @@ export const zhCN: Record<MessageKey, string> = {
   "models.baseUrl": "Base URL",
   "models.headers": "自定义请求头",
   "models.headersDesc": "每行一个，格式为「名称: 值」。",
+  "models.amazonQDesc": "填写该区域 Amazon Q / CodeWhisperer 接口接受的 API key。模型和能力通过你的 key 获取，不限制 key 前缀。此接口不提供美元 token 单价。",
   "models.addedKnown": "已添加 {name}，自动导入 {n} 个已知模型",
   "models.addedPick": "已添加 {name}，可点击「添加模型」选择要使用的模型",
   "models.savedFetchFailed": "已保存，但获取模型列表失败：{msg}",

@@ -5,6 +5,7 @@ export type ProviderKind =
   | "google"
   | "deepseek"
   | "openrouter"
+  | "amazon-q"
   | "ollama";
 
 /**

@@ -11,6 +11,8 @@ import { getShellEnv } from "./env";
 import { lookupFacts } from "./catalog";
 import { sortEfforts } from "../shared/effort";
 import { st } from "./i18n";
+import { AmazonQClient, amazonQEfforts, AMAZON_Q_BASE_URL } from "./llm/amazon-q-api";
+import { AmazonQLanguageModel } from "./llm/amazon-q";
 
 export const PROVIDER_PRESETS: Record<ProviderKind, { name: string; baseUrl: string; needsKey: boolean }> = {
   anthropic: { name: "Anthropic", baseUrl: "https://api.anthropic.com/v1", needsKey: true },
@@ -19,6 +21,7 @@ export const PROVIDER_PRESETS: Record<ProviderKind, { name: string; baseUrl: str
   google: { name: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta", needsKey: true },
   deepseek: { name: "DeepSeek", baseUrl: "https://api.deepseek.com/v1", needsKey: true },
   openrouter: { name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", needsKey: true },
+  "amazon-q": { name: "Amazon Q", baseUrl: AMAZON_Q_BASE_URL, needsKey: true },
   ollama: { name: "Ollama", baseUrl: "http://127.0.0.1:11434/v1", needsKey: false },
 };
 
@@ -66,10 +69,25 @@ export const proxiedFetch: typeof fetch = Object.assign(
   { preconnect: fetch.preconnect },
 ) as typeof fetch;
 
+const amazonQClients = new Map<string, { sig: string; client: AmazonQClient }>();
+function amazonQClient(p: ProviderConfig): AmazonQClient {
+  const sig = JSON.stringify([p.baseUrl, p.apiKey, p.headers]);
+  let entry = amazonQClients.get(p.id);
+  if (!entry || entry.sig !== sig) {
+    entry = { sig, client: new AmazonQClient({ apiKey: p.apiKey, baseURL: p.baseUrl, headers: p.headers, fetch: proxiedFetch }) };
+    amazonQClients.set(p.id, entry);
+  }
+  return entry.client;
+}
+
 function createProvider(p: ProviderConfig): (modelId: string) => LanguageModel {
   const baseURL = p.baseUrl || PROVIDER_PRESETS[p.kind].baseUrl;
   const common = { apiKey: p.apiKey || undefined, baseURL, headers: p.headers, fetch: proxiedFetch };
   switch (p.kind) {
+    case "amazon-q": {
+      const client = amazonQClient(p);
+      return (id) => new AmazonQLanguageModel(id, client);
+    }
     case "anthropic": {
       const prov = createAnthropic({ ...common, apiKey: p.apiKey || "missing" });
       return (id) => prov(id);
@@ -169,7 +187,7 @@ export interface ModelHint {
 
 export function modelDefaults(kind: ProviderKind, id: string, name?: string, contextHint?: number, hint?: ModelHint): Omit<ModelConfig, "providerId"> {
   const facts = lookupFacts(kind, hint?.baseUrl ?? "", id);
-  const known = lookupKnownModel(kind, id);
+  const known = kind === "amazon-q" ? null : lookupKnownModel(kind, id);
   const long = LONG_CONTEXT.test(id);
   const lower = id.toLowerCase();
   const claude = /(^|\/)claude-/.test(lower);
@@ -185,8 +203,8 @@ export function modelDefaults(kind: ProviderKind, id: string, name?: string, con
     name: name || facts?.name || known?.name || id,
     contextWindow,
     maxTokens: hint?.maxTokens ?? (facts?.maxTokens || known?.maxTokens || 16384),
-    reasoning: hint?.reasoning ?? ((efforts?.length ?? 0) > 0 || (facts ? !!facts.reasoning : known ? known.reasoning : /reason|think|o\d|gpt-[5-9]|r1|qwq|claude|gemini-2\.5|gemini-3/.test(lower))),
-    vision: hint?.vision ?? facts?.vision ?? known?.input.includes("image") ?? (/vision|gpt-4o|gpt-[5-9]|claude|gemini|vl/.test(lower)),
+    reasoning: hint?.reasoning ?? ((efforts?.length ?? 0) > 0 || (facts ? !!facts.reasoning : known ? known.reasoning : kind !== "amazon-q" && /reason|think|o\d|gpt-[5-9]|r1|qwq|claude|gemini-2\.5|gemini-3/.test(lower))),
+    vision: hint?.vision ?? facts?.vision ?? known?.input.includes("image") ?? (kind !== "amazon-q" && /vision|gpt-4o|gpt-[5-9]|claude|gemini|vl/.test(lower)),
     cost: { input: cost.input, output: cost.output, cacheRead: cost.cacheRead, cacheWrite: cost.cacheWrite },
     enabled: true,
     efforts,
@@ -196,6 +214,20 @@ export function modelDefaults(kind: ProviderKind, id: string, name?: string, con
 }
 
 export async function fetchRemoteModels(p: ProviderConfig): Promise<RemoteModel[]> {
+  if (p.kind === "amazon-q") {
+    return (await amazonQClient(p).models(undefined, true)).map((model) => ({
+      id: model.modelId,
+      name: model.modelName || model.modelId,
+      contextWindow: model.tokenLimits?.maxInputTokens,
+      maxTokens: model.tokenLimits?.maxOutputTokens,
+      vision: model.supportedInputTypes?.includes("IMAGE") ?? false,
+      reasoning: !!model.additionalModelRequestFieldsSchema?.properties?.thinking || !!model.additionalModelRequestFieldsSchema?.properties?.reasoning,
+      ...amazonQEfforts(model),
+      // Amazon Q bills credits, not USD per token; public provider prices do not apply.
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      known: true,
+    }));
+  }
   const base = (p.baseUrl || PROVIDER_PRESETS[p.kind].baseUrl).replace(/\/+$/, "");
   let url = `${base}/models`;
   const headers: Record<string, string> = { ...p.headers };

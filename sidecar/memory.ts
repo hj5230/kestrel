@@ -39,6 +39,7 @@ export function slug(s: string, max: number): string {
 }
 
 const SECRET_PATTERNS: [RegExp, string][] = [
+  [/\bksk_[A-Za-z0-9_-]{20,}\b/, "Kiro API key"],
   [/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "private key"],
   [/\b(?:sk|pk|rk)-[A-Za-z0-9_-]{20,}/, "API key"],
   [/\bgh[pousr]_[A-Za-z0-9]{30,}/, "GitHub token"],

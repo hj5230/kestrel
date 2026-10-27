@@ -212,6 +212,8 @@ function codexRow(rows: Map<string, CodexRow>, keys: string[]): CodexRow | null 
  * that serving config is not the public API card. Pass `codex` as an empty map to ignore the file.
  */
 export function lookupFacts(kind: ProviderKind, baseUrl: string, id: string, codex?: Map<string, CodexRow>): CatalogFacts | null {
+  // Amazon Q entitlements and credit billing come from its authenticated model discovery.
+  if (kind === "amazon-q") return null;
   const keys = modelKeys(id);
   const entry = loaded ? pickEntry(kind, baseUrl, keys) : null;
   const row = codexRow(codex ?? readCodexRows(), keys);

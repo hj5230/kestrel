@@ -14,7 +14,7 @@ Tauri (Rust)                  sidecar (Bun, single binary kestrel-agent)        
 ```
 
 - The agent loop is `@mariozechner/pi-agent-core`. Model calls go through a custom `streamFn` on the Vercel AI SDK v7 (`ai` + `@ai-sdk/*`); pi's model catalogue only fills in context windows and prices.
-- Providers: Anthropic, OpenAI, Google, DeepSeek, OpenRouter, Ollama and any OpenAI-compatible service.
+- Providers: Anthropic, OpenAI, Google, DeepSeek, OpenRouter, Amazon Q, Ollama and any OpenAI-compatible service.
 - Storage: `~/Library/Application Support/com.zhaoshangqi.kestrel/kestrel.db` (`kestrel-dev.db` in development); log at `~/Library/Logs/com.zhaoshangqi.kestrel/agent.log`.
 - Mobile: the iOS app drives the agent on a paired Mac; see [Mobile](#mobile-ios).
 
@@ -48,6 +48,34 @@ npm run tauri build -- --bundles app
 ```
 
 `beforeBuildCommand` builds the front end, then compiles `src-tauri/binaries/kestrel-agent-<target>` with `bun build --compile`; it ships inside `Kestrel.app` as an externalBin.
+
+## Amazon Q
+
+In **Settings → Models → Add provider**, select **Amazon Q**, enter your API key,
+and use its regional service root (normally `https://q.us-east-1.amazonaws.com/`).
+Saving discovers and imports the models your key can access. Context windows, output
+limits, image support, reasoning efforts and defaults come from the authenticated
+model list. Discovery failures are surfaced instead of substituting a static catalog.
+
+The sidecar connects directly through the AI SDK v4 provider interface. It sends
+API-key authentication and operation targets to the service root, decodes CRC-checked
+AWS EventStream frames, and leaves tools and permissions in Kestrel's agent loop.
+System instructions and memory disclosure retain their supplied text. Forced tool
+choice and structured-output requests are explicitly unsupported.
+
+The supplied key is sent unchanged as a Bearer token with `tokentype: API_KEY`;
+no `ksk_` or other key prefix is required. Existing `kiro` provider configurations
+are migrated to `amazon-q` while preserving their IDs, keys, models and sessions.
+
+The endpoint reports credits rather than USD per token. Public model token prices are not applied;
+credit metering is available in SDK provider metadata. Missing token counts use Kestrel's
+existing, explicitly marked estimate. See [third-party attribution](third-party-notices/amazon-q.md)
+for the MIT protocol reference and thinking-parser adaptation.
+
+To independently check discovery and one minimal generation, run
+`python3 scripts/check-amazon-q-api.py`; it reads `AMAZON_Q_API_KEY` (or the legacy
+`KIRO_API_KEY` variable) or prompts without echoing
+the key. Keep credentials out of source files.
 
 ## Permissions
 

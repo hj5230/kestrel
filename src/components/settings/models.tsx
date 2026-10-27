@@ -37,7 +37,7 @@ import { t } from "@/lib/i18n"
 
 type Presets = Record<ProviderKind, { name: string; baseUrl: string; needsKey: boolean }>
 
-const KIND_ORDER: ProviderKind[] = ["anthropic", "openai", "google", "deepseek", "openrouter", "ollama", "openai-compatible"]
+const KIND_ORDER: ProviderKind[] = ["anthropic", "openai", "google", "deepseek", "openrouter", "amazon-q", "ollama", "openai-compatible"]
 
 function headersToText(h: Record<string, string>) {
   return Object.entries(h)
@@ -100,7 +100,8 @@ function ProviderDialog({ open, provider, presets, onClose }: { open: boolean; p
       if (!provider) {
         try {
           const remote = await rpc<RemoteModel[]>("providers.remoteModels", { id: saved.id })
-          const known = remote.filter((m) => m.known).slice(0, 12)
+          const recognized = remote.filter((m) => m.known)
+          const known = saved.kind === "amazon-q" ? recognized : recognized.slice(0, 12)
           if (known.length) {
             await rpc("models.addMany", { providerId: saved.id, models: known })
             await refreshProviders()
@@ -149,6 +150,7 @@ function ProviderDialog({ open, provider, presets, onClose }: { open: boolean; p
             <Field>
               <FieldLabel>{t("models.baseUrl")}</FieldLabel>
               <Input value={baseUrl} className="font-mono text-xs" onInput={(e) => setBaseUrl(e.currentTarget.value)} placeholder={presets?.[kind].baseUrl} />
+              {kind === "amazon-q" && <FieldDescription>{t("models.amazonQDesc")}</FieldDescription>}
             </Field>
             <Field>
               <FieldLabel>API Key{presets && !presets[kind].needsKey && <span className="font-normal text-muted-foreground"> {t("common.optional")}</span>}</FieldLabel>
@@ -158,7 +160,7 @@ function ProviderDialog({ open, provider, presets, onClose }: { open: boolean; p
                   value={apiKey}
                   className="font-mono text-xs pointer-coarse:h-11 pointer-coarse:text-base"
                   onInput={(e) => setApiKey(e.currentTarget.value)}
-                  placeholder="sk-…"
+                  placeholder={kind === "amazon-q" ? "…" : "sk-…"}
                   autoComplete="off"
                 />
                 <InputGroupAddon align="inline-end">

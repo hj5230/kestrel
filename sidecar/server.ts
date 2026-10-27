@@ -115,8 +115,13 @@ const handlers: Record<string, Handler> = {
   },
 
   "models.list": ({ providerId } = {}) => store.listModels(providerId),
-  "models.defaults": ({ providerId, id, name, contextWindow }) => {
+  "models.defaults": async ({ providerId, id, name, contextWindow }) => {
     const p = store.getProvider(providerId);
+    if (p?.kind === "amazon-q") {
+      const remote = (await fetchRemoteModels(p)).find((m) => m.id === id);
+      if (!remote) throw new Error(`Amazon Q model is unavailable for this API key: ${id}`);
+      return { providerId, ...modelDefaults(p.kind, id, name || remote.name, contextWindow ?? remote.contextWindow, remote) };
+    }
     return { providerId, ...modelDefaults(p?.kind ?? "openai-compatible", id, name, contextWindow, { baseUrl: p?.baseUrl }) };
   },
   "models.upsert": (m: ModelConfig) => {
@@ -128,7 +133,16 @@ const handlers: Record<string, Handler> = {
   "models.addMany": async ({ providerId, models }: { providerId: string; models: (Partial<RemoteModel> & { id: string })[] }) => {
     const p = store.getProvider(providerId);
     if (!p) throw new Error(st("providerNotFound", { id: providerId }));
-    for (const m of models) {
+    let incoming = models;
+    if (p.kind === "amazon-q") {
+      const discovered = new Map((await fetchRemoteModels(p)).map((m) => [m.id, m]));
+      incoming = models.map((m) => {
+        const remote = discovered.get(m.id);
+        if (!remote) throw new Error(`Amazon Q model is unavailable for this API key: ${m.id}`);
+        return remote;
+      });
+    }
+    for (const m of incoming) {
       if (store.getModel(providerId, m.id)) continue;
       const d = modelDefaults(p.kind, m.id, m.name, m.contextWindow, { ...m, baseUrl: p.baseUrl });
       store.upsertModel({ providerId, ...d });

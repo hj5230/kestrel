@@ -163,6 +163,9 @@ const MIGRATIONS: string[] = [
   );`,
   `ALTER TABLE memory_jobs ADD COLUMN plan TEXT;
    CREATE INDEX memory_jobs_pending ON memory_jobs(state, next_at, created_at);`,
+  `UPDATE providers SET kind = 'amazon-q',
+     name = CASE WHEN name = 'Kiro' THEN 'Amazon Q' ELSE name END
+   WHERE kind = 'kiro';`,
 ];
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -303,12 +306,16 @@ export function getProvider(id: string): ProviderConfig | null {
 }
 
 export function upsertProvider(p: ProviderConfig) {
+  // Older paired clients can still submit the previous provider type.
+  const legacy = (p.kind as string) === "kiro";
+  const kind = legacy ? "amazon-q" : p.kind;
+  const name = legacy && p.name === "Kiro" ? "Amazon Q" : p.name;
   db.run(
     `INSERT INTO providers (id, kind, name, base_url, api_key, headers, enabled, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, name = excluded.name, base_url = excluded.base_url,
        api_key = excluded.api_key, headers = excluded.headers, enabled = excluded.enabled`,
-    [p.id, p.kind, p.name, p.baseUrl, p.apiKey, JSON.stringify(p.headers ?? {}), p.enabled ? 1 : 0, p.createdAt || Date.now()],
+    [p.id, kind, name, p.baseUrl, p.apiKey, JSON.stringify(p.headers ?? {}), p.enabled ? 1 : 0, p.createdAt || Date.now()],
   );
 }
 
