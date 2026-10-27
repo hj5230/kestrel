@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useState } from "preact/hooks"
+// The session list. Rows stay quiet: status sits where the menu button does, and a group label folds its sessions away.
+import { useEffect, useMemo, useRef, useState } from "preact/hooks"
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
   BarChart3Icon,
   CheckIcon,
+  ChevronRightIcon,
   ChevronsUpDownIcon,
   CircleAlertIcon,
   DownloadIcon,
   FolderOpenIcon,
   FolderTreeIcon,
-  HistoryIcon,
   LaptopIcon,
   MoreHorizontalIcon,
   PencilIcon,
@@ -18,7 +19,6 @@ import {
   PlusIcon,
   SearchIcon,
   Settings2Icon,
-  SquarePenIcon,
   Trash2Icon,
 } from "lucide-react"
 import type { SessionInfo } from "@shared/protocol"
@@ -27,9 +27,7 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuAction,
@@ -48,12 +46,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Kbd } from "@/components/ui/kbd"
-import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
 import { RenameDialog, ConfirmDeleteDialog, ArchivedDialog } from "@/components/session-dialogs"
 import { rpc } from "@/lib/api"
-import { basename, dayBucket, relativeTime, shortPath } from "@/lib/format"
+import { basename, dayBucket, dayBucketId, relativeTime, shortPath } from "@/lib/format"
 import { addingMac, appInfo, connected, pairedMac, pairedMacs, paletteOpen, route, sessions, enabledModels, switchMac } from "@/lib/store"
 import { isDesktopApp, isMobileApp } from "@/lib/platform"
 import { downloadText } from "@/lib/download"
@@ -71,29 +68,84 @@ function loadGroupMode(): GroupMode {
   }
 }
 
+const COLLAPSED_KEY = "kestrel-collapsed-groups"
+
+function loadCollapsed(): Set<string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "[]")
+    if (!Array.isArray(raw)) return new Set()
+    return new Set(raw.filter((x) => typeof x === "string"))
+  } catch {
+    return new Set()
+  }
+}
+
+function storeCollapsed(ids: Set<string>) {
+  try {
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...ids]))
+  } catch {}
+}
+
+/** Pill row shared by the destinations and the sessions. Selected stays the same weight as the rest. */
+const rowClass =
+  "h-8 rounded-full px-2.5 font-normal text-[13px] text-muted-foreground hover:text-sidebar-accent-foreground data-active:font-normal data-active:text-sidebar-accent-foreground"
+
 export function StatusDot({ status }: { status: SessionInfo["status"] }) {
-  if (status === "running") return <Spinner className="size-3.5 text-muted-foreground" />
-  if (status === "waiting") return <span className="size-2 rounded-full bg-warning ring-3 ring-warning/20" />
+  if (status === "running") return <span className="size-1.5 rounded-full bg-muted-foreground" />
+  if (status === "waiting") return <span className="size-1.5 rounded-full bg-warning" />
   if (status === "error") return <CircleAlertIcon className="size-3.5 text-destructive" />
   return null
 }
 
+/** Hard ellipsis eats the last glyph. Fade the end, and only once the line actually overflows. */
+function FadeLabel({ text, className }: { text: string; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [over, setOver] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const check = () => setOver(el.scrollWidth > el.clientWidth + 1)
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [text])
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "min-w-0 flex-1 overflow-hidden whitespace-nowrap",
+        over &&
+          "[mask-image:linear-gradient(to_right,#000_calc(100%-24px),transparent)] group-hover/menu-item:[mask-image:linear-gradient(to_right,#000_calc(100%-44px),transparent_calc(100%-20px))] group-focus-within/menu-item:[mask-image:linear-gradient(to_right,#000_calc(100%-44px),transparent_calc(100%-20px))] pointer-coarse:[mask-image:linear-gradient(to_right,#000_calc(100%-44px),transparent_calc(100%-20px))]",
+        className,
+      )}
+    >
+      {text}
+    </div>
+  )
+}
+
 function SessionItem({ s, active, onRename, onDelete }: { s: SessionInfo; active: boolean; onRename: () => void; onDelete: () => void }) {
   const status = s.status !== "idle" ? <StatusDot status={s.status} /> : null
+  const title = s.title || t("common.untitled")
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
         isActive={active}
         onClick={() => (route.value = { name: "chat", sessionId: s.id })}
-        className="h-8 gap-2 pr-8"
-        title={`${s.title || t("common.untitled")}\n${shortPath(s.cwd, appInfo.value?.home)}`}
+        className={rowClass}
+        title={`${title}\n${shortPath(s.cwd, appInfo.value?.home)}\n${relativeTime(s.updatedAt)}`}
       >
-        {status && <span className="flex size-4 shrink-0 items-center justify-center">{status}</span>}
-        <span className={cn("truncate", !s.title && "text-muted-foreground")}>{s.title || t("common.untitled")}</span>
-        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/70 tabular-nums group-hover/menu-item:opacity-0 pointer-coarse:group-hover/menu-item:opacity-100">
-          {relativeTime(s.updatedAt)}
-        </span>
+        <FadeLabel text={title} className={!s.title && !active ? "text-muted-foreground/70" : undefined} />
       </SidebarMenuButton>
+      {status && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 right-1 z-0 flex size-5 -translate-y-1/2 items-center justify-center group-hover/menu-item:opacity-0 group-focus-within/menu-item:opacity-0 group-has-data-[state=open]/menu-item:opacity-0 pointer-coarse:right-10 pointer-coarse:opacity-100 pointer-coarse:group-hover/menu-item:opacity-100 pointer-coarse:group-focus-within/menu-item:opacity-100 pointer-coarse:group-has-data-[state=open]/menu-item:opacity-100"
+        >
+          {status}
+        </span>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <SidebarMenuAction showOnHover>
@@ -154,7 +206,7 @@ function MacSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" aria-label={t("sidebar.switchMac")} className="-my-1 flex min-w-0 items-center gap-1 rounded-md py-1 pr-1 outline-none active:bg-sidebar-accent">
+        <button type="button" aria-label={t("sidebar.switchMac")} className="-my-1 flex min-w-0 items-center gap-1 rounded-full py-1 pr-1 outline-none active:bg-sidebar-accent">
           <span className="truncate">{current.serverName}</span>
           <ChevronsUpDownIcon className="size-3 shrink-0" />
         </button>
@@ -191,6 +243,7 @@ function MacSwitcher() {
 
 export function AppSidebar() {
   const [groupMode, setGroupMode] = useState<GroupMode>(loadGroupMode)
+  const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
   const [renaming, setRenaming] = useState<SessionInfo | null>(null)
   const [deleting, setDeleting] = useState<SessionInfo | null>(null)
   const [archivedOpen, setArchivedOpen] = useState(false)
@@ -204,16 +257,24 @@ export function AppSidebar() {
   const groups = useMemo(() => {
     const pinned = list.filter((s) => s.pinned)
     const rest = list.filter((s) => !s.pinned)
-    const out: { label: string; items: SessionInfo[] }[] = []
-    if (pinned.length) out.push({ label: t("sidebar.pinned"), items: pinned })
-    const map = new Map<string, SessionInfo[]>()
-    for (const s of rest) {
-      const key = groupMode === "time" ? dayBucket(s.updatedAt) : s.cwd
-      if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(s)
+    const home = appInfo.value?.home
+    const out: { id: string; label: string; title: string; items: SessionInfo[] }[] = []
+    if (pinned.length) {
+      const label = t("sidebar.pinned")
+      out.push({ id: "pinned", label, title: label, items: pinned })
     }
-    for (const [key, items] of map) {
-      out.push({ label: groupMode === "time" ? key : basename(key), items })
+    const map = new Map<string, { id: string; label: string; title: string; items: SessionInfo[] }>()
+    for (const s of rest) {
+      const id = groupMode === "time" ? `time:${dayBucketId(s.updatedAt)}` : `project:${s.cwd}`
+      let group = map.get(id)
+      if (!group) {
+        const label = groupMode === "time" ? dayBucket(s.updatedAt) : basename(s.cwd)
+        const title = groupMode === "time" ? label : shortPath(s.cwd, home)
+        group = { id, label, title, items: [] }
+        map.set(id, group)
+        out.push(group)
+      }
+      group.items.push(s)
     }
     return out
   }, [list, groupMode, lang.value])
@@ -225,38 +286,41 @@ export function AppSidebar() {
     } catch {}
   }
 
+  const toggleGroup = (id: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      storeCollapsed(next)
+      return next
+    })
+  }
+
   const nav = [
-    { key: "home", label: t("nav.newSession"), icon: SquarePenIcon, kbd: "⌘N", onClick: () => (route.value = { name: "home" }) },
+    { key: "home", label: t("nav.newSession"), icon: PlusIcon, kbd: "⌘N", onClick: () => (route.value = { name: "home" }) },
     { key: "usage", label: t("nav.usage"), icon: BarChart3Icon, onClick: () => (route.value = { name: "usage" }) },
     { key: "settings", label: t("nav.settings"), icon: Settings2Icon, kbd: "⌘,", onClick: () => (route.value = { name: "settings" }) },
   ]
 
   return (
     <Sidebar variant="sidebar" collapsible="offcanvas">
-      <SidebarHeader className="gap-3 pt-0">
+      <SidebarHeader className="gap-1 pt-0">
         <div data-tauri-drag-region={isDesktopApp || undefined} className={cn("shrink-0", isMobileApp ? "h-[max(0.5rem,env(safe-area-inset-top))]" : "h-9")} />
-        <div className="flex items-center gap-2 px-1.5">
-          <span className="font-semibold tracking-tight">Kestrel</span>
-          <div className="ml-auto flex items-center">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" aria-label={t("nav.search")} onClick={() => (paletteOpen.value = true)}>
-                  <SearchIcon />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {t("nav.search")} <Kbd>⌘K</Kbd>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
         <SidebarMenu>
           {nav.map((n) => (
             <SidebarMenuItem key={n.key}>
-              <SidebarMenuButton isActive={r.name === n.key} onClick={n.onClick}>
-                <n.icon />
-                <span>{n.label}</span>
-                {n.kbd && <span className="ml-auto text-[11px] text-muted-foreground/70 pointer-coarse:hidden">{n.kbd}</span>}
+              <SidebarMenuButton isActive={r.name === n.key} onClick={n.onClick} className={rowClass}>
+                {n.key === "home" ? (
+                  <span className="flex size-4 shrink-0 items-center justify-center rounded-full ring-1 ring-current">
+                    <PlusIcon className="size-2.5!" />
+                  </span>
+                ) : (
+                  <n.icon />
+                )}
+                <span className="min-w-0 flex-1 truncate">{n.label}</span>
+                {n.kbd && (
+                  <span className="ml-auto text-[11px] text-muted-foreground/70 opacity-0 group-hover/menu-item:opacity-100 pointer-coarse:hidden">{n.kbd}</span>
+                )}
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
@@ -266,54 +330,83 @@ export function AppSidebar() {
         {list.length === 0 && (
           <div className="px-4 py-8 text-center text-xs text-muted-foreground">{t("sidebar.empty")}</div>
         )}
-        {groups.map((g, i) => (
-          <SidebarGroup key={g.label + i} className="py-1">
-            <SidebarGroupLabel className="truncate" title={g.label}>
-              {g.label}
-            </SidebarGroupLabel>
-            {i === 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarGroupAction title={t("sidebar.grouping")}>
-                    <FolderTreeIcon />
-                  </SidebarGroupAction>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuLabel>{t("sidebar.groupSessions")}</DropdownMenuLabel>
-                  <DropdownMenuRadioGroup value={groupMode} onValueChange={(v) => setMode(v as GroupMode)}>
-                    <DropdownMenuRadioItem value="time">{t("sidebar.byTime")}</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="project">{t("sidebar.byProject")}</DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => setArchivedOpen(true)}>
-                    <ArchiveRestoreIcon />
-                    {t("sidebar.archived")}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-0.5">
-                {g.items.map((s) => (
-                  <SessionItem key={s.id} s={s} active={s.id === activeId} onRename={() => setRenaming(s)} onDelete={() => setDeleting(s)} />
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+        {groups.map((g, i) => {
+          const open = !collapsed.has(g.id)
+          return (
+            <SidebarGroup key={g.id} className={cn("px-2 pb-0.5", i === 0 ? "pt-2" : "pt-3")}>
+              <div className="group/label flex items-center gap-0.5 pr-1">
+                <button
+                  type="button"
+                  className="flex min-h-7 min-w-0 flex-1 items-center gap-1 rounded-full px-2 py-1 text-left text-xs font-normal text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring pointer-coarse:min-h-11"
+                  aria-expanded={open}
+                  title={g.title !== g.label ? g.title : undefined}
+                  onClick={() => toggleGroup(g.id)}
+                >
+                  <ChevronRightIcon className={cn("size-3 shrink-0 transition-transform duration-150", open && "rotate-90")} />
+                  <span className="truncate">{g.label}</span>
+                </button>
+                {i === 0 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        title={t("sidebar.grouping")}
+                        aria-label={t("sidebar.grouping")}
+                        className="pointer-events-none flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 outline-none group-hover/label:pointer-events-auto group-hover/label:opacity-100 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring aria-expanded:pointer-events-auto aria-expanded:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:size-10 pointer-coarse:opacity-100"
+                      >
+                        <FolderTreeIcon className="size-3.5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuLabel>{t("sidebar.groupSessions")}</DropdownMenuLabel>
+                      <DropdownMenuRadioGroup value={groupMode} onValueChange={(v) => setMode(v as GroupMode)}>
+                        <DropdownMenuRadioItem value="time">{t("sidebar.byTime")}</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="project">{t("sidebar.byProject")}</DropdownMenuRadioItem>
+                      </DropdownMenuRadioGroup>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={() => setArchivedOpen(true)}>
+                        <ArchiveRestoreIcon />
+                        {t("sidebar.archived")}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+              {open && (
+                <SidebarGroupContent>
+                  <SidebarMenu className="gap-px">
+                    {g.items.map((s) => (
+                      <SessionItem key={s.id} s={s} active={s.id === activeId} onRename={() => setRenaming(s)} onDelete={() => setDeleting(s)} />
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              )}
+            </SidebarGroup>
+          )
+        })}
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground">
+      <SidebarFooter className="pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <div className="flex items-center gap-1.5 px-1.5 text-xs">
           <span className={cn("size-1.5 shrink-0 rounded-full", connected.value ? "bg-success" : "bg-destructive")} />
           {isMobileApp && pairedMac.value ? (
             <MacSwitcher />
           ) : (
-            <span className="truncate">{connected.value ? t("sidebar.connected") : t("sidebar.connecting")}</span>
+            <span className="shrink-0 text-sidebar-foreground/80">{connected.value ? t("sidebar.connected") : t("sidebar.connecting")}</span>
           )}
-          <span className="ml-auto flex shrink-0 items-center gap-1">
-            <HistoryIcon className="size-3" />
-            {t("sidebar.stats", { sessions: list.length, models: enabledModels.value.length })}
+          <span aria-hidden="true" className="text-muted-foreground">
+            ·
           </span>
+          <span className="min-w-0 truncate text-muted-foreground">{t("sidebar.stats", { sessions: list.length, models: enabledModels.value.length })}</span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon-sm" className="ml-auto shrink-0 rounded-full" aria-label={t("nav.search")} onClick={() => (paletteOpen.value = true)}>
+                <SearchIcon />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {t("nav.search")} <Kbd>⌘K</Kbd>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </SidebarFooter>
       <RenameDialog session={renaming} onClose={() => setRenaming(null)} />

@@ -45,16 +45,30 @@ export function basename(p: string): string {
   return parts[parts.length - 1] || p
 }
 
-export function dayBucket(ts: number): string {
-  const d = new Date(ts)
+export type DayBucketId = "today" | "yesterday" | "last7" | "last30" | "older"
+
+/** Stable across language changes, so a collapsed time group stays collapsed after switching locale. */
+export function dayBucketId(ts: number): DayBucketId {
+  const day = new Date(ts)
+  day.setHours(0, 0, 0, 0)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const day = new Date(d)
-  day.setHours(0, 0, 0, 0)
   const diff = (today.getTime() - day.getTime()) / 86400_000
-  if (diff <= 0) return t("time.today")
-  if (diff <= 1) return t("time.yesterday")
-  if (diff <= 7) return t("time.last7")
-  if (diff <= 30) return t("time.last30")
-  return t("time.older")
+  if (diff <= 0) return "today"
+  if (diff <= 1) return "yesterday"
+  if (diff <= 7) return "last7"
+  if (diff <= 30) return "last30"
+  return "older"
+}
+
+const DAY_BUCKET_KEY = {
+  today: "time.today",
+  yesterday: "time.yesterday",
+  last7: "time.last7",
+  last30: "time.last30",
+  older: "time.older",
+} as const
+
+export function dayBucket(ts: number): string {
+  return t(DAY_BUCKET_KEY[dayBucketId(ts)])
 }
