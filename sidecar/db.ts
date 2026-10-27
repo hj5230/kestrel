@@ -13,6 +13,7 @@ import type {
   StoredMessage,
   UsageSummary,
 } from "../shared/protocol";
+import { planBackfill, type CatalogFacts } from "./catalog";
 import { HOME } from "./env";
 import { DEFAULT_BASH_WHITELIST } from "./permissions";
 
@@ -147,6 +148,11 @@ const MIGRATIONS: string[] = [
   `,
   `
   UPDATE sessions SET permission_mode = 'auto' WHERE permission_mode = 'whitelist';
+  `,
+  `
+  ALTER TABLE models ADD COLUMN efforts TEXT;
+  ALTER TABLE models ADD COLUMN effort_default TEXT;
+  ALTER TABLE models ADD COLUMN locked TEXT NOT NULL DEFAULT '';
   `,
 ];
 
@@ -305,6 +311,9 @@ const rowToModel = (r: any): ModelConfig => ({
   vision: !!r.vision,
   cost: { input: r.cost_input, output: r.cost_output, cacheRead: r.cost_cache_read, cacheWrite: r.cost_cache_write },
   enabled: !!r.enabled,
+  efforts: r.efforts == null || r.efforts === "" ? null : json<string[]>(r.efforts, []),
+  effortDefault: r.effort_default ?? null,
+  locked: r.locked ? String(r.locked).split(",").filter(Boolean) : [],
 });
 
 export function listModels(providerId?: string): ModelConfig[] {
@@ -321,12 +330,13 @@ export function getModel(providerId: string, id: string): ModelConfig | null {
 
 export function upsertModel(m: ModelConfig) {
   db.run(
-    `INSERT INTO models (provider_id, id, name, context_window, max_tokens, reasoning, vision, cost_input, cost_output, cost_cache_read, cost_cache_write, enabled)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO models (provider_id, id, name, context_window, max_tokens, reasoning, vision, cost_input, cost_output, cost_cache_read, cost_cache_write, enabled, efforts, effort_default, locked)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(provider_id, id) DO UPDATE SET name = excluded.name, context_window = excluded.context_window,
        max_tokens = excluded.max_tokens, reasoning = excluded.reasoning, vision = excluded.vision,
        cost_input = excluded.cost_input, cost_output = excluded.cost_output, cost_cache_read = excluded.cost_cache_read,
-       cost_cache_write = excluded.cost_cache_write, enabled = excluded.enabled`,
+       cost_cache_write = excluded.cost_cache_write, enabled = excluded.enabled, efforts = excluded.efforts,
+       effort_default = excluded.effort_default, locked = excluded.locked`,
     [
       m.providerId,
       m.id,
@@ -340,8 +350,23 @@ export function upsertModel(m: ModelConfig) {
       m.cost.cacheRead,
       m.cost.cacheWrite,
       m.enabled ? 1 : 0,
+      m.efforts == null ? null : JSON.stringify(m.efforts),
+      m.effortDefault ?? null,
+      (m.locked ?? []).join(","),
     ],
   );
+}
+
+/** Fills catalog fields that are still at the generic default. Returns how many rows changed. */
+export function backfillModels(factsFor: (m: ModelConfig) => CatalogFacts | null): number {
+  let changed = 0;
+  for (const model of listModels()) {
+    const next = planBackfill(model, factsFor(model));
+    if (!next) continue;
+    upsertModel(next);
+    changed++;
+  }
+  return changed;
 }
 
 export function deleteModel(providerId: string, id: string) {

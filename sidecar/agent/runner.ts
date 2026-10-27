@@ -26,6 +26,7 @@ import { mcpStatuses, mcpTools } from "../mcp";
 import { st } from "../i18n";
 import { buildTranscript, describeAction, partsFromMessages, reviewAction, reviewerConfigured } from "../auto-review";
 import { evaluatePermission, isBroadEntry, type PermissionResult } from "../permissions";
+import { resolveThinking } from "../../shared/effort";
 import { languageModel, resolveModel, toPiModel } from "../providers";
 import { costOf, parseModelSetting, recordSideUsage, sideModel, usageOf } from "../side-model";
 import { createSession, newId } from "../sessions";
@@ -194,7 +195,7 @@ export class SessionRunner {
     });
     this.agent = new Agent({
       initialState: { systemPrompt: "", model: placeholder, thinkingLevel: info.thinking as any, tools: [], messages },
-      streamFn: createVercelStreamFn((m) => ({ model: languageModel(m.provider, m.id) })),
+      streamFn: createVercelStreamFn((m) => ({ model: languageModel(m.provider, m.id), kind: store.getProvider(m.provider)?.kind })),
       convertToLlm: (msgs) =>
         msgs.filter((m: any) => m.role === "user" || m.role === "toolResult" || (m.role === "assistant" && m.content?.length)) as Message[],
       transformContext: (msgs, signal) => this.transformContext(msgs, signal),
@@ -280,7 +281,7 @@ export class SessionRunner {
     const cfg = resolveModel(s.providerId, s.modelId);
     const model = toPiModel(cfg);
     this.agent.state.model = model;
-    this.agent.state.thinkingLevel = (cfg.reasoning ? s.thinking : "off") as any;
+    this.agent.state.thinkingLevel = (cfg.reasoning ? (resolveThinking(s.thinking, cfg.efforts, cfg.effortDefault) ?? "off") : "off") as any;
     this.agent.state.tools = this.buildTools(s.kind === "subagent");
     this.agent.state.systemPrompt = buildSystemPrompt({
       cwd: s.cwd,

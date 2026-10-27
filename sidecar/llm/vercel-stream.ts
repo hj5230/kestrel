@@ -11,10 +11,13 @@ import {
   type ToolCall,
   type Usage,
 } from "@mariozechner/pi-ai";
+import type { ProviderKind } from "../../shared/protocol";
 import { estimateMessageTokens, estimateTextTokens } from "../agent/compaction";
+import { reasoningRequest } from "./reasoning";
 
 export type ModelResolver = (model: Model<any>) => {
   model: LanguageModel;
+  kind?: ProviderKind;
   providerOptions?: Record<string, any>;
   headers?: Record<string, string>;
 };
@@ -142,10 +145,6 @@ export function toModelMessages(messages: Message[], target: Model<any>): ModelM
   return out;
 }
 
-function mapReasoning(level: SimpleStreamOptions["reasoning"]) {
-  return level ?? "none";
-}
-
 function errorText(err: unknown): string {
   if (!err) return "Unknown error";
   if (typeof err === "string") return err;
@@ -188,6 +187,8 @@ export function createVercelStreamFn(resolve: ModelResolver) {
         for (const t of context.tools ?? []) {
           tools[t.name] = { description: t.description, inputSchema: jsonSchema(t.parameters as any) } as any;
         }
+        const level = typeof options?.reasoning === "string" ? options.reasoning : undefined;
+        const asked = resolved.kind && level ? reasoningRequest(resolved.kind, level) : undefined;
         const result = streamText({
           model: resolved.model,
           system: context.systemPrompt,
@@ -199,8 +200,10 @@ export function createVercelStreamFn(resolve: ModelResolver) {
           headers: { ...resolved.headers, ...options?.headers },
           maxRetries: options?.maxRetries ?? 2,
           onError: () => {},
-          reasoning: model.reasoning ? mapReasoning(options?.reasoning) : undefined,
-          providerOptions: resolved.providerOptions,
+          reasoning: asked?.reasoning,
+          providerOptions: {
+            ...resolved.providerOptions, ...asked?.providerOptions,
+          },
         } as any);
 
         let stopReason: StopReason = "stop";

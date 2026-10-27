@@ -1,6 +1,9 @@
 import os from "node:os";
 import path from "node:path";
-import { getSettings, openDb } from "./db";
+import { loadCatalogCache, lookupFacts, refreshCatalog } from "./catalog";
+import { backfillModels, getProvider, getSettings, openDb } from "./db";
+import { emit } from "./hub";
+import { proxiedFetch } from "./providers";
 import { resolveShellEnv } from "./env";
 import { openHistoryDb, setHistorySources, syncHistory } from "./history";
 import { startMcp, stopAllMcp } from "./mcp";
@@ -20,11 +23,26 @@ const token = arg("token") ?? (dev ? "dev" : crypto.randomUUID());
 
 for (const k of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]) delete process.env[k];
 
+loadCatalogCache(dataDir);
 openDb(dataDir, dev);
+const fillModels = () =>
+  backfillModels((model) => {
+    const provider = getProvider(model.providerId);
+    return provider ? lookupFacts(provider.kind, provider.baseUrl, model.id) : null;
+  });
+fillModels();
 const envReady = resolveShellEnv();
 const server = startServer({ port, token, dataDir, dev });
 console.log(`KESTREL_READY ${JSON.stringify({ port: server.port, token })}`);
 initRemote(dataDir);
+
+// The catalog is large and the network copy can be a day old. Refresh after the app is up, then
+// fill any model fields that are still at the generic default.
+refreshCatalog(dataDir, proxiedFetch)
+  .then(() => {
+    if (fillModels()) emit({ type: "models_updated" });
+  })
+  .catch(() => {});
 
 // Conversations from other apps on this Mac, indexed in the background shortly after start
 openHistoryDb(path.join(dataDir, dev ? "history-dev.db" : "history.db"));

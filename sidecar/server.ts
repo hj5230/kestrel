@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import type { AppInfo, FileAttachment, McpServerConfig, ModelConfig, ProviderConfig, SessionInfo } from "../shared/protocol";
+import type { AppInfo, FileAttachment, McpServerConfig, ModelConfig, ProviderConfig, RemoteModel, SessionInfo } from "../shared/protocol";
 import { dropRunner, getRunner, peekRunner, respondApproval, respondQuestion, sessionDetail } from "./agent/runner";
 import { collectInstructions } from "./agent/prompt";
 import * as store from "./db";
@@ -11,6 +11,8 @@ import { st } from "./i18n";
 import { mcpStatuses, removeMcp, restartMcp } from "./mcp";
 import { deleteMemory, getMemory, listMemories, writeMemory, type MemoryInput } from "./memory";
 import { DEFAULT_BASH_WHITELIST } from "./permissions";
+import { sortEfforts } from "../shared/effort";
+import { locksFor, lookupFacts } from "./catalog";
 import { fetchRemoteModels, modelDefaults, PROVIDER_PRESETS } from "./providers";
 import { createSession, exportMarkdown, forkSession, newId } from "./sessions";
 import { historyStatus, rebuildHistory, setHistorySources, syncHistory } from "./history";
@@ -107,16 +109,21 @@ const handlers: Record<string, Handler> = {
   "models.list": ({ providerId } = {}) => store.listModels(providerId),
   "models.defaults": ({ providerId, id, name, contextWindow }) => {
     const p = store.getProvider(providerId);
-    return { providerId, ...modelDefaults(p?.kind ?? "openai-compatible", id, name, contextWindow) };
+    return { providerId, ...modelDefaults(p?.kind ?? "openai-compatible", id, name, contextWindow, { baseUrl: p?.baseUrl }) };
   },
-  "models.upsert": (m: ModelConfig) => store.upsertModel(m),
-  "models.addMany": ({ providerId, models }: { providerId: string; models: { id: string; name?: string; contextWindow?: number; cost?: ModelConfig["cost"] }[] }) => {
+  "models.upsert": (m: ModelConfig) => {
+    const p = store.getProvider(m.providerId);
+    const facts = p ? lookupFacts(p.kind, p.baseUrl, m.id) : null;
+    const efforts = m.efforts == null ? null : sortEfforts(m.efforts);
+    store.upsertModel({ ...m, efforts, locked: locksFor({ ...m, efforts }, facts) });
+  },
+  "models.addMany": async ({ providerId, models }: { providerId: string; models: (Partial<RemoteModel> & { id: string })[] }) => {
     const p = store.getProvider(providerId);
     if (!p) throw new Error(st("providerNotFound", { id: providerId }));
     for (const m of models) {
       if (store.getModel(providerId, m.id)) continue;
-      const d = modelDefaults(p.kind, m.id, m.name, m.contextWindow);
-      store.upsertModel({ providerId, ...d, contextWindow: m.contextWindow || d.contextWindow, cost: m.cost ?? d.cost });
+      const d = modelDefaults(p.kind, m.id, m.name, m.contextWindow, { ...m, baseUrl: p.baseUrl });
+      store.upsertModel({ providerId, ...d });
     }
     return store.listModels(providerId);
   },

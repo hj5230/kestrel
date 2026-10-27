@@ -26,7 +26,6 @@ export function HomeView() {
     if (!model.modelId && firstModel) setModel({ providerId: firstModel.providerId, modelId: firstModel.id })
   }, [firstModel?.id])
 
-  const m = findModel(model.providerId, model.modelId)
   const noModels = enabledModels.value.length === 0
 
   const start = async (text: string, images: Attachment[], files: StagedFile[]) => {
@@ -79,7 +78,7 @@ export function HomeView() {
                 providerId={model.providerId}
                 modelId={model.modelId}
                 onChange={(providerId, modelId) => setModel({ providerId, modelId })}
-                thinking={m?.reasoning ? thinking : null}
+                thinking={thinking}
                 onThinking={setThinking}
               />
             }

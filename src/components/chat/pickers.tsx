@@ -13,6 +13,7 @@ import {
   Settings2Icon,
   EyeIcon,
 } from "lucide-react"
+import { PREFERRED_EFFORTS, resolveThinking } from "@shared/effort"
 import type { PermissionMode, ThinkingLevel } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -174,9 +175,13 @@ export function ModelPicker({
   )
 }
 
-const THINKING: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"]
+const KNOWN_EFFORTS = new Set(["off", "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"])
 
-/** The model and its reasoning effort as one button. The effort only shows for a model that supports it. */
+export function effortLabel(v: string) {
+  return KNOWN_EFFORTS.has(v) ? t(`thinking.${v}` as MessageKey) : v
+}
+
+/** The model and its reasoning effort as one button. The choices are that model's own list. */
 export function ModelControl({
   providerId,
   modelId,
@@ -192,6 +197,8 @@ export function ModelControl({
 }) {
   const [open, setOpen] = useState(false)
   const current = findModel(providerId, modelId)
+  const choices = current?.reasoning && current.efforts?.length ? current.efforts : null
+  const selected = choices && thinking ? resolveThinking(thinking, choices, current?.effortDefault) : null
   return (
     <Panel
       open={open}
@@ -200,9 +207,9 @@ export function ModelControl({
       trigger={
         <Button variant="ghost" size="sm" className="max-w-[42vw] gap-1 px-2 text-muted-foreground hover:text-foreground pointer-coarse:min-h-10 sm:max-w-56">
           <span className="truncate">{current?.name ?? (modelId || t("picker.selectModel"))}</span>
-          {thinking && (
+          {choices && (
             <>
-              <span className="hidden shrink-0 sm:inline">· {t(`thinking.${thinking}` as MessageKey)}</span>
+              <span className="hidden shrink-0 sm:inline">· {selected ? effortLabel(selected) : t("picker.effortDefault")}</span>
               <span className="size-1.5 shrink-0 rounded-full bg-current opacity-70 sm:hidden" />
             </>
           )}
@@ -219,11 +226,11 @@ export function ModelControl({
           else onChange(p, m)
         }}
       />
-      {thinking && (
+      {choices && (
         <div className="border-t p-2.5">
           <div className="mb-1.5 text-xs text-muted-foreground">{t("picker.thinking")}</div>
           <div className="flex flex-wrap gap-1">
-            {THINKING.map((v) => (
+            {choices.map((v) => (
               <button
                 key={v}
                 type="button"
@@ -233,10 +240,10 @@ export function ModelControl({
                 }}
                 className={cn(
                   "rounded-md px-2 py-1 text-xs pointer-coarse:min-h-10",
-                  v === thinking ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground",
+                  v === selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground",
                 )}
               >
-                {t(`thinking.${v}` as MessageKey)}
+                {effortLabel(v)}
               </button>
             ))}
           </div>
@@ -247,21 +254,20 @@ export function ModelControl({
 }
 
 export function ThinkingPicker({ value, onChange }: { value: ThinkingLevel; onChange: (v: ThinkingLevel) => void }) {
-  const label = t(`thinking.${value}` as MessageKey)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="gap-1 px-2 text-muted-foreground hover:text-foreground" title={t("picker.thinking")}>
           <BrainIcon />
-          <span>{label}</span>
+          <span>{effortLabel(value)}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-40">
         <DropdownMenuLabel>{t("picker.thinking")}</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v as ThinkingLevel)}>
-          {THINKING.map((v) => (
+          {PREFERRED_EFFORTS.map((v) => (
             <DropdownMenuRadioItem key={v} value={v}>
-              {t(`thinking.${v}` as MessageKey)}
+              {effortLabel(v)}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

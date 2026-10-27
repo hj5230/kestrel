@@ -7,7 +7,11 @@ export type ProviderKind =
   | "openrouter"
   | "ollama";
 
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+/**
+ * An effort value exactly as the model accepts it (`low`, `max`, `none`, `ultra`, …).
+ * `off` is the legacy spelling of `none`.
+ */
+export type ThinkingLevel = string;
 
 /**
  * manual      — ask before every edit, command and MCP call.
@@ -44,13 +48,27 @@ export interface ModelConfig {
   vision: boolean;
   cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
   enabled: boolean;
+  /**
+   * Effort values this model actually accepts, weakest first.
+   * `null` means we have not looked it up yet. An empty list means it has no effort enum.
+   */
+  efforts?: string[] | null;
+  /** The model's own default, when the catalog names one and it is in `efforts`. */
+  effortDefault?: string | null;
+  /** Fields a person set to something other than the catalog, so a refresh does not overwrite them. */
+  locked?: string[];
 }
 
 export interface RemoteModel {
   id: string;
   name: string;
   contextWindow?: number;
+  maxTokens?: number;
+  reasoning?: boolean;
+  vision?: boolean;
   cost?: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  efforts?: string[];
+  effortDefault?: string;
   known: boolean;
 }
 
@@ -449,6 +467,7 @@ export type ServerEvent =
   | { type: "compacting"; sessionId: string; active: boolean }
   | { type: "mcp_status"; servers: McpServerStatus[] }
   | { type: "memory_changed" }
+  | { type: "models_updated" }
   | { type: "notice"; sessionId?: string; level: "info" | "warn" | "error"; text: string }
   | { type: "run_finished"; sessionId: string; title: string; ok: boolean }
   | { type: "remote_status"; status: RemoteStatus };

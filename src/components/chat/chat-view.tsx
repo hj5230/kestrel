@@ -324,7 +324,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
                     providerId={s.providerId}
                     modelId={s.modelId}
                     onChange={(providerId, modelId) => update({ providerId, modelId })}
-                    thinking={model?.reasoning ? s.thinking : null}
+                    thinking={s.thinking}
                     onThinking={(v: ThinkingLevel) => update({ thinking: v })}
                   />
                 }

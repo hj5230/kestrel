@@ -221,20 +221,51 @@ function NumField({ value, onValue, as: Comp = Input }: { value: number; onValue
   )
 }
 
+function parseEfforts(text: string): string[] {
+  return text.split(",").map((s) => s.trim()).filter(Boolean)
+}
+
 function ModelDialog({ model, onClose }: { model: ModelConfig | null; onClose: () => void }) {
   const [m, setM] = useState<ModelConfig | null>(model)
-  useEffect(() => setM(model), [model])
+  const [effortsText, setEffortsText] = useState("")
+  const [filling, setFilling] = useState(false)
+  useEffect(() => {
+    setM(model)
+    setEffortsText((model?.efforts ?? []).join(", "))
+    if (!model || model.efforts != null) return
+    let cancel = false
+    rpc<ModelConfig>("models.defaults", { providerId: model.providerId, id: model.id, name: model.name })
+      .then((d) => {
+        if (!cancel && d.efforts?.length) setEffortsText(d.efforts.join(", "))
+      })
+      .catch(() => {})
+    return () => {
+      cancel = true
+    }
+  }, [model])
   if (!m) return null
   const set = (patch: Partial<ModelConfig>) => setM({ ...m, ...patch })
   const setCost = (patch: Partial<ModelConfig["cost"]>) => setM({ ...m, cost: { ...m.cost, ...patch } })
   const save = async (e: Event) => {
     e.preventDefault()
     try {
-      await rpc("models.upsert", m)
+      await rpc("models.upsert", { ...m, efforts: parseEfforts(effortsText) })
       await refreshProviders()
       onClose()
     } catch (err: any) {
       toast.error(err.message)
+    }
+  }
+  const fill = async () => {
+    setFilling(true)
+    try {
+      const d = await rpc<ModelConfig>("models.defaults", { providerId: m.providerId, id: m.id, name: m.name })
+      setM({ ...m, ...d, name: m.name, enabled: m.enabled, providerId: m.providerId, id: m.id })
+      setEffortsText((d.efforts ?? []).join(", "))
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setFilling(false)
     }
   }
   return (
@@ -291,6 +322,16 @@ function ModelDialog({ model, onClose }: { model: ModelConfig | null; onClose: (
                 {t("models.vision")}
               </Label>
             </div>
+            <Field>
+              <div className="flex items-center justify-between gap-2">
+                <FieldLabel>{t("models.efforts")}</FieldLabel>
+                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={filling} onClick={fill}>
+                  {t("models.fill")}
+                </Button>
+              </div>
+              <Input className="font-mono text-xs" value={effortsText} placeholder="low, high, max" onInput={(e) => setEffortsText(e.currentTarget.value)} />
+              <FieldDescription>{t("models.effortsDesc")}</FieldDescription>
+            </Field>
           </FieldGroup>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
@@ -341,7 +382,7 @@ function FetchModelsDialog({ provider, onClose }: { provider: ProviderConfig | n
       providerId: provider!.id,
       models: ids.map((id) => {
         const r = remote?.find((x) => x.id === id)
-        return { id, contextWindow: r?.contextWindow, cost: r?.cost }
+        return { ...r, id }
       }),
     })
     await refreshProviders()

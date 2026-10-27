@@ -262,6 +262,9 @@ function handleEvents() {
       case "memory_changed":
         memoryRev.value++
         break
+      case "models_updated":
+        void refreshProviders()
+        break
       case "notice":
         if (e.level === "error") toast.error(e.text)
         else if (e.level === "warn") toast.warning(e.text)

@@ -7,9 +7,9 @@ import { getModels, getProviders, type Model } from "@mariozechner/pi-ai";
 import type { LanguageModel } from "ai";
 import type { ModelConfig, ProviderConfig, ProviderKind, RemoteModel } from "../shared/protocol";
 import * as store from "./db";
-import fs from "node:fs";
-import path from "node:path";
-import { getShellEnv, HOME } from "./env";
+import { getShellEnv } from "./env";
+import { lookupFacts } from "./catalog";
+import { sortEfforts } from "../shared/effort";
 import { st } from "./i18n";
 
 export const PROVIDER_PRESETS: Record<ProviderKind, { name: string; baseUrl: string; needsKey: boolean }> = {
@@ -156,71 +156,42 @@ export function lookupKnownModel(kind: ProviderKind, id: string): Model<any> | n
   return null;
 }
 
-interface CodexModel {
-  contextWindow: number;
-  vision: boolean;
-  reasoning: boolean;
+export interface ModelHint {
+  baseUrl?: string;
+  maxTokens?: number;
+  reasoning?: boolean;
+  vision?: boolean;
+  /** Effort list reported by this endpoint. Used only when it is non-empty; it beats the catalog. */
+  efforts?: string[];
+  effortDefault?: string | null;
+  cost?: ModelConfig["cost"];
 }
 
-let codexCache: { mtime: number; models: Map<string, CodexModel> } | null = null;
-
-/**
- * What the Codex CLI knows about its own models (`~/.codex/models_cache.json`, refreshed by Codex).
- * Proxies that serve a ChatGPT subscription use the same model ids, and the pi-ai catalog lags them.
- */
-function codexModel(id: string): CodexModel | null {
-  const file = path.join(HOME, ".codex", "models_cache.json");
-  let mtime: number;
-  try {
-    mtime = fs.statSync(file).mtimeMs;
-  } catch {
-    return null;
-  }
-  if (!codexCache || codexCache.mtime !== mtime) {
-    const models = new Map<string, CodexModel>();
-    try {
-      for (const m of JSON.parse(fs.readFileSync(file, "utf8")).models ?? []) {
-        if (typeof m?.slug !== "string" || !(m.context_window > 0)) continue;
-        models.set(m.slug, {
-          contextWindow: m.context_window,
-          vision: Array.isArray(m.input_modalities) && m.input_modalities.includes("image"),
-          reasoning: Array.isArray(m.supported_reasoning_levels) && m.supported_reasoning_levels.length > 0,
-        });
-      }
-    } catch {}
-    codexCache = { mtime, models };
-  }
-  return codexCache.models.get(id.split("/").pop()!) ?? null;
-}
-
-export function modelDefaults(kind: ProviderKind, id: string, name?: string, contextHint?: number): Omit<ModelConfig, "providerId"> {
+export function modelDefaults(kind: ProviderKind, id: string, name?: string, contextHint?: number, hint?: ModelHint): Omit<ModelConfig, "providerId"> {
+  const facts = lookupFacts(kind, hint?.baseUrl ?? "", id);
   const known = lookupKnownModel(kind, id);
   const long = LONG_CONTEXT.test(id);
-  if (known) {
-    return {
-      id,
-      name: name || known.name,
-      contextWindow: long ? Math.max(known.contextWindow, 1_000_000) : known.contextWindow,
-      maxTokens: known.maxTokens,
-      reasoning: known.reasoning,
-      vision: known.input.includes("image"),
-      cost: { ...known.cost },
-      enabled: true,
-    };
-  }
   const lower = id.toLowerCase();
-  const codex = codexModel(id);
   const claude = /(^|\/)claude-/.test(lower);
+  let contextWindow = facts?.contextWindow ?? known?.contextWindow ?? (long ? 1_000_000 : claude ? 200_000 : 128_000);
+  if (long) contextWindow = Math.max(contextWindow, 1_000_000);
+  if (contextHint) contextWindow = contextHint;
+  const efforts = hint?.efforts !== undefined ? sortEfforts(hint.efforts) : (facts?.efforts ?? null);
+  let effortDefault = hint?.effortDefault ?? facts?.effortDefault ?? null;
+  if (effortDefault && efforts && !efforts.includes(effortDefault)) effortDefault = null;
+  const cost = hint?.cost ?? facts?.cost ?? known?.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
   return {
     id,
-    name: name || id,
-    // the endpoint's own figure first, then what we can tell from the id
-    contextWindow: contextHint || (long ? 1_000_000 : codex?.contextWindow || (claude ? 200_000 : 128000)),
-    maxTokens: 16384,
-    reasoning: codex?.reasoning ?? /reason|think|o\d|gpt-[5-9]|r1|qwq|claude|gemini-2\.5|gemini-3/.test(lower),
-    vision: codex?.vision ?? /vision|gpt-4o|gpt-[5-9]|claude|gemini|vl/.test(lower),
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    name: name || facts?.name || known?.name || id,
+    contextWindow,
+    maxTokens: hint?.maxTokens ?? (facts?.maxTokens || known?.maxTokens || 16384),
+    reasoning: hint?.reasoning ?? ((efforts?.length ?? 0) > 0 || (facts ? !!facts.reasoning : known ? known.reasoning : /reason|think|o\d|gpt-[5-9]|r1|qwq|claude|gemini-2\.5|gemini-3/.test(lower))),
+    vision: hint?.vision ?? facts?.vision ?? known?.input.includes("image") ?? (/vision|gpt-4o|gpt-[5-9]|claude|gemini|vl/.test(lower)),
+    cost: { input: cost.input, output: cost.output, cacheRead: cost.cacheRead, cacheWrite: cost.cacheWrite },
     enabled: true,
+    efforts,
+    effortDefault,
+    locked: [],
   };
 }
 
@@ -251,12 +222,15 @@ export async function fetchRemoteModels(p: ProviderConfig): Promise<RemoteModel[
         pr && (Number(pr.prompt) > 0 || Number(pr.completion) > 0)
           ? { input: perM(pr.prompt), output: perM(pr.completion), cacheRead: perM(pr.input_cache_read), cacheWrite: perM(pr.input_cache_write) }
           : undefined;
+      const reported = Array.isArray(m.reasoning?.supported_efforts) ? m.reasoning.supported_efforts.filter((v: unknown): v is string => typeof v === "string" && !!v) : [];
       return {
         id,
         name: m.display_name ?? m.displayName ?? m.name ?? id,
         contextWindow: m.context_length ?? m.inputTokenLimit ?? m.context_window ?? undefined,
         cost,
-        known: !!lookupKnownModel(p.kind, id),
+        efforts: reported.length ? reported : undefined,
+        effortDefault: typeof m.reasoning?.default_effort === "string" ? m.reasoning.default_effort : undefined,
+        known: !!lookupKnownModel(p.kind, id) || !!lookupFacts(p.kind, base, id),
       } as RemoteModel;
     })
     .filter((m) => m.id && !/embed|tts|whisper|dall-e|image|audio|moderation|realtime|transcribe/i.test(m.id))
@@ -283,5 +257,5 @@ export function resolveModel(providerId: string, modelId: string): ModelConfig {
   if (m) return m;
   const p = store.getProvider(providerId);
   if (!p) throw new Error(st("configureProvider"));
-  return { providerId, ...modelDefaults(p.kind, modelId) };
+  return { providerId, ...modelDefaults(p.kind, modelId, undefined, undefined, { baseUrl: p.baseUrl }) };
 }
