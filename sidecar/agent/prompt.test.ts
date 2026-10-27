@@ -41,34 +41,24 @@ describe("asking the user", () => {
 });
 
 describe("memory", () => {
-  test("reading is framed as the first step, not an optional extra", () => {
-    const p = prompt();
-    expect(p).toContain("before your first reply or tool call");
-    expect(p).toContain("a missed note is the costly mistake");
+  test("unconfigured memory does not advertise tools or a note index", () => {
+    expect(prompt()).toContain("Memory is unavailable");
+    expect(prompt()).not.toContain("<memory_index>");
   });
-
-  test("saving is a checkpoint before the final message when auto-save is on", () => {
-    expect(prompt()).toContain("Before you send the final message of a turn");
-    expect(prompt()).toContain("Don't wait to be asked");
+  test("configured memory explains automatic tiered disclosure and background saving", () => {
+    store.saveSettings({ memoryEmbedding: { api: "ollama", url: "http://localhost:1/api/embed", model: "e", apiKey: "" }, memoryReranker: { url: "http://localhost:2/v1/rerank", model: "r", apiKey: "" } });
+    expect(prompt()).toContain("full notes first, then titles");
+    expect(prompt()).toContain("durable background process");
+    expect(prompt()).not.toContain("<memory_index>");
   });
-
-  test("with auto-save off, both the prompt and the tool say to save only when asked", () => {
+  test("auto-save off preserves explicit-only saving in prompt and tools", () => {
     store.saveSettings({ memoryAutoSave: false });
     expect(prompt()).toContain("only when the user explicitly asks");
-    expect(prompt()).not.toContain("Don't wait to be asked");
-    const write = memoryTools(ctx(false), { readOnly: false }).find((t) => t.name === "memory_write")!;
-    expect(write.description).toContain("only when the user explicitly asks");
-    expect(write.description).not.toContain("don't wait to be asked");
+    expect(memoryTools(ctx(false), { readOnly: false }).find((t) => t.name === "memory_write")!.description).toContain("only when the user explicitly asks");
   });
-
-  test("with auto-save on, the write tool tells the model to save without being asked", () => {
-    store.saveSettings({ memoryAutoSave: true });
-    const write = memoryTools(ctx(true), { readOnly: false }).find((t) => t.name === "memory_write")!;
-    expect(write.description).toContain("don't wait to be asked");
-  });
-
-  test("the read tool says when to open a note", () => {
-    const read = memoryTools(ctx(true), { readOnly: true }).find((t) => t.name === "memory_read")!;
-    expect(read.description).toContain("plausibly related");
+  test("read is batched with required explicit ids; subagents cannot write", () => {
+    const tools = memoryTools(ctx(true), { readOnly: true });
+    expect(tools.map((t) => t.name)).toEqual(["memory_search", "memory_read"]);
+    expect((tools[1].parameters as any).required).toEqual(["ids"]);
   });
 });

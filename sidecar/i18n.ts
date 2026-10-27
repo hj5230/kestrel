@@ -1,6 +1,11 @@
 import * as store from "./db";
 
 const en = {
+  memoryDisabled: "Memory is disabled.",
+  memoryUnconfigured: "Memory is unavailable. Configure both Embedding and Reranker in Settings → Memory.",
+  memoryFailed: "Memory is unavailable: {reason}. No alternative retrieval was used.",
+  memoryJobFailed: "Automatic memory saving failed: {reason}. Retry it in Settings → Memory.",
+  memoryModelTimeout: "Memory model did not respond within {seconds} seconds.",
   sessionNotFound: "Session not found",
   dirNotFound: "Folder does not exist: {path}",
   noModel: "No model selected. Add a provider and model in Settings → Models.",
@@ -47,6 +52,11 @@ const en = {
 type Key = keyof typeof en;
 
 const zh: Record<Key, string> = {
+  memoryDisabled: "记忆已关闭。",
+  memoryUnconfigured: "记忆不可用。请在「设置 → 记忆」中配置 Embedding 和 Reranker 两个模型。",
+  memoryFailed: "记忆不可用：{reason}。未使用其他检索方式。",
+  memoryJobFailed: "自动保存记忆失败：{reason}。请在「设置 → 记忆」中重试。",
+  memoryModelTimeout: "记忆模型未在 {seconds} 秒内响应。",
   sessionNotFound: "会话不存在",
   dirNotFound: "目录不存在：{path}",
   noModel: "尚未选择模型。请先在「设置 → 模型」中添加供应商和模型。",

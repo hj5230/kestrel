@@ -47,7 +47,7 @@ export function sideModel(setting: string | undefined, session: { providerId: st
 export const costOf = (u: Usage, m: ModelConfig) => (u.input * m.cost.input + u.output * m.cost.output + u.cacheRead * m.cost.cacheRead + u.cacheWrite * m.cost.cacheWrite) / 1e6;
 
 /** Books a side call against the session (so it shows in its cost) and in the usage statistics. */
-export function recordSideUsage(sessionId: string, purpose: "title" | "compaction" | "review", model: { providerId: string; modelId: string }, usage: Usage) {
+export function recordSideUsage(sessionId: string, purpose: "title" | "compaction" | "review" | "memory", model: { providerId: string; modelId: string }, usage: Usage) {
   if (!usage.input && !usage.output && !usage.cacheRead && !usage.cacheWrite) return;
   let cost = 0;
   try {

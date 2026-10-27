@@ -15,6 +15,7 @@ import type {
 } from "../shared/protocol";
 import { planBackfill, type CatalogFacts } from "./catalog";
 import { HOME } from "./env";
+import { validateMemoryEndpoint } from "./memory-config";
 import { DEFAULT_BASH_WHITELIST } from "./permissions";
 
 const MIGRATIONS: string[] = [
@@ -154,6 +155,14 @@ const MIGRATIONS: string[] = [
   ALTER TABLE models ADD COLUMN effort_default TEXT;
   ALTER TABLE models ADD COLUMN locked TEXT NOT NULL DEFAULT '';
   `,
+  `CREATE TABLE memory_jobs (
+    id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    seq INTEGER NOT NULL, message TEXT NOT NULL, epoch TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
+    error TEXT, created_at INTEGER NOT NULL, next_at INTEGER NOT NULL DEFAULT 0
+  );`,
+  `ALTER TABLE memory_jobs ADD COLUMN plan TEXT;
+   CREATE INDEX memory_jobs_pending ON memory_jobs(state, next_at, created_at);`,
 ];
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -179,6 +188,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   commandDirs: ["~/.kestrel/commands", "~/.claude/commands"],
   memoryEnabled: true,
   memoryAutoSave: true,
+  memoryEmbedding: { api: "ollama", url: "", model: "", apiKey: "" },
+  memoryReranker: { url: "", model: "", apiKey: "" },
+  memoryMinScore: 0.1,
   proxyMode: "env",
   proxyUrl: "",
   tavilyApiKey: "",
@@ -259,6 +271,9 @@ export function getSettings(): AppSettings {
 
 export function saveSettings(patch: Partial<AppSettings>): AppSettings {
   const next = { ...getSettings(), ...patch };
+  if (patch.memoryEmbedding !== undefined) next.memoryEmbedding = validateMemoryEndpoint(patch.memoryEmbedding, true) as AppSettings["memoryEmbedding"];
+  if (patch.memoryReranker !== undefined) next.memoryReranker = validateMemoryEndpoint(patch.memoryReranker);
+  if (!Number.isFinite(next.memoryMinScore) || next.memoryMinScore < 0 || next.memoryMinScore > 1) throw new Error("Memory relevance threshold must be between 0 and 1");
   db.run("INSERT INTO meta (key, value) VALUES ('settings', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [
     JSON.stringify(next),
   ]);
@@ -528,7 +543,7 @@ export function loadMessages(sessionId: string): StoredMessage[] {
   }));
 }
 
-export function appendMessage(sessionId: string, message: ChatMessage): StoredMessage {
+export function appendMessage(sessionId: string, message: ChatMessage, memoryEpoch?: string): StoredMessage {
   const row = db.query("SELECT COALESCE(MAX(seq), -1) + 1 AS next FROM messages WHERE session_id = ?").get(sessionId) as { next: number };
   const seq = row.next;
   db.transaction(() => {
@@ -542,12 +557,16 @@ export function appendMessage(sessionId: string, message: ChatMessage): StoredMe
     const text = searchableText(message).trim();
     if (text) db.run("INSERT INTO messages_fts (text, session_id, seq, role) VALUES (?, ?, ?, ?)", [text, sessionId, seq, message.role]);
     db.run("UPDATE sessions SET updated_at = ? WHERE id = ?", [Date.now(), sessionId]);
+    if (message.role === "user" && memoryEpoch !== undefined) {
+      db.run("INSERT INTO memory_jobs (id, session_id, seq, message, epoch, created_at) VALUES (?, ?, ?, ?, ?, ?)", [crypto.randomUUID(), sessionId, seq, JSON.stringify(message), memoryEpoch, Date.now()]);
+    }
   })();
   return { seq, message };
 }
 
 export function truncateMessages(sessionId: string, fromSeq: number) {
   db.transaction(() => {
+    db.run("DELETE FROM memory_jobs WHERE session_id = ? AND seq >= ?", [sessionId, fromSeq]);
     db.run("DELETE FROM messages WHERE session_id = ? AND seq >= ?", [sessionId, fromSeq]);
     db.run("DELETE FROM messages_fts WHERE session_id = ? AND seq >= ?", [sessionId, fromSeq]);
     db.run("DELETE FROM compactions WHERE session_id = ? AND cut_seq >= ?", [sessionId, fromSeq]);

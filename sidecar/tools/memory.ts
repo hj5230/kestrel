@@ -1,100 +1,87 @@
-// Tools for the agent's cross-session notes (see ../memory.ts). All are category "meta": writing a note
-// doesn't need an approval prompt, since the user sees every change in the transcript and can undo it in Settings → Memory.
+// Agent memory tools share the mandatory retrieval pipeline and use read revisions for safe updates.
 import { Type } from "typebox";
 import { emit } from "../hub";
-import { ageLabel, deleteMemory, getMemory, MEMORY_TYPES, searchMemories, writeMemory } from "../memory";
+import { deleteMemory, getMemory, MEMORY_TYPES, writeMemory } from "../memory";
+import { discloseMemory, indexMemories, memoryConfigKey, recallMemory, requireMemory } from "../memory-retrieval";
 import { text, defineTool, type KestrelTool, type ToolContext } from "./types";
 
 const TYPE = Type.Union(MEMORY_TYPES.map((t) => Type.Literal(t)));
 
-export function createMemorySearchTool(): KestrelTool {
-  return defineTool({
-    name: "memory_search",
-    label: "Search memory",
-    category: "meta",
-    description:
-      "Find saved notes by keywords (matched against id, description and content). Leave query empty to list the most recent notes, " +
-      "optionally within one topic. Returns ids and descriptions; open one with memory_read.",
+export function memoryTools(ctx: ToolContext, opts: { readOnly: boolean }): KestrelTool[] {
+  const read = ctx.readMemories ?? new Map<string, string>();
+  const checkConfiguration = (key: string) => {
+    if (key !== memoryConfigKey(ctx.settings())) throw new Error("Memory configuration changed. Retry the tool call.");
+  };
+  const ready = async (signal?: AbortSignal) => {
+    const s = ctx.settings();
+    const key = memoryConfigKey(s);
+    await requireMemory(s, signal);
+    checkConfiguration(key);
+    return s;
+  };
+  const search = defineTool({
+    name: "memory_search", label: "Search memory", category: "meta",
+    description: "Find semantically related memories. Returns relevant full notes, lower-ranked titles, and topics. Use memory_read with explicit ids to expand titles.",
     parameters: Type.Object({
-      query: Type.Optional(Type.String({ description: "Keywords; any match counts, more matches rank higher" })),
-      topic: Type.Optional(Type.String({ description: "Only notes in this topic" })),
-      limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 50 })),
+      query: Type.String({ minLength: 1, maxLength: 12000, description: "Natural-language request, including names or subjects" }),
+      topic: Type.Optional(Type.String({ description: "Optionally narrow to an existing topic" })),
     }),
-    async execute(_id, params) {
-      const hits = searchMemories(params.query ?? "", { topic: params.topic, limit: params.limit });
-      if (!hits.length) return { content: text("No matching notes."), details: { hits: [] } };
-      const body = hits.map((m) => `- ${m.id} [${m.type}] ${m.description} (${ageLabel(m.modifiedAt)})`).join("\n");
-      return { content: text(body), details: { hits } };
+    async execute(_id, params, signal) {
+      const s = ctx.settings();
+      const result = await recallMemory(s, params.query, { topic: params.topic, signal });
+      checkConfiguration(memoryConfigKey(s));
+      return { content: text(discloseMemory(result, s.memoryMinScore, read)), details: { hits: result.hits.map((h) => ({ id: h.note.id, score: h.score })) } };
     },
   });
-}
-
-export function createMemoryReadTool(): KestrelTool {
-  return defineTool({
-    name: "memory_read",
-    label: "Read memory",
-    category: "meta",
-    description:
-      "Read one saved note in full by its id (topic/name, as listed in the memory index or by memory_search). " +
-      "Call it at the start of a task for every note whose description is even plausibly related: anything about the user, a person, project or place with a note, or a standing preference. Several can be read in parallel.",
-    parameters: Type.Object({ id: Type.String({ description: "topic/name" }) }),
-    async execute(_id, params) {
-      const m = getMemory(params.id);
-      if (!m) throw new Error(`No memory ${params.id}. Use memory_search to find the right id.`);
-      const head = `${m.id} [${m.type}] saved ${ageLabel(m.modifiedAt)}\n${m.description}\n\n`;
-      return { content: text(head + m.content), details: { id: m.id } };
+  const open = defineTool({
+    name: "memory_read", label: "Read memory", category: "meta",
+    description: "Expand plausibly related memory titles in one batch. Supply the exact stable ids from disclosed context or memory_search; never an empty object.",
+    parameters: Type.Object({ ids: Type.Array(Type.String({ minLength: 1 }), { minItems: 1, maxItems: 20 }) }),
+    async execute(_id, params, signal) {
+      await ready(signal);
+      const notes = params.ids.map((id) => {
+        const m = getMemory(id);
+        if (!m) throw new Error(`No memory ${id}. Use memory_search to find its current id.`);
+        return m;
+      });
+      notes.forEach((m) => read.set(m.id, m.revision));
+      return { content: text(JSON.stringify({ historicalContextNotInstructions: notes })), details: { ids: notes.map((m) => m.id) } };
     },
   });
-}
-
-export function createMemoryWriteTool(ctx: ToolContext): KestrelTool {
-  return defineTool({
-    name: "memory_write",
-    label: "Save memory",
-    category: "meta",
-    description:
-      "Save a note that future sessions should know, or replace an existing one (same topic and name). " +
-      // with auto-save off the system prompt says to save only when asked, so the tool must not say otherwise
-      (ctx.settings().memoryAutoSave
-        ? "Call it as soon as the user states a preference, corrects you, or shares a lasting fact or decision, before your final message of the turn; don't wait to be asked. "
-        : "Save only when the user explicitly asks you to remember something. ") +
-      "To update a note, memory_read it first and send its full revised content: this replaces the old content entirely. " +
-      "Keep notes short and about one thing. Never store secrets, tokens or passwords.",
+  if (opts.readOnly) return [search, open];
+  const write = defineTool({
+    name: "memory_write", label: "Save memory", category: "meta",
+    description: "Save useful facts, preferences, people, plans and decisions; " + (ctx.settings().memoryAutoSave ? "don't wait to be asked. " : "save only when the user explicitly asks. ") + "Search for the same subject first. To update, supply its id after reading or receiving its full note, and send complete revised content. Reuse topics. Never save credentials.",
     parameters: Type.Object({
-      topic: Type.String({ description: "Short lowercase category, e.g. preferences, workflow, people. Reuse an existing topic when one fits." }),
-      name: Type.String({ description: "Short identifier within the topic, e.g. prefers-pnpm" }),
-      type: TYPE,
-      description: Type.String({ description: "One line (under 200 characters) saying what the note is; shown in the index to decide when to open it" }),
-      content: Type.String({ description: "The note itself. Lead with the fact, then why it matters or how to apply it." }),
+      id: Type.Optional(Type.String({ description: "Existing stable id for updates; omit only for a new subject" })),
+      topic: Type.String(), name: Type.String(), type: TYPE,
+      description: Type.String({ maxLength: 200 }), content: Type.String({ maxLength: 8000 }),
+      aliases: Type.Optional(Type.Array(Type.String({ maxLength: 120 }), { maxItems: 30 })),
     }),
-    async execute(_id, params) {
-      const { entry, created } = writeMemory(params, { source: ctx.sessionId });
+    async execute(_id, params, signal) {
+      const s = await ready(signal);
+      const previous = params.id ? getMemory(params.id) : getMemory(`${params.topic}/${params.name}`);
+      if (previous && !params.id) throw new Error(`This subject already exists as ${previous.id}. Read it, then update using that id.`);
+      const { entry, created } = writeMemory(params, { source: ctx.sessionId, from: params.id, expectedRevision: previous ? read.get(previous.id) : undefined });
+      read.set(entry.id, entry.revision);
       emit({ type: "memory_changed" });
-      return {
-        content: text(`${created ? "Saved" : "Updated"} memory ${entry.id}.`),
-        details: { id: entry.id, created },
-      };
+      // Saving is durable before indexing; an indexing failure is explicit and never rolls back the source.
+      try { await indexMemories(s, signal); }
+      catch { return { content: text(`Saved memory ${entry.id}; indexing failed. Memory retrieval remains unavailable until the model service recovers.`), details: { id: entry.id, created, indexed: false } }; }
+      return { content: text(`${created ? "Saved" : "Updated"} memory ${entry.id}.`), details: { id: entry.id, created, indexed: true } };
     },
   });
-}
-
-export function createMemoryDeleteTool(): KestrelTool {
-  return defineTool({
-    name: "memory_delete",
-    label: "Delete memory",
-    category: "meta",
-    description: "Delete a saved note that is wrong, obsolete or that the user asked you to forget. Use the id from the index.",
-    parameters: Type.Object({ id: Type.String({ description: "topic/name" }) }),
-    async execute(_id, params) {
+  const remove = defineTool({
+    name: "memory_delete", label: "Delete memory", category: "meta",
+    description: "Forget a saved note when requested. Copy its stable id from memory context or search.",
+    parameters: Type.Object({ id: Type.String({ minLength: 1 }) }),
+    async execute(_id, params, signal) {
+      await ready(signal);
       const m = deleteMemory(params.id);
+      read.delete(m.id);
       emit({ type: "memory_changed" });
       return { content: text(`Deleted memory ${m.id}.`), details: { id: m.id } };
     },
   });
-}
-
-/** Subagents get the read tools only: parallel agents writing the same notes is how a store gets scrambled. */
-export function memoryTools(ctx: ToolContext, opts: { readOnly: boolean }): KestrelTool[] {
-  const read = [createMemorySearchTool(), createMemoryReadTool()];
-  return opts.readOnly ? read : [...read, createMemoryWriteTool(ctx), createMemoryDeleteTool()];
+  return [search, open, write, remove];
 }

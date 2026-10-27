@@ -37,6 +37,11 @@ import { createAskUserTool, sanitizeAnswers } from "../tools/ask";
 import { withEmptyArgsHint } from "../tools/empty-args";
 import { createEditTool, createGlobTool, createGrepTool, createLsTool, createReadTool, createWriteTool } from "../tools/fs-tools";
 import { memoryTools } from "../tools/memory";
+import { memoryConfigured } from "../memory-config";
+import { memoryEpoch } from "../memory";
+import { memoryConfigKey } from "../memory-retrieval";
+import { MemoryContext } from "../memory-context";
+import { drainMemoryJobs } from "../memory-jobs";
 import { createReadSessionTool, createSearchSessionsTool, createSkillTool, createTaskTool, createTodoTool } from "../tools/meta";
 import type { KestrelTool, SubagentRequest, ToolContext } from "../tools/types";
 import { createWebFetchTool, createWebSearchTool } from "../tools/web";
@@ -164,6 +169,7 @@ export class SessionRunner {
   readonly parent: SessionRunner | null;
   readonly rootId: string;
   readFiles = new Map<string, number>();
+  private memoryContext = new MemoryContext();
   queued: (QueuedMessage & { ts: number; msg: AgentMessage })[] = [];
   streaming: AssistantMsg | null = null;
   runningTools: SessionDetail["runningTools"] = {};
@@ -244,6 +250,7 @@ export class SessionRunner {
       cwd: () => this.info().cwd,
       settings: () => store.getSettings(),
       readFiles: this.readFiles,
+      readMemories: this.memoryContext.read,
       setTodos: (todos: Todo[]) => {
         store.updateSession(this.id, { todos });
         this.emitSession();
@@ -269,7 +276,7 @@ export class SessionRunner {
     if (!subagent) tools.push(createTodoTool(ctx), createTaskTool(ctx), createAskUserTool(ctx));
     if (store.getSettings().tavilyApiKey.trim()) tools.push(createWebSearchTool(ctx));
     if (discoverSkills(this.info().cwd).length) tools.push(createSkillTool(ctx));
-    if (store.getSettings().memoryEnabled) tools.push(...memoryTools(ctx, { readOnly: subagent }));
+    if (store.getSettings().memoryEnabled && memoryConfigured(store.getSettings())) tools.push(...memoryTools(ctx, { readOnly: subagent }));
     tools.push(...mcpTools());
     return tools.map(withEmptyArgsHint);
   }
@@ -314,7 +321,11 @@ export class SessionRunner {
     } catch {}
     const start = Math.min(this.compaction?.cutSeq ?? 0, messages.length);
     const rest = messages.slice(start);
-    return this.compaction ? [summaryMessage(this.compaction.summary), ...rest] : rest;
+    const context = this.compaction ? [summaryMessage(this.compaction.summary), ...rest] : rest;
+    const settings = store.getSettings();
+    const result = await this.memoryContext.inject(settings, context, messages, signal);
+    if (memoryConfigKey(settings) !== memoryConfigKey(store.getSettings())) throw new Error("Memory configuration changed during retrieval. Retry the request.");
+    return result;
   }
 
   async compact(opts: { auto: boolean; messages?: AgentMessage[]; signal?: AbortSignal; instructions?: string; full?: boolean }) {
@@ -552,7 +563,9 @@ export class SessionRunner {
           this.streamTimer = null;
           this.streaming = null;
         }
-        const stored = store.appendMessage(this.id, msg);
+        const settings = store.getSettings();
+        const epoch = msg.role === "user" && this.info().kind === "main" && settings.memoryEnabled && settings.memoryAutoSave && memoryConfigured(settings) ? memoryEpoch() : undefined;
+        const stored = store.appendMessage(this.id, msg, epoch);
         emit({ type: "message_appended", sessionId: this.id, stored });
         if (msg.role === "assistant") {
           emit({ type: "stream", sessionId: this.id, message: null });
@@ -697,7 +710,10 @@ export class SessionRunner {
       }
       this.emitSession();
       const s = store.getSession(this.id);
-      if (s?.kind === "main") emit({ type: "run_finished", sessionId: this.id, title: s.title || st("sessionFallback"), ok });
+      if (s?.kind === "main") {
+        emit({ type: "run_finished", sessionId: this.id, title: s.title || st("sessionFallback"), ok });
+        void drainMemoryJobs();
+      }
     }
   }
 

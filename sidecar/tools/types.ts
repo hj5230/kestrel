@@ -18,6 +18,7 @@ export interface ToolContext {
   cwd: () => string;
   settings: () => AppSettings;
   readFiles: Map<string, number>;
+  readMemories?: Map<string, string>;
   setTodos: (todos: Todo[]) => void;
   runSubagent: (req: SubagentRequest, signal: AbortSignal | undefined, onProgress: (details: any) => void) => Promise<string>;
   /** Put questions to the user and wait. Resolves to null when they dismiss it or the run is aborted. */

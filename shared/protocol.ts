@@ -312,9 +312,39 @@ export interface SkillInfo {
 /** What a memory is about; steers what the agent saves and how the settings page groups it. */
 export type MemoryType = "user" | "feedback" | "project" | "reference";
 
+export interface MemoryModelEndpoint {
+  url: string;
+  model: string;
+  apiKey: string;
+}
+
+export interface MemoryEmbeddingEndpoint extends MemoryModelEndpoint {
+  api: "ollama" | "openai";
+}
+
+export interface MemoryStatus {
+  state: "disabled" | "unconfigured" | "indexing" | "ready" | "error";
+  total: number;
+  indexed: number;
+  error: string | null;
+  pending: number;
+  failed: number;
+  saveError: string | null;
+  migrated: number;
+}
+
+export interface MemoryEvidence {
+  sessionId: string;
+  seq: number;
+  quote: string;
+}
+
 export interface MemorySummary {
-  /** `topic/name`; stable key used by the agent tools and the settings page. */
+  /** Stable identity, preserved when a note is moved or renamed. */
   id: string;
+  locator: string;
+  revision: string;
+  aliases: string[];
   topic: string;
   name: string;
   type: MemoryType;
@@ -327,6 +357,7 @@ export interface MemorySummary {
 
 export interface MemoryEntry extends MemorySummary {
   content: string;
+  evidence: MemoryEvidence[];
 }
 
 export interface SlashCommandInfo {
@@ -364,6 +395,10 @@ export interface AppSettings {
   memoryEnabled: boolean;
   /** Agent may save on its own judgement; off means only when the user asks it to remember something. */
   memoryAutoSave: boolean;
+  memoryEmbedding: MemoryEmbeddingEndpoint;
+  memoryReranker: MemoryModelEndpoint;
+  /** Normalized reranker score required for automatic full-text disclosure. */
+  memoryMinScore: number;
   proxyMode: "env" | "none" | "custom";
   proxyUrl: string;
   /** Tavily API key. The web_search tool exists only while this is set. */

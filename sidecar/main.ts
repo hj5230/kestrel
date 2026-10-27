@@ -10,6 +10,9 @@ import { startMcp, stopAllMcp } from "./mcp";
 import { killAllShells } from "./tools/bash";
 import { initRemote, shutdownRemote } from "./remote";
 import { startServer } from "./server";
+import { cancelMemoryWork, initializeMemory, prepareMemory } from "./memory-retrieval";
+import { memoryConfigured } from "./memory-config";
+import { startMemoryJobs, stopMemoryJobs } from "./memory-jobs";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -25,6 +28,7 @@ for (const k of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_
 
 loadCatalogCache(dataDir);
 openDb(dataDir, dev);
+try { initializeMemory(); } catch (e) { console.error("Memory initialization failed:", e instanceof Error ? e.message : String(e)); }
 const fillModels = () =>
   backfillModels((model) => {
     const provider = getProvider(model.providerId);
@@ -49,9 +53,16 @@ openHistoryDb(path.join(dataDir, dev ? "history-dev.db" : "history.db"));
 setHistorySources(getSettings().historySources);
 setTimeout(() => syncHistory().catch(() => {}), 3000);
 
-envReady.then(() => startMcp()).catch(() => {});
+envReady.then(() => {
+  const s = getSettings();
+  if (s.memoryEnabled && memoryConfigured(s)) void prepareMemory(s).catch(() => {});
+  startMemoryJobs();
+  return startMcp();
+}).catch(() => {});
 
 async function shutdown() {
+  cancelMemoryWork();
+  stopMemoryJobs();
   shutdownRemote();
   killAllShells();
   await Promise.race([stopAllMcp(), new Promise((r) => setTimeout(r, 1500))]);

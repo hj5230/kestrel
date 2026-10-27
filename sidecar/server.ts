@@ -9,6 +9,9 @@ import { collapseHome, expandHome, HOME, SHELL, which } from "./env";
 import { emit, subscribe } from "./hub";
 import { st } from "./i18n";
 import { mcpStatuses, removeMcp, restartMcp } from "./mcp";
+import { memoryConfigured, validateMemoryEndpoint } from "./memory-config";
+import { cancelMemoryWork, memoryConfigKey, testMemoryModels, memoryStatus, prepareMemory, resetMemoryIndex } from "./memory-retrieval";
+import { drainMemoryJobs, memoryJobCounts, retryMemoryJobs } from "./memory-jobs";
 import { deleteMemory, getMemory, listMemories, writeMemory, type MemoryInput } from "./memory";
 import { DEFAULT_BASH_WHITELIST } from "./permissions";
 import { sortEfforts } from "../shared/effort";
@@ -74,7 +77,12 @@ const handlers: Record<string, Handler> = {
 
   "settings.get": () => store.getSettings(),
   "settings.update": (patch) => {
+    const previousMemory = memoryConfigKey(store.getSettings());
     const s = store.saveSettings(patch);
+    if (previousMemory !== memoryConfigKey(s)) cancelMemoryWork();
+    if (Object.keys(patch).some((k) => k.startsWith("memory"))) {
+      if (s.memoryEnabled && memoryConfigured(s)) void prepareMemory(s).then(() => drainMemoryJobs()).catch(() => {});
+    }
     if ("historySources" in patch) {
       setHistorySources(s.historySources);
       syncHistory().catch(() => {});
@@ -253,15 +261,32 @@ const handlers: Record<string, Handler> = {
   "skills.list": ({ cwd }) => discoverSkills(expandHome(cwd || store.getSettings().defaultCwd), true),
   "commands.list": ({ cwd }) => listSlashCommands(expandHome(cwd || store.getSettings().defaultCwd)),
 
+  "memory.status": () => ({ ...memoryStatus(store.getSettings()), ...memoryJobCounts() }),
+  "memory.test": async ({ embedding, reranker }) => {
+    const s = { ...store.getSettings(), memoryEnabled: true, memoryEmbedding: validateMemoryEndpoint(embedding, true), memoryReranker: validateMemoryEndpoint(reranker, false) };
+    if (!memoryConfigured(s)) throw new Error(st("memoryUnconfigured"));
+    await testMemoryModels(s);
+    // A successful test of the saved configuration also clears a previous startup failure.
+    if (store.getSettings().memoryEnabled && memoryConfigKey(s) === memoryConfigKey(store.getSettings())) await prepareMemory(s);
+    return true;
+  },
+  "memory.rebuild": async () => {
+    resetMemoryIndex();
+    await prepareMemory(store.getSettings());
+    return { ...memoryStatus(store.getSettings()), ...memoryJobCounts() };
+  },
+  "memory.retry": () => { retryMemoryJobs(); return true; },
   "memory.list": () => listMemories(),
   "memory.get": ({ id }: { id: string }) => {
     const m = getMemory(id);
     if (!m) throw new Error(`No memory ${id}`);
     return m;
   },
-  "memory.save": ({ input, from }: { input: MemoryInput; from?: string }) => {
-    const { entry } = writeMemory(input, { from });
+  "memory.save": ({ input, from, revision }: { input: MemoryInput; from?: string; revision?: string }) => {
+    const { entry } = writeMemory(input, { from, expectedRevision: revision });
     emit({ type: "memory_changed" });
+    const s = store.getSettings();
+    if (s.memoryEnabled && memoryConfigured(s)) void prepareMemory(s).catch(() => {});
     return entry;
   },
   "memory.delete": ({ id }: { id: string }) => {

@@ -26,7 +26,7 @@ Tauri (Rust)                  sidecar (Bun, single binary kestrel-agent)        
 - Permissions: Manual, Accept edits, Auto and Bypass modes; see [Permissions](#permissions). A denial can carry a reason.
 - English and Chinese UI, English by default.
 - Context: AGENTS.md / CLAUDE.md loaded level by level, a global instructions file, skills (SKILL.md) and custom `/` commands, auto-compaction with retry on context overflow.
-- Memory: notes the agent keeps across sessions, as Markdown files grouped by topic in `~/.kestrel/memory/<topic>/<name>.md` (types: user, feedback, project, reference). Each session starts with an index of one-line descriptions; the agent opens notes with `memory_read` and can save, replace and delete them itself (deleted notes go to `.trash`; secrets are refused; subagents are read-only). Browse, edit, move and delete them in Settings → Memory, or turn the feature or the agent's own saving off there.
+- Memory: Markdown notes in `~/.kestrel/memory/<topic>/<name>.md`, with stable IDs, revisions and source evidence. Configure **both** an embedding endpoint and a Jina-compatible reranker endpoint in Settings → Memory. Every new user message gets a bounded semantic disclosure: up to three full notes, eight related titles, then topics. Tools share this mandatory pipeline; missing configuration disables memory, and service failures never fall back to keyword-only retrieval. A durable background queue extracts useful facts with the session's chat model, validates source quotes, and resumes interrupted saves. Manual management remains available while memory is unavailable. Legacy files are backed up in `.migration-v2` before migration; prior revisions live in `.history`, deleted notes in `.trash`, and vectors in a rebuildable `.index-v2.sqlite` cache. Long inputs use overlapping fixed-size embedding chunks; reranking receives whole notes. No Qdrant service is needed.
 - Asking you: with `ask_user` the agent puts multiple-choice questions (single or multi-select, its recommendation first, plus a free-text "Other") to you in a card above the input and waits; it also covers proposals that need a go-ahead. Skip dismisses it and the agent carries on. The question and your answers stay in the transcript. Subagents can't ask; they report back to the agent that launched them.
 - Past conversations beyond this app: `search_sessions` / `read_session` also search the sessions that Claude Code (`~/.claude/projects`), Codex (`~/.codex/sessions`) and Cursor (`~/.cursor/projects`) keep on this Mac, read-only. A background index (`history.db` next to Kestrel's database, rebuilt from the originals, incremental after the first pass) holds only what you said and what the assistant answered, not tool output or helper/subagent threads. Turn each app on or off, or rebuild the index, in Settings → Memory.
 - Usage: cost, tokens, cache hits, model ranking, tool calls and active hours (ECharts).
@@ -59,6 +59,41 @@ Auto mode is the default. It asks as rarely as it safely can, in layers; each ca
 4. **A person**, with the reason shown on the approval card.
 
 Without a review model, step 3 is skipped and unclear calls are asked, so Auto then behaves like the old allowlist mode, minus the unsafe corners. With a review model, allowlist entries that would let any command through (`bash`, `python3`, `npm run`, `rm`, …) are ignored, and are never offered under "Always allow". The policy has three slots you can fill in (trusted environment, extra block rules, exceptions). Auto review is a safety net, not a security boundary; keep sensitive work in Manual mode.
+
+## Local memory models
+
+Install the two runtimes, then run each server in its own terminal:
+
+```sh
+brew install ollama llama.cpp
+ollama serve
+# In another terminal:
+ollama pull qwen3-embedding:0.6b
+llama-server -hf ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF:Q8_0 \
+  --embedding --rerank --pooling rank --host 127.0.0.1 --port 8081 \
+  --alias qwen3-reranker-0.6b -c 32768 -b 32768 -ub 32768 -np 1
+```
+
+In **Settings → Memory**, choose Ollama for Embedding, enter `http://127.0.0.1:11434/api/embed` with model `qwen3-embedding:0.6b`, and use `http://127.0.0.1:8081/v1/rerank` with model `qwen3-reranker-0.6b` for Reranker. These addresses are accessed by the Mac, including when configured from a phone. Use **Test both models**, then **Save**, and wait for **Memory is ready**. The app does not install or supervise these model servers. Remote endpoints and optional API keys are supported; note content is sent to the endpoints you configure.
+
+Saving the configuration indexes existing notes. **Rebuild index** discards only cached vectors; Markdown remains authoritative. Failed background saves remain visible and can be retried. Turning off automatic saving stops pending work; deleting a note revokes older pending jobs so they cannot recreate forgotten facts. Automatic extraction uses the session model and its usage appears in the session's token/cost totals.
+
+Ollama embedding requests keep the selected model resident with `keep_alive: -1` and allow up to five minutes for a cold load, including Metal shader compilation. Other model requests allow 90 seconds. Warmup and indexing are shared across concurrent callers; stopping one conversation stops its wait, while changing or disabling the memory configuration cancels the shared work. Preparation remains visible in the status panel throughout warmup. A successful connection test of the saved configuration also prepares the index and clears an earlier startup error.
+
+### Retrieval and updates
+
+The system prompt explains the tools. Before each model call, the sidecar matches the latest request (with two preceding user turns for reference resolution), fuses vector and lexical candidates, then reranks up to 40 complete notes. Above the relevance threshold, a roughly 2,000-token budget admits up to three full notes and eight titles, followed by topics. This context is inserted into the latest user message only for inference; it is never copied into the saved conversation or its summary. `memory_search` uses the same pipeline. Long inputs are embedded in overlapping 900-codepoint chunks with a 4,096-token Ollama window, without silently truncating the notes.
+
+Every new main-session user message also creates a durable extraction job. After the foreground run finishes, the session model extracts useful details and merges corrections into retrieved notes. Each automatic write needs an exact quote from that user message. Stable IDs identify the subject; content revisions detect intervening edits; the queue persists a validated write plan before changing files so interrupted jobs can resume. Existing notes retain revision history and source evidence. Automatic extraction currently covers user statements; assistant assertions are not treated as confirmed user facts.
+
+Missing endpoint configuration hides agent memory tools and disclosure. Once configured, a failed retrieval stops the request with an explicit error. Failed saves remain queued, retry up to three times, then require **Retry failed saves**. Both models remain mandatory even when there are no notes. The SQLite vector cache avoids an additional database service for this local application. The app permits creating up to 10,000 notes; vector lookup uses an exact scan intended for local collections, not a multi-tenant vector service.
+
+Design references reviewed in October 2026:
+
+- [LangMem](https://github.com/langchain-ai/langmem/blob/main/docs/docs/background_quickstart.md) separates tool-driven writes from background extraction. Kestrel uses a persistent per-turn queue so saving does not depend on the foreground agent choosing a tool.
+- [Letta's memory and dreaming](https://docs.letta.com/configuration/memory) combines a versioned memory filesystem with background consolidation. Kestrel keeps editable Markdown and recoverable prior revisions.
+- [Mem0's 2026 algorithm](https://mem0.ai/blog/mem0-the-token-efficient-memory-algorithm) uses multiple retrieval signals and additive facts to retain changes over time. Kestrel combines semantic, lexical and alias signals, while retaining subject-level updates requested by the product; dates, evidence and revision backups protect their history. This is an implementation choice, not a claim of matching Mem0's published benchmark results.
+- [Qwen3's model documentation](https://github.com/QwenLM/Qwen3-Embedding), [Ollama's embedding API](https://docs.ollama.com/api/embed), and [llama.cpp's reranking server](https://github.com/ggml-org/llama.cpp/tree/master/tools/server) define the tested model and API contracts.
 
 ## Mobile (iOS)
 

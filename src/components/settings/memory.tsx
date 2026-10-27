@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "preact/hooks"
 import { BrainIcon, ExternalLinkIcon, FolderOpenIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
-import type { AppSettings, HistoryStatus, MemoryEntry, MemorySummary, MemoryType } from "@shared/protocol"
+import type { AppSettings, HistoryStatus, MemoryEntry, MemoryEvidence, MemorySummary, MemoryType } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { MemoryModels } from "./memory-models"
 import { Panel, Row, Section } from "./layout"
 import { rpc } from "@/lib/api"
 import { relativeTime } from "@/lib/format"
@@ -39,6 +40,8 @@ function MemoryDialog({ open, entry, topics, onClose }: { open: boolean; entry: 
   const [draft, setDraft] = useState<Draft>(
     entry ? { topic: entry.topic, name: entry.name, type: entry.type, description: entry.description, content: "" } : EMPTY,
   )
+  const [revision, setRevision] = useState(entry?.revision)
+  const [evidence, setEvidence] = useState<MemoryEvidence[]>([])
   const [loading, setLoading] = useState(!!entry)
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -48,7 +51,7 @@ function MemoryDialog({ open, entry, topics, onClose }: { open: boolean; entry: 
   useEffect(() => {
     if (!entry) return
     rpc<MemoryEntry>("memory.get", { id: entry.id })
-      .then((m) => set({ content: m.content }))
+      .then((m) => { set({ topic: m.topic, name: m.name, type: m.type, description: m.description, content: m.content }); setRevision(m.revision); setEvidence(m.evidence) })
       .catch((e) => (toast.error(e.message), onClose()))
       .finally(() => setLoading(false))
   }, [])
@@ -57,7 +60,7 @@ function MemoryDialog({ open, entry, topics, onClose }: { open: boolean; entry: 
     e.preventDefault()
     setSaving(true)
     try {
-      await rpc("memory.save", { input: draft, from: entry?.id })
+      await rpc("memory.save", { input: draft, from: entry?.id, revision })
       onClose()
     } catch (err: any) {
       toast.error(err.message)
@@ -130,6 +133,10 @@ function MemoryDialog({ open, entry, topics, onClose }: { open: boolean; entry: 
                 <FieldLabel>{t("memory.content")}</FieldLabel>
                 <Textarea rows={8} value={draft.content} disabled={loading} onInput={(e) => set({ content: e.currentTarget.value })} required />
               </Field>
+              {evidence.length > 0 && <div className="grid gap-2">
+                <p className="text-xs font-medium text-muted-foreground">{t("memory.evidence")}</p>
+                {evidence.slice(-3).map((e) => <blockquote key={`${e.sessionId}:${e.seq}:${e.quote}`} className="border-l-2 pl-3 text-sm break-words">{e.quote}</blockquote>)}
+              </div>}
               {session && (
                 <Button
                   type="button"
@@ -171,7 +178,7 @@ function MemoryDialog({ open, entry, topics, onClose }: { open: boolean; entry: 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("memory.deleteTitle", { id: entry?.id ?? "" })}</AlertDialogTitle>
+            <AlertDialogTitle>{t("memory.deleteTitle", { id: entry?.locator ?? "" })}</AlertDialogTitle>
             <AlertDialogDescription>{t("memory.deleteBody")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -259,7 +266,7 @@ export function MemorySettings({ s }: { s: AppSettings }) {
   const topics = useMemo(() => [...new Set((list ?? []).map((m) => m.topic))], [list])
   const grouped = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    const shown = (list ?? []).filter((m) => !needle || `${m.id} ${m.description}`.toLowerCase().includes(needle))
+    const shown = (list ?? []).filter((m) => !needle || `${m.locator} ${m.description}`.toLowerCase().includes(needle))
     const byTopic = new Map<string, MemorySummary[]>()
     for (const m of shown) byTopic.set(m.topic, [...(byTopic.get(m.topic) ?? []), m])
     return [...byTopic.entries()]
@@ -288,13 +295,15 @@ export function MemorySettings({ s }: { s: AppSettings }) {
         </Panel>
       </Section>
 
+      <MemoryModels s={s} />
+
       <HistorySettings s={s} />
 
       <Section
         title={list ? t("memory.notesN", { n: list.length }) : t("memory.notes")}
         desc={t("memory.notesDesc", { dir: MEMORY_DIR })}
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {list && list.length > 0 && <Input className="w-44" placeholder={t("memory.search")} value={q} onInput={(e) => setQ(e.currentTarget.value)} />}
             <Button size="sm" onClick={() => open(null)}>
               <PlusIcon />
