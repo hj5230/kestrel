@@ -120,7 +120,7 @@ function ProviderDialog({ open, provider, presets, onClose }: { open: boolean; p
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
         <form onSubmit={save} className="grid gap-5">
           <DialogHeader>
             <DialogTitle>{provider ? t("models.editProvider") : t("models.newProvider")}</DialogTitle>
@@ -152,11 +152,11 @@ function ProviderDialog({ open, provider, presets, onClose }: { open: boolean; p
             </Field>
             <Field>
               <FieldLabel>API Key{presets && !presets[kind].needsKey && <span className="font-normal text-muted-foreground"> {t("common.optional")}</span>}</FieldLabel>
-              <InputGroup>
+              <InputGroup className="pointer-coarse:h-auto">
                 <InputGroupInput
                   type={(reveal ? "text" : "password") as "password"}
                   value={apiKey}
-                  className="font-mono text-xs"
+                  className="font-mono text-xs pointer-coarse:h-11 pointer-coarse:text-base"
                   onInput={(e) => setApiKey(e.currentTarget.value)}
                   placeholder="sk-…"
                   autoComplete="off"
