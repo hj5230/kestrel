@@ -86,9 +86,9 @@ function storeCollapsed(ids: Set<string>) {
   } catch {}
 }
 
-/** Pill row shared by the destinations and the sessions. Selected stays the same weight as the rest. */
+/** Pill row. Hover is a light wash in the secondary color; the selected row is a darker fill and full-strength text. */
 const rowClass =
-  "h-8 rounded-full px-2.5 font-normal text-[13px] text-muted-foreground hover:text-sidebar-accent-foreground data-active:font-normal data-active:text-sidebar-accent-foreground"
+  "h-8 rounded-full px-2.5 font-normal text-[13px] text-muted-foreground hover:bg-sidebar-hover hover:text-muted-foreground data-active:bg-sidebar-accent data-active:font-normal data-active:text-sidebar-accent-foreground data-active:hover:bg-sidebar-accent data-active:hover:text-sidebar-accent-foreground"
 
 export function StatusDot({ status }: { status: SessionInfo["status"] }) {
   if (status === "running") return <span className="size-1.5 rounded-full bg-muted-foreground" />
@@ -337,7 +337,7 @@ export function AppSidebar() {
               <div className="group/label flex items-center gap-0.5 pr-1">
                 <button
                   type="button"
-                  className="flex min-h-7 min-w-0 flex-1 items-center gap-1 rounded-full px-2 py-1 text-left text-xs font-normal text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring pointer-coarse:min-h-11"
+                  className="flex min-h-7 min-w-0 flex-1 items-center gap-1 rounded-full px-2 py-1 text-left text-xs font-normal text-muted-foreground outline-none hover:bg-sidebar-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring pointer-coarse:min-h-11"
                   aria-expanded={open}
                   title={g.title !== g.label ? g.title : undefined}
                   onClick={() => toggleGroup(g.id)}
@@ -352,7 +352,7 @@ export function AppSidebar() {
                         type="button"
                         title={t("sidebar.grouping")}
                         aria-label={t("sidebar.grouping")}
-                        className="pointer-events-none flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 outline-none group-hover/label:pointer-events-auto group-hover/label:opacity-100 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring aria-expanded:pointer-events-auto aria-expanded:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:size-10 pointer-coarse:opacity-100"
+                        className="pointer-events-none flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 outline-none group-hover/label:pointer-events-auto group-hover/label:opacity-100 hover:bg-sidebar-hover hover:text-sidebar-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring aria-expanded:pointer-events-auto aria-expanded:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:size-10 pointer-coarse:opacity-100"
                       >
                         <FolderTreeIcon className="size-3.5" />
                       </button>
