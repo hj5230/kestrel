@@ -136,7 +136,7 @@ export const zhCN: Record<MessageKey, string> = {
   "composer.kind.skill": "技能",
   "composer.kind.file": "文件",
   "composer.imageTooLarge": "图片不能超过 10MB",
-  "composer.placeholder": "给 Kestrel 布置任务…  / 调用命令与技能，@ 引用文件",
+  "composer.placeholder": "回复…  / 命令，@ 文件",
   "composer.add": "添加",
   "composer.addImage": "添加图片",
   "composer.addFile": "添加文件",

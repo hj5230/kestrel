@@ -37,10 +37,10 @@ export function ContextMeter({ session, model, onCompact, compacting }: { sessio
   return (
     <HoverCard openDelay={150}>
       <HoverCardTrigger asChild>
-        <button type="button" className={cn("flex items-center gap-1.5 rounded-md px-2 py-1 text-xs tabular-nums hover:bg-muted pointer-coarse:min-h-10", tone)}>
+        <button type="button" className={cn("flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs whitespace-nowrap tabular-nums hover:bg-muted pointer-coarse:min-h-10", tone)}>
           <Ring value={ratio} />
           <span>{Math.round(ratio * 100)}%</span>
-          {u.cost > 0 && <span className="text-muted-foreground">· {formatCost(u.cost)}</span>}
+          {u.cost > 0 && <span className="text-muted-foreground max-sm:hidden">· {formatCost(u.cost)}</span>}
         </button>
       </HoverCardTrigger>
       <HoverCardContent align="end" className="w-72">

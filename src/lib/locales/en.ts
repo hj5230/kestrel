@@ -134,7 +134,7 @@ export const en = {
   "composer.kind.skill": "Skill",
   "composer.kind.file": "File",
   "composer.imageTooLarge": "Images must be under 10 MB",
-  "composer.placeholder": "Give Kestrel a task…  / for commands & skills, @ to reference files",
+  "composer.placeholder": "Reply…  / commands, @ files",
   "composer.add": "Add",
   "composer.addImage": "Add images",
   "composer.addFile": "Add file",
