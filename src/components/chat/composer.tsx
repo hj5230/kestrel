@@ -147,12 +147,27 @@ export function Composer({
 
   useEffect(() => () => persistDraft(latestText.current), [draftKey])
 
-  useLayoutEffect(() => {
+  const fit = () => {
     const el = ta.current
     if (!el) return
     el.style.height = "0px"
     el.style.height = `${Math.min(el.scrollHeight, 320)}px`
-  }, [text])
+  }
+  useLayoutEffect(fit, [text])
+  // The height depends on the width too: measured while the window or sidebar was resizing, it stays stale.
+  useEffect(() => {
+    const el = ta.current
+    if (!el) return
+    let width = el.clientWidth
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth !== width) {
+        width = el.clientWidth
+        fit()
+      }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // On touch devices focusing pops the keyboard over the conversation; let the user tap in.
   useEffect(() => {
