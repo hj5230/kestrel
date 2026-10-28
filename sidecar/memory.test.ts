@@ -110,6 +110,16 @@ test("one missing model disables all semantic paths and performs no API calls", 
   await expect(read.execute("x", { ids: [allMemories()[0].id] })).rejects.toThrow();
 });
 
+test("a memory service that is down does not stop the request", async () => {
+  writeMemory(input());
+  mode = "/embed";
+  const original = [user(query)];
+  const warnings: string[] = [];
+  expect(await new MemoryContext().inject(store.getSettings(), original, original, undefined, (w) => warnings.push(w))).toBe(original);
+  expect(warnings).toHaveLength(1);
+  expect(warnings[0]).toContain("HTTP 503");
+});
+
 test("embedding and reranking are both mandatory, even for an empty store", async () => {
   await recallMemory(store.getSettings(), query);
   expect(calls.map((c) => c.path)).toEqual(["/embed", "/rerank"]);
@@ -238,7 +248,7 @@ test("automatic disclosure is ephemeral, cached per message, refreshed by new tu
   expect(textOf(compacted[1])).toContain("memory_context");
 });
 
-test("runner sends memory beside user input and keeps persisted messages clean; errors block the chat request", async () => {
+test("runner sends memory beside user input, keeps persisted messages clean, and still answers when memory is down", async () => {
   store.saveSettings({ memoryAutoSave: false }); writeMemory(input());
   const info = session(); const runner = getRunner(info.id);
   await runner.sendAndWait(query);
@@ -247,8 +257,10 @@ test("runner sends memory beside user input and keeps persisted messages clean; 
   expect(textOf(store.loadMessages(info.id)[0].message)).toBe(query);
   mode = "/rerank"; calls = [];
   await runner.sendAndWait("new question");
-  expect(calls.some((c) => c.body.stream)).toBe(false);
-  expect(store.getSession(info.id)?.status).toBe("error");
+  // A memory service that went away must not block the conversation: the model is still called.
+  expect(calls.some((c) => c.body.stream)).toBe(true);
+  expect(JSON.stringify(calls.find((c) => c.body.stream)!.body.messages)).not.toContain("memory_context");
+  expect(store.getSession(info.id)?.status).not.toBe("error");
 });
 
 test("durable extraction saves source evidence and usage; truncation and forgetting revoke pending jobs", async () => {

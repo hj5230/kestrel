@@ -10,7 +10,7 @@ export class MemoryContext {
   readonly read = new Map<string, string>();
   private cached: { key: string; text: string } | null = null;
 
-  async inject(s: AppSettings, context: AgentMessage[], original: AgentMessage[], signal?: AbortSignal): Promise<AgentMessage[]> {
+  async inject(s: AppSettings, context: AgentMessage[], original: AgentMessage[], signal?: AbortSignal, onUnavailable?: (message: string) => void): Promise<AgentMessage[]> {
     if (!s.memoryEnabled || !memoryConfigured(s)) { this.cached = null; this.read.clear(); return context; }
     const users = original.filter((m) => m.role === "user").slice(-3);
     const latest = users.at(-1);
@@ -24,7 +24,13 @@ export class MemoryContext {
         const recall = await recallMemory(s, query, { signal });
         key = hashMemory(JSON.stringify(latest)) + memoryConfigKey(s) + recall.snapshot;
         this.cached = { key, text: discloseMemory(recall, s.memoryMinScore, this.read) };
-      } catch (e) { throw new Error(st("memoryFailed", { reason: e instanceof Error ? e.message : String(e) })); }
+      } catch (e) {
+        if (signal?.aborted) throw e;
+        // A memory service that is down must not take the conversation down with it: answer without notes and say so once.
+        this.cached = null;
+        onUnavailable?.(st("memoryFailed", { reason: e instanceof Error ? e.message : String(e) }));
+        return context;
+      }
     }
     const overlay = this.cached!.text;
     const i = context.indexOf(latest);

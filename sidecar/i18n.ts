@@ -3,7 +3,7 @@ import * as store from "./db";
 const en = {
   memoryDisabled: "Memory is disabled.",
   memoryUnconfigured: "Memory is unavailable. Configure both Embedding and Reranker in Settings → Memory.",
-  memoryFailed: "Memory is unavailable: {reason}. No alternative retrieval was used.",
+  memoryFailed: "Memory is unavailable ({reason}); answering without notes. Check Settings → Memory.",
   memoryJobFailed: "Automatic memory saving failed: {reason}. Retry it in Settings → Memory.",
   memoryModelTimeout: "Memory model did not respond within {seconds} seconds.",
   sessionNotFound: "Session not found",
@@ -54,7 +54,7 @@ type Key = keyof typeof en;
 const zh: Record<Key, string> = {
   memoryDisabled: "记忆已关闭。",
   memoryUnconfigured: "记忆不可用。请在「设置 → 记忆」中配置 Embedding 和 Reranker 两个模型。",
-  memoryFailed: "记忆不可用：{reason}。未使用其他检索方式。",
+  memoryFailed: "记忆不可用（{reason}），本次不使用记忆回答。请检查「设置 → 记忆」。",
   memoryJobFailed: "自动保存记忆失败：{reason}。请在「设置 → 记忆」中重试。",
   memoryModelTimeout: "记忆模型未在 {seconds} 秒内响应。",
   sessionNotFound: "会话不存在",

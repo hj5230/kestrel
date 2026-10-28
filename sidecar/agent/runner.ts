@@ -323,7 +323,7 @@ export class SessionRunner {
     const rest = messages.slice(start);
     const context = this.compaction ? [summaryMessage(this.compaction.summary), ...rest] : rest;
     const settings = store.getSettings();
-    const result = await this.memoryContext.inject(settings, context, messages, signal);
+    const result = await this.memoryContext.inject(settings, context, messages, signal, (text) => emit({ type: "notice", sessionId: this.rootId, level: "warn", text }));
     if (memoryConfigKey(settings) !== memoryConfigKey(store.getSettings())) throw new Error("Memory configuration changed during retrieval. Retry the request.");
     return result;
   }
