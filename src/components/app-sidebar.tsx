@@ -51,7 +51,7 @@ import { Button } from "@/components/ui/button"
 import { RenameDialog, ConfirmDeleteDialog, ArchivedDialog } from "@/components/session-dialogs"
 import { rpc } from "@/lib/api"
 import { basename, dayBucket, dayBucketId, relativeTime, shortPath } from "@/lib/format"
-import { addingMac, appInfo, connected, pairedMac, pairedMacs, paletteOpen, route, sessions, enabledModels, switchMac } from "@/lib/store"
+import { addingMac, appInfo, connected, pairedMac, pairedMacs, paletteOpen, route, sessions, enabledModels, switchMac, unseen } from "@/lib/store"
 import { isDesktopApp, isMobileApp } from "@/lib/platform"
 import { downloadText } from "@/lib/download"
 import { toast } from "sonner"
@@ -86,14 +86,16 @@ function storeCollapsed(ids: Set<string>) {
   } catch {}
 }
 
-/** Pill row. Hover is a light wash in the secondary color; the selected row is a darker fill and full-strength text. */
+/** Hover is a light wash in the secondary color; the selected row is a darker fill and full-strength text. */
 const rowClass =
-  "h-8 rounded-full px-2.5 font-normal text-[13px] text-muted-foreground hover:bg-sidebar-hover hover:text-muted-foreground data-active:bg-sidebar-accent data-active:font-normal data-active:text-sidebar-accent-foreground data-active:hover:bg-sidebar-accent data-active:hover:text-sidebar-accent-foreground"
+  "h-8 rounded-md px-2.5 font-normal text-[13px] text-muted-foreground hover:bg-sidebar-hover hover:text-muted-foreground data-active:bg-sidebar-accent data-active:font-normal data-active:text-sidebar-accent-foreground data-active:hover:bg-sidebar-accent data-active:hover:text-sidebar-accent-foreground"
 
-export function StatusDot({ status }: { status: SessionInfo["status"] }) {
-  if (status === "running") return <span className="size-1.5 rounded-full bg-muted-foreground" />
+/** Working: a gray dot that breathes. Needs an answer: yellow. Finished since last opened: blue. */
+export function StatusDot({ status, unseen }: { status: SessionInfo["status"]; unseen?: boolean }) {
+  if (status === "running") return <span className="size-1.5 animate-breathe rounded-full bg-muted-foreground" />
   if (status === "waiting") return <span className="size-1.5 rounded-full bg-warning" />
   if (status === "error") return <CircleAlertIcon className="size-3.5 text-destructive" />
+  if (unseen) return <span className="size-1.5 rounded-full bg-info" />
   return null
 }
 
@@ -126,7 +128,7 @@ function FadeLabel({ text, className }: { text: string; className?: string }) {
 }
 
 function SessionItem({ s, active, onRename, onDelete }: { s: SessionInfo; active: boolean; onRename: () => void; onDelete: () => void }) {
-  const status = s.status !== "idle" ? <StatusDot status={s.status} /> : null
+  const status = s.status !== "idle" || unseen.value.has(s.id) ? <StatusDot status={s.status} unseen={unseen.value.has(s.id)} /> : null
   const title = s.title || t("common.untitled")
   return (
     <SidebarMenuItem>
@@ -141,14 +143,15 @@ function SessionItem({ s, active, onRename, onDelete }: { s: SessionInfo; active
       {status && (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 right-1 z-0 flex size-5 -translate-y-1/2 items-center justify-center group-hover/menu-item:opacity-0 group-focus-within/menu-item:opacity-0 group-has-data-[state=open]/menu-item:opacity-0 pointer-coarse:right-10 pointer-coarse:opacity-100 pointer-coarse:group-hover/menu-item:opacity-100 pointer-coarse:group-focus-within/menu-item:opacity-100 pointer-coarse:group-has-data-[state=open]/menu-item:opacity-100"
+          className="pointer-events-none absolute top-1/2 right-1 z-0 flex size-5 -translate-y-1/2 items-center justify-center group-hover/menu-item:opacity-0 group-focus-within/menu-item:opacity-0 group-has-data-[state=open]/menu-item:opacity-0 pointer-coarse:right-2.5"
         >
           {status}
         </span>
       )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <SidebarMenuAction showOnHover>
+          {/* With a status dot the "…" replaces it on hover at every width; the kit only hides it from md up. */}
+          <SidebarMenuAction showOnHover className={status ? "max-md:opacity-0 pointer-coarse:opacity-0" : undefined} aria-label={t("common.moreActions")}>
             <MoreHorizontalIcon />
           </SidebarMenuAction>
         </DropdownMenuTrigger>
@@ -206,7 +209,7 @@ function MacSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" aria-label={t("sidebar.switchMac")} className="-my-1 flex min-w-0 items-center gap-1 rounded-full py-1 pr-1 outline-none active:bg-sidebar-accent">
+        <button type="button" aria-label={t("sidebar.switchMac")} className="-my-1 flex min-w-0 items-center gap-1 rounded-md py-1 pr-1 outline-none active:bg-sidebar-accent">
           <span className="truncate">{current.serverName}</span>
           <ChevronsUpDownIcon className="size-3 shrink-0" />
         </button>
@@ -337,7 +340,7 @@ export function AppSidebar() {
               <div className="group/label flex items-center gap-0.5 pr-1">
                 <button
                   type="button"
-                  className="flex min-h-7 min-w-0 flex-1 items-center gap-1 rounded-full px-2 py-1 text-left text-xs font-normal text-muted-foreground outline-none hover:bg-sidebar-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring pointer-coarse:min-h-11"
+                  className="flex min-h-7 min-w-0 flex-1 items-center gap-1 rounded-md px-2 py-1 text-left text-xs font-normal text-muted-foreground outline-none hover:bg-sidebar-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring pointer-coarse:min-h-11"
                   aria-expanded={open}
                   title={g.title !== g.label ? g.title : undefined}
                   onClick={() => toggleGroup(g.id)}
@@ -352,7 +355,7 @@ export function AppSidebar() {
                         type="button"
                         title={t("sidebar.grouping")}
                         aria-label={t("sidebar.grouping")}
-                        className="pointer-events-none flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 outline-none group-hover/label:pointer-events-auto group-hover/label:opacity-100 hover:bg-sidebar-hover hover:text-sidebar-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring aria-expanded:pointer-events-auto aria-expanded:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:size-10 pointer-coarse:opacity-100"
+                        className="pointer-events-none flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 outline-none group-hover/label:pointer-events-auto group-hover/label:opacity-100 hover:bg-sidebar-hover hover:text-sidebar-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring aria-expanded:pointer-events-auto aria-expanded:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:size-10 pointer-coarse:opacity-100"
                       >
                         <FolderTreeIcon className="size-3.5" />
                       </button>
@@ -399,7 +402,7 @@ export function AppSidebar() {
           <span className="min-w-0 truncate text-muted-foreground">{t("sidebar.stats", { sessions: list.length, models: enabledModels.value.length })}</span>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="ml-auto shrink-0 rounded-full" aria-label={t("nav.search")} onClick={() => (paletteOpen.value = true)}>
+              <Button variant="ghost" size="icon-sm" className="ml-auto shrink-0" aria-label={t("nav.search")} onClick={() => (paletteOpen.value = true)}>
                 <SearchIcon />
               </Button>
             </TooltipTrigger>

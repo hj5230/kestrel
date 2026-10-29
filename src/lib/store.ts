@@ -69,6 +69,34 @@ export const addingMac = signal(false)
 export const deviceRevoked = signal(false)
 export const newSessionOpen = signal(false)
 
+// Sessions whose run finished while the user was elsewhere: the sidebar keeps a dot until they are opened.
+// Kept per Mac on the phone, since two Macs can share session ids by chance only, never by meaning.
+const unseenKey = () => (isMobileApp && routeHost ? `kestrel-unseen:${routeHost}` : "kestrel-unseen")
+function loadUnseen(): Set<string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(unseenKey()) ?? "[]")
+    return new Set(Array.isArray(raw) ? raw.filter((x) => typeof x === "string") : [])
+  } catch {
+    return new Set()
+  }
+}
+export const unseen = signal<Set<string>>(new Set())
+function setUnseen(next: Set<string>) {
+  unseen.value = next
+  try {
+    localStorage.setItem(unseenKey(), JSON.stringify([...next]))
+  } catch {}
+}
+function markSeen(id: string) {
+  if (!unseen.value.has(id)) return
+  const next = new Set(unseen.value)
+  next.delete(id)
+  setUnseen(next)
+}
+route.subscribe((r) => {
+  if (r.name === "chat") markSeen(r.sessionId)
+})
+
 const details = new Map<string, Signal<DetailState | null>>()
 
 export function detailSignal(id: string): Signal<DetailState | null> {
@@ -201,6 +229,7 @@ function handleEvents() {
         patchDetail(e.session.id, (d) => ({ ...d, session: e.session }))
         break
       case "session_deleted":
+        markSeen(e.id)
         sessions.value = sessions.value.filter((s) => s.id !== e.id)
         details.delete(e.id)
         if (route.value.name === "chat" && route.value.sessionId === e.id) route.value = { name: "home" }
@@ -274,6 +303,9 @@ function handleEvents() {
         else toast.info(e.text)
         break
       case "run_finished":
+        if (!(route.value.name === "chat" && route.value.sessionId === e.sessionId && document.visibilityState === "visible")) {
+          setUnseen(new Set(unseen.value).add(e.sessionId))
+        }
         if (settings.value?.notifyOnFinish) notify(e.ok ? t("notify.done") : t("notify.failed"), e.title)
         break
       case "remote_status":
@@ -300,6 +332,7 @@ export async function boot() {
         route.value = saved ? JSON.parse(saved) : { name: "home" }
       } catch { route.value = { name: "home" } }
     }
+    unseen.value = loadUnseen()
     const [info, s] = await Promise.all([rpc<AppInfo>("app.info"), rpc<AppSettings>("settings.get")])
     if (!connectionGeneration.current(generation)) return
     appInfo.value = info
@@ -334,6 +367,7 @@ function resetForMacChange() {
   paletteOpen.value = false
   details.clear()
   routeHost = ""
+  unseen.value = new Set()
   pairedMac.value = undefined
   route.value = { name: "home" }
   deviceRevoked.value = false
