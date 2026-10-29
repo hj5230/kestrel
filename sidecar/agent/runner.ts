@@ -8,6 +8,7 @@ import type {
   ApprovalRequest,
   AssistantMsg,
   ChatMessage,
+  ContextBreakdown,
   FileAttachment,
   Question,
   QuestionAnswer,
@@ -46,7 +47,7 @@ import { createReadSessionTool, createSearchSessionsTool, createSkillTool, creat
 import type { KestrelTool, SubagentRequest, ToolContext } from "../tools/types";
 import { createWebFetchTool, createWebSearchTool } from "../tools/web";
 import { estimateContextTokens, estimateMessageTokens, estimateTextTokens, findCutIndex, summarize, summaryMessage } from "./compaction";
-import { buildSystemPrompt } from "./prompt";
+import { buildSystemPrompt, collectInstructions } from "./prompt";
 
 const runners = new Map<string, SessionRunner>();
 
@@ -299,6 +300,41 @@ export class SessionRunner {
         .filter((m) => m.state === "connected")
         .map((m) => m.name),
     });
+  }
+
+  /** Where the context window goes, estimated with the same token heuristic auto-compaction uses. */
+  contextBreakdown(): ContextBreakdown {
+    const s = this.info();
+    const settings = store.getSettings();
+    const cfg = s.providerId && s.modelId ? store.getModel(s.providerId, s.modelId) : null;
+    const window = cfg?.contextWindow ?? 128000;
+    const tools = this.buildTools(s.kind === "subagent");
+    const schema = (t: KestrelTool) => estimateTextTokens(JSON.stringify([t.name, t.description, t.parameters]));
+    const mcp = tools.filter((t) => t.category === "mcp");
+    const builtIn = tools.filter((t) => t.category !== "mcp");
+    const prompt = buildSystemPrompt({
+      cwd: s.cwd,
+      permissionMode: s.permissionMode,
+      modelName: cfg?.name ?? s.modelId,
+      subagent: s.kind === "subagent",
+      mcpServers: mcpStatuses().filter((m) => m.state === "connected").map((m) => m.name),
+    });
+    const instructions = collectInstructions(s.cwd).reduce((n, f) => n + estimateTextTokens(f.content), estimateTextTokens(settings.systemPromptAppend));
+    const skills = discoverSkills(s.cwd).reduce((n, k) => n + estimateTextTokens(`- ${k.name}: ${k.description.replace(/\s+/g, " ").slice(0, 280)}\n`), 0);
+    const messages = this.agent.state.messages.slice(this.compaction?.cutSeq ?? 0);
+    const history = messages.reduce((n, m) => n + estimateMessageTokens(m), this.compaction ? estimateTextTokens(this.compaction.summary) : 0);
+    // The prompt holds the instructions and skill list; count those once, under their own names.
+    const system = Math.max(0, estimateTextTokens(prompt) - instructions - skills);
+    const parts = { messages: history, system, tools: builtIn.reduce((n, t) => n + schema(t), 0), mcp: mcp.reduce((n, t) => n + schema(t), 0), skills, instructions };
+    const used = Object.values(parts).reduce((a, b) => a + b, 0);
+    return {
+      window,
+      // The last reply's reported usage is exact; the parts are estimates scaled to it when there is one.
+      used: s.usage.contextTokens || used,
+      parts,
+      buffer: settings.autoCompact ? Math.round(window * (1 - settings.compactThreshold)) : 0,
+      counts: { mcpTools: mcp.length, tools: builtIn.length, skills: discoverSkills(s.cwd).length, instructionFiles: collectInstructions(s.cwd).length },
+    };
   }
 
   // ---------- context ----------

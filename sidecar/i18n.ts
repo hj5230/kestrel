@@ -47,6 +47,9 @@ const en = {
   cmdModel: "Switch the model for this session",
   cmdExport: "Export this session as Markdown",
   cmdFork: "Fork a new session from here",
+  ffmpegMissing: "This image format needs ffmpeg. Install it (brew install ffmpeg) or set its path in Settings → Execution & network.",
+  imageUnreadable: "The image could not be read",
+  imageTooLarge: "The image is too large to send",
 };
 
 type Key = keyof typeof en;
@@ -79,6 +82,9 @@ const zh: Record<Key, string> = {
   uploadInvalidSession: "上传目标会话无效",
   uploadMissingFile: "未上传文件",
   uploadTooLarge: "文件过大（最大 100 MB）",
+  ffmpegMissing: "这种图片格式需要 ffmpeg。请安装（brew install ffmpeg），或在「设置 → 执行与网络」中填写它的路径。",
+  imageUnreadable: "无法读取这张图片",
+  imageTooLarge: "图片过大，无法发送",
   uploadInvalidPath: "文件路径无效",
   uploadNotFile: "所选路径不是文件",
   uploadNameExhausted: "无法生成唯一的上传文件名",

@@ -273,6 +273,16 @@ export interface AskDetails {
   answers: QuestionAnswer[] | null;
 }
 
+/** Estimated tokens per part of the context window; `used` is the provider's own count when known. */
+export interface ContextBreakdown {
+  window: number;
+  used: number;
+  parts: { messages: number; system: number; tools: number; mcp: number; skills: number; instructions: number };
+  /** Room auto-compaction keeps free (the part above its threshold); 0 when it is off. */
+  buffer: number;
+  counts: { mcpTools: number; tools: number; skills: number; instructionFiles: number };
+}
+
 export interface SessionDetail {
   session: SessionInfo;
   messages: StoredMessage[];
@@ -413,6 +423,8 @@ export interface AppSettings {
   /** Tavily API key. The web_search tool exists only while this is set. */
   tavilyApiKey: string;
   bashTimeoutSec: number;
+  /** ffmpeg used to convert pictures the webview can't decode; empty = found on PATH or in Homebrew's folders. */
+  ffmpegPath: string;
   bashWhitelist: string[];
   toolWhitelist: string[];
   /** `providerId::modelId` of the model that reviews calls in auto mode; empty = no reviewer, unclear calls are asked. */

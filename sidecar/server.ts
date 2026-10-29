@@ -21,6 +21,7 @@ import { createSession, exportMarkdown, forkSession, newId } from "./sessions";
 import { historyStatus, rebuildHistory, setHistorySources, syncHistory } from "./history";
 import { discoverSkills, listSlashCommands } from "./skills";
 import { describeLocalFiles, importLocalFile, removeSessionUploads, storeUpload, UploadError } from "./uploads";
+import { convertImage, mediaStatus } from "./media";
 import type { Server, WebSocketHandler } from "bun";
 import { generateText } from "ai";
 import { languageModel } from "./providers";
@@ -114,6 +115,9 @@ const handlers: Record<string, Handler> = {
     return { ok: true, text: r.text.slice(0, 200), ms: Date.now() - started };
   },
 
+  "media.status": () => mediaStatus(),
+  "media.image": ({ data, name }: { data: string; name?: string }) => convertImage(data, name),
+
   "models.list": ({ providerId } = {}) => store.listModels(providerId),
   "models.defaults": async ({ providerId, id, name, contextWindow, metadataSource }) => {
     const p = store.getProvider(providerId);
@@ -184,6 +188,12 @@ const handlers: Record<string, Handler> = {
     return s;
   },
   "sessions.export": ({ id }) => exportMarkdown(id),
+  // One stored message per line, as the session's own record (no rendering), for pasting into other tools.
+  "sessions.jsonl": ({ id }) => {
+    if (!store.getSession(id)) throw new Error(st("sessionNotFound"));
+    return store.loadMessages(id).map((m) => JSON.stringify({ seq: m.seq, ...m.message })).join("\n");
+  },
+  "sessions.contextBreakdown": ({ id }) => getRunner(id).contextBreakdown(),
   "sessions.search": ({ query, limit }) => store.searchMessages(query, limit ?? 40),
   "sessions.context": ({ id }) => {
     const s = store.getSession(id);

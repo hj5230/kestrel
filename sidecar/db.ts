@@ -16,7 +16,7 @@ import type {
 import { planBackfill, type CatalogFacts } from "./catalog";
 import { HOME } from "./env";
 import { validateMemoryEndpoint } from "./memory-config";
-import { DEFAULT_BASH_WHITELIST } from "./permissions";
+import { BASH_WHITELIST_ADDED_V2, DEFAULT_BASH_WHITELIST } from "./permissions";
 
 const MIGRATIONS: string[] = [
   `
@@ -200,6 +200,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   proxyUrl: "",
   tavilyApiKey: "",
   bashTimeoutSec: 120,
+  ffmpegPath: "",
   bashWhitelist: DEFAULT_BASH_WHITELIST,
   toolWhitelist: [],
   autoModel: "",
@@ -250,6 +251,23 @@ export function openDb(dataDir: string, dev: boolean) {
     fs.chmodSync(dbPath, 0o600);
   } catch {}
   db.run("UPDATE sessions SET status = 'idle' WHERE status IN ('running', 'waiting')");
+  mergeBashDefaults();
+}
+
+/** A saved allowlist is the user's own and stays as it is, except that entries added to the defaults later are
+ *  merged in once. Entries the user removed from an earlier default list stay removed. */
+function mergeBashDefaults() {
+  const done = db.query("SELECT value FROM meta WHERE key = 'bash_defaults_rev'").get() as { value: string } | null;
+  if (Number(done?.value ?? 1) >= 2) return;
+  const row = db.query("SELECT value FROM meta WHERE key = 'settings'").get() as { value: string } | null;
+  const saved = json<Partial<AppSettings>>(row?.value, {});
+  db.transaction(() => {
+    if (Array.isArray(saved.bashWhitelist)) {
+      const have = new Set(saved.bashWhitelist);
+      saveSettings({ bashWhitelist: [...saved.bashWhitelist, ...BASH_WHITELIST_ADDED_V2.filter((e) => !have.has(e))] });
+    }
+    db.run("INSERT INTO meta (key, value) VALUES ('bash_defaults_rev', '2') ON CONFLICT(key) DO UPDATE SET value = excluded.value");
+  })();
 }
 
 const json = <T>(s: string | null | undefined, fallback: T): T => {
