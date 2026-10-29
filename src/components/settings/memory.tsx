@@ -194,7 +194,7 @@ function MemoryDialog({ open, entry, topics, onClose }: { open: boolean; entry: 
 }
 
 /** Which other apps' conversations the agent may search, and how far their indexing has got. */
-function HistorySettings({ s }: { s: AppSettings }) {
+export function HistorySettings({ s }: { s: AppSettings }) {
   const [status, setStatus] = useState<HistoryStatus | null>(null)
   const indexing = !!status?.indexing
   useEffect(() => {
@@ -296,8 +296,6 @@ export function MemorySettings({ s }: { s: AppSettings }) {
       </Section>
 
       <MemoryModels s={s} />
-
-      <HistorySettings s={s} />
 
       <Section
         title={list ? t("memory.notesN", { n: list.length }) : t("memory.notes")}

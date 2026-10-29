@@ -671,4 +671,7 @@ export const zhCN: Record<MessageKey, string> = {
   "models.previewMetadata": "预览模型信息",
   "models.metadataPreview": "上下文 {context} · 输出 {output} · 每百万 token ${input}/${price}",
   "models.applyAutomatic": "应用并恢复自动更新",
+  "settings.tab.execution": "执行与网络",
+  "settings.tab.automation": "标题与上下文",
+  "settings.tab.history": "历史对话",
 }

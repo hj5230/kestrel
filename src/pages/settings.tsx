@@ -15,7 +15,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { Panel, Row, Section } from "@/components/settings/layout"
 import { ModelsSettings } from "@/components/settings/models"
 import { McpSettings } from "@/components/settings/mcp"
-import { MemorySettings } from "@/components/settings/memory"
+import { HistorySettings, MemorySettings } from "@/components/settings/memory"
 import { MobileSettings } from "@/components/settings/mobile"
 import { ConnectionSettings } from "@/components/settings/connection"
 import { CwdPicker, ModelPicker, PermissionPicker, ThinkingPicker, permissionModes } from "@/components/chat/pickers"
@@ -29,11 +29,14 @@ import { cn } from "@/lib/utils"
 
 const TABS = [
   { key: "general", icon: PaletteIcon },
+  { key: "execution", icon: CpuIcon },
+  { key: "automation", icon: BrainIcon },
   { key: "models", icon: CpuIcon },
   { key: "mcp", icon: PlugIcon },
   { key: "skills", icon: SparklesIcon },
   { key: "instructions", icon: BookTextIcon },
   { key: "memory", icon: BrainIcon },
+  { key: "history", icon: BookTextIcon },
   { key: "permissions", icon: ShieldCheckIcon },
   // Pairing phones is managed on the Mac; the phone shows which Mac it drives instead.
   ...(!isMobileApp ? [{ key: "mobile", icon: SmartphoneIcon }] : []),
@@ -135,7 +138,7 @@ function General({ s }: { s: AppSettings }) {
             <ModelPicker providerId={s.defaultProviderId} modelId={s.defaultModelId} onChange={(p, m) => save({ defaultProviderId: p, defaultModelId: m })} />
           </Row>
           <Row label={t("settings.thinking")} desc={t("settings.thinkingDesc")}>
-            <ThinkingPicker value={s.defaultThinking} onChange={(v) => save({ defaultThinking: v })} />
+            <ThinkingPicker value={s.defaultThinking} choices={enabledModels.value.find((m) => m.providerId === s.defaultProviderId && m.id === s.defaultModelId)?.efforts ?? []} onChange={(v) => save({ defaultThinking: v })} />
           </Row>
           <Row label={t("settings.permission")}>
             <PermissionPicker value={s.defaultPermissionMode} onChange={(v) => save({ defaultPermissionMode: v })} />
@@ -172,44 +175,18 @@ function General({ s }: { s: AppSettings }) {
               </SelectContent>
             </Select>
           </Row>
-          <ModelRow label={t("settings.titleModel")} desc={t("settings.titleModelDesc")} value={s.titleModel} none={t("settings.titleSame")} onChange={(v) => save({ titleModel: v })} />
           <Row label={t("settings.notify")} desc={t("settings.notifyDesc")}>
             <Switch checked={s.notifyOnFinish} onCheckedChange={(v) => save({ notifyOnFinish: v })} />
           </Row>
         </Panel>
       </Section>
-      <Section title={t("settings.context")} desc={t("settings.contextDesc")}>
-        <Panel>
-          <Row label={t("settings.autoCompact")}>
-            <Switch checked={s.autoCompact} onCheckedChange={(v) => save({ autoCompact: v })} />
-          </Row>
-          <Row label={t("settings.threshold")} desc={t("settings.thresholdDesc", { pct: Math.round(s.compactThreshold * 100) })}>
-            <Slider
-              className="w-48"
-              min={50}
-              max={95}
-              step={5}
-              value={[Math.round(s.compactThreshold * 100)]}
-              onValueCommit={(v: number[]) => save({ compactThreshold: v[0] / 100 })}
-            />
-          </Row>
-          <ModelRow label={t("settings.compactModel")} desc={t("settings.compactModelDesc")} value={s.compactModel} none={t("settings.titleSame")} onChange={(v) => save({ compactModel: v })} />
-          <Row label={t("settings.keepRecent")} desc={t("settings.keepRecentDesc")}>
-            <Select value={String(s.keepRecentTokens)} onValueChange={(v) => save({ keepRecentTokens: Number(v) })}>
-              <SelectTrigger size="sm" className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[8000, 16000, 24000, 40000, 64000].map((n) => (
-                  <SelectItem key={n} value={String(n)}>
-                    {t("settings.keepRecentN", { n: n / 1000 })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Row>
-        </Panel>
-      </Section>
+    </div>
+  )
+}
+
+function Execution({ s }: { s: AppSettings }) {
+  return (
+    <div className="grid gap-8">
       <Section title={t("settings.exec")}>
         <Panel>
           <Row label={t("settings.bashTimeout")} desc={t("settings.bashTimeoutDesc")}>
@@ -247,6 +224,50 @@ function General({ s }: { s: AppSettings }) {
               value={s.tavilyApiKey}
               onCommit={(v) => save({ tavilyApiKey: v.trim() })}
             />
+          </Row>
+        </Panel>
+      </Section>
+    </div>
+  )
+}
+
+function Automation({ s }: { s: AppSettings }) {
+  return (
+    <div className="grid gap-8">
+      <Section title={t("settings.titleModel")}>
+        <Panel>
+          <ModelRow label={t("settings.titleModel")} desc={t("settings.titleModelDesc")} value={s.titleModel} none={t("settings.titleSame")} onChange={(v) => save({ titleModel: v })} />
+        </Panel>
+      </Section>
+      <Section title={t("settings.context")} desc={t("settings.contextDesc")}>
+        <Panel>
+          <Row label={t("settings.autoCompact")}>
+            <Switch checked={s.autoCompact} onCheckedChange={(v) => save({ autoCompact: v })} />
+          </Row>
+          <Row label={t("settings.threshold")} desc={t("settings.thresholdDesc", { pct: Math.round(s.compactThreshold * 100) })}>
+            <Slider
+              className="w-48"
+              min={50}
+              max={95}
+              step={5}
+              value={[Math.round(s.compactThreshold * 100)]}
+              onValueCommit={(v: number[]) => save({ compactThreshold: v[0] / 100 })}
+            />
+          </Row>
+          <ModelRow label={t("settings.compactModel")} desc={t("settings.compactModelDesc")} value={s.compactModel} none={t("settings.titleSame")} onChange={(v) => save({ compactModel: v })} />
+          <Row label={t("settings.keepRecent")} desc={t("settings.keepRecentDesc")}>
+            <Select value={String(s.keepRecentTokens)} onValueChange={(v) => save({ keepRecentTokens: Number(v) })}>
+              <SelectTrigger size="sm" className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[8000, 16000, 24000, 40000, 64000].map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {t("settings.keepRecentN", { n: n / 1000 })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Row>
         </Panel>
       </Section>
@@ -499,6 +520,9 @@ export function SettingsPage({ tab }: { tab?: string }) {
         <div className="min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-3xl px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-8 md:py-8">
             {current === "general" && <General s={s} />}
+            {current === "execution" && <Execution s={s} />}
+            {current === "automation" && <Automation s={s} />}
+            {current === "history" && <HistorySettings s={s} />}
             {current === "models" && <ModelsSettings />}
             {current === "mcp" && <McpSettings />}
             {current === "skills" && <Skills s={s} />}

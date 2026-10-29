@@ -669,6 +669,9 @@ export const en = {
   "models.previewMetadata": "Preview model information",
   "models.metadataPreview": "Context {context} · output {output} · ${input}/${price} per 1M tokens",
   "models.applyAutomatic": "Apply and restore automatic updates",
+  "settings.tab.execution": "Execution & network",
+  "settings.tab.automation": "Titles & context",
+  "settings.tab.history": "Conversation history",
 }
 
 export type MessageKey = keyof typeof en
