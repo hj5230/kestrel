@@ -62,7 +62,13 @@ export default function App() {
       <ErrorBoundary compact resetKey={paletteOpen.value}>
         <CommandPalette />
       </ErrorBoundary>
-      <Toaster theme={dark ? "dark" : "light"} position={isMobileApp ? "top-center" : "bottom-right"} />
+      {/* Sonner's top offset ignores the notch and Dynamic Island; start below the safe area on the phone. */}
+      <Toaster
+        theme={dark ? "dark" : "light"}
+        position={isMobileApp ? "top-center" : "bottom-right"}
+        mobileOffset={isMobileApp ? { top: "calc(env(safe-area-inset-top) + 8px)" } : undefined}
+        offset={isMobileApp ? { top: "calc(env(safe-area-inset-top) + 8px)" } : undefined}
+      />
     </TooltipProvider>
   )
 }

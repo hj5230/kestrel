@@ -3,6 +3,7 @@ import App from "./App"
 import { boot } from "./lib/store"
 import { isMobileApp } from "./lib/platform"
 import { trackVisualViewport } from "./lib/viewport"
+import { routeExternalLinks } from "./lib/links"
 import "./index.css"
 
 if (isMobileApp) {
@@ -16,5 +17,6 @@ try {
   if (t?.accent && t.accent !== "neutral") document.documentElement.dataset.accent = t.accent
 } catch {}
 
+routeExternalLinks()
 boot()
 render(<App />, document.getElementById("root")!)
