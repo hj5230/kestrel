@@ -107,7 +107,7 @@ describe("auto mode, end to end", () => {
 
   test("the reviewer lets a harmless command through", async () => {
     reviewerSaw.length = 0;
-    const { asked, results } = await session(["true"]);
+    const { asked, results } = await session(["sleep 0"]);
     expect(reviewerSaw.length).toBe(1);
     expect(asked).toEqual([]);
     expect(results[0].error).toBe(false);
@@ -154,7 +154,7 @@ describe("auto mode, end to end", () => {
   test("when the reviewer cannot be reached, a person is asked", async () => {
     reviewerDown = true;
     try {
-      const { asked, results } = await session(["true"], "deny");
+      const { asked, results } = await session(["sleep 0"], "deny");
       expect(asked.length).toBe(1);
       expect(asked[0].note?.code).toBe("review_error");
       expect(results[0].error).toBe(true);
@@ -174,7 +174,7 @@ describe("auto mode, end to end", () => {
   test("without a review model, unclear commands are simply asked", async () => {
     store.saveSettings({ autoModel: "" });
     try {
-      const { asked } = await session(["true"], "deny");
+      const { asked } = await session(["sleep 0"], "deny");
       expect(asked.length).toBe(1);
       expect(asked[0].note ?? null).toBeNull();
     } finally {

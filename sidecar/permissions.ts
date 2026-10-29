@@ -87,6 +87,167 @@ export const DEFAULT_BASH_WHITELIST = [
   "tsc --version",
 ];
 
+/** Added in the second revision of the defaults. Existing installs get these merged in once (db.ts). */
+export const BASH_WHITELIST_ADDED_V2 = [
+  // Read-only inspection: text, files and the system.
+  "less",
+  "more",
+  "nl",
+  "column",
+  "fold",
+  "rev",
+  "tac",
+  "paste",
+  "join",
+  "comm",
+  "expand",
+  "unexpand",
+  "strings",
+  "od",
+  "hexdump",
+  "xxd",
+  "base64",
+  "sha1sum",
+  "sha256sum",
+  "md5sum",
+  "cksum",
+  "seq",
+  "true",
+  "false",
+  "test",
+  "[",
+  "locale",
+  "tty",
+  "groups",
+  "arch",
+  "nproc",
+  "sysctl -n",
+  "vm_stat",
+  "top -l 1",
+  "pgrep",
+  "mdfind",
+  "mdls",
+  "otool -L",
+  "lipo -info",
+  "codesign -dv",
+  "plutil -p",
+  "plutil -lint",
+  "man",
+  "tldr",
+  "help",
+  "yq",
+  "bat",
+  "eza",
+  "exa",
+  "fzf --filter",
+  "ast-grep",
+  "tokei",
+  "cloc",
+  "scc",
+  // Version control, read-only.
+  "git grep",
+  "git cat-file",
+  "git ls-tree",
+  "git merge-base",
+  "git name-rev",
+  "git count-objects",
+  "git worktree list",
+  "git tag --list",
+  "git tag -l",
+  "git show-ref",
+  "git for-each-ref",
+  "git rev-list",
+  "git range-diff",
+  "git whatchanged",
+  "git check-ignore",
+  "git check-attr",
+  "git var",
+  "git help",
+  "git version",
+  "git --version",
+  "gh --version",
+  "gh auth status",
+  "gh pr list",
+  "gh pr view",
+  "gh pr diff",
+  "gh pr checks",
+  "gh pr status",
+  "gh issue list",
+  "gh issue view",
+  "gh repo view",
+  "gh run list",
+  "gh run view",
+  // Toolchains: versions, listings and checks that only print.
+  "npm config get",
+  "npm config list",
+  "npm explain",
+  "npm why",
+  "npm pkg get",
+  "npm root",
+  "npm prefix",
+  "npm bin",
+  "pnpm list",
+  "pnpm why",
+  "pnpm outdated",
+  "yarn --version",
+  "yarn list",
+  "yarn why",
+  "yarn info",
+  "bun pm ls",
+  "deno --version",
+  "pip --version",
+  "pip3 --version",
+  "pip list",
+  "pip3 list",
+  "pip show",
+  "pip3 show",
+  "pip freeze",
+  "pip3 freeze",
+  "uv --version",
+  "uv pip list",
+  "uv pip show",
+  "poetry --version",
+  "poetry show",
+  "cargo tree",
+  "cargo metadata",
+  "cargo search",
+  "rustup show",
+  "rustup --version",
+  "go env",
+  "go list",
+  "go doc",
+  "java -version",
+  "javac -version",
+  "swift --version",
+  "xcodebuild -version",
+  "xcodebuild -list",
+  "xcrun --show-sdk-path",
+  "xcrun simctl list",
+  "xcode-select -p",
+  "docker --version",
+  "docker ps",
+  "docker images",
+  "docker version",
+  "brew --version",
+  "brew list",
+  "brew info",
+  "brew --prefix",
+  "brew deps",
+  "brew outdated",
+  "brew search",
+  "cmake --version",
+  // Linters that read config as data. ESLint, Prettier and mypy are left out: their configs and plugins are code.
+  "tsc --noEmit",
+  "biome check",
+  "ruff check",
+  "pyright",
+  "shellcheck",
+  "hadolint",
+  "actionlint",
+];
+
+DEFAULT_BASH_WHITELIST.push(...BASH_WHITELIST_ADDED_V2);
+
 // ---------- what a tool call needs ----------
 
 export interface PermissionResult {
@@ -172,8 +333,35 @@ function riskyArgs(words: string[]): boolean {
   if (cmd === "tree") return has("-o");
   if (cmd === "uniq") return args.filter((a) => !a.startsWith("-")).length > 1;
   if (cmd === "date") return has("-s", "--set");
+  // A second file name is where xxd writes.
+  if (cmd === "xxd") return has("-r", "-revert") || args.filter((a) => !a.startsWith("-")).length > 1;
+  if (cmd === "base64") return has("-o", "--output");
+  // A pager can write a log file; its interactive `!command` needs a terminal the agent's shell doesn't have.
+  if (cmd === "less" || cmd === "more") return has("-o", "-O") || args.some((a) => a.startsWith("--log-file") || a.startsWith("--LOG-FILE"));
+  if (cmd === "man") return has("-H", "-P", "--html", "--pager");
+  if (cmd === "sysctl") return args.some((a) => a.includes("=")) || has("-w");
+  if (cmd === "yq") return has("-i", "--inplace");
+  if (cmd === "cloc" || cmd === "scc" || cmd === "tokei") return has("--report-file", "--out", "-o", "--output");
+  if (cmd === "bat") return has("--pager");
+  if (cmd === "ast-grep") return has("-U", "--update-all", "-r", "--rewrite", "-i", "--interactive");
+  if (cmd === "fzf") return has("--bind", "--preview", "--execute");
+  if (cmd === "biome") return has("--write", "--apply", "--apply-unsafe", "--fix");
+  if (cmd === "ruff") return has("--fix", "--unsafe-fixes", "-w", "--watch");
+  // Only `tsc --noEmit` is listed; anything that builds, watches or picks other output is asked.
+  if (cmd === "tsc") return has("--build", "-b", "--watch", "-w", "--outDir", "--outFile", "--declarationDir");
+  if (cmd === "plutil") return has("-convert", "-insert", "-replace", "-remove", "-o");
+  if (cmd === "go" && sub === "env") return has("-w", "-u");
+  if (cmd === "go") return has("-toolexec", "-exec", "-overlay", "-export");
+  if (cmd === "codesign") return has("--extract-certificates");
+  if (cmd === "npm" && sub === "config") return args.slice(1).some((a) => ["set", "delete", "edit", "fix"].includes(a));
+  if (cmd === "npm" && sub === "pkg") return args.slice(1).some((a) => ["set", "delete", "fix"].includes(a));
+  // Only viewing subcommands are listed; `--web` opens a browser.
+  if (cmd === "gh") return has("--web", "-w", "--show-token", "-t");
+
   if (cmd === "git") {
-    if (has("--output", "--ext-diff", "--textconv", "--open-files-in-pager", "-O")) return true;
+    // --filters and --textconv run drivers named in .gitattributes, which a cloned repository controls.
+    if (has("--output", "--ext-diff", "--textconv", "--filters", "--open-files-in-pager", "-O", "--upload-pack", "--exec")) return true;
+    if (sub === "help") return has("--web", "-w", "--info", "-i");
     if (sub === "reflog") return args.slice(1).some((a) => a === "expire" || a === "delete");
     if (sub === "branch") return has("-d", "-D", "-m", "-M", "-c", "-C", "-f", "--force", "--delete", "--move", "--copy", "-u", "--set-upstream-to", "--unset-upstream", "--edit-description");
   }
@@ -300,7 +488,7 @@ const UNKNOWN: Verdict = { level: 1 };
 const force = (code: ApprovalNote["code"], detail?: string): Verdict => ({ level: 2, note: { code, detail } });
 const worse = (a: Verdict, b: Verdict) => (b.level > a.level ? b : a);
 
-const UNSAFE_ENV = /^(PATH|IFS|SHELL|ENV|BASH_ENV|PS4|PROMPT_COMMAND|LD_.*|DYLD_.*|NODE_OPTIONS|NODE_PATH|PYTHON.*|RUBY.*|PERL.*|GIT_.*|PAGER|EDITOR|VISUAL|BROWSER|NPM_CONFIG_.*|CARGO_.*|HOME|ZDOTDIR)$/i;
+const UNSAFE_ENV = /^(PATH|IFS|SHELL|ENV|BASH_ENV|PS4|PROMPT_COMMAND|LD_.*|DYLD_.*|NODE_OPTIONS|NODE_PATH|PYTHON.*|RUBY.*|PERL.*|GIT_.*|PAGER|MANPAGER|MANOPT|LESS.*|EDITOR|VISUAL|BROWSER|NPM_CONFIG_.*|CARGO_.*|HOME|ZDOTDIR)$/i;
 const SCOPE_OPS: Record<string, RegExp> = {
   mkdir: /^-[pv]+$/,
   touch: /^-[cam]+$/,
