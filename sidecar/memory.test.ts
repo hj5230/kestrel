@@ -248,7 +248,7 @@ test("automatic disclosure is ephemeral, cached per message, refreshed by new tu
   expect(textOf(compacted[1])).toContain("memory_context");
 });
 
-test("runner sends memory beside user input, keeps persisted messages clean, and still answers when memory is down", async () => {
+test("runner keeps persisted messages clean and continues without notes when retrieval fails", async () => {
   store.saveSettings({ memoryAutoSave: false }); writeMemory(input());
   const info = session(); const runner = getRunner(info.id);
   await runner.sendAndWait(query);
@@ -257,10 +257,9 @@ test("runner sends memory beside user input, keeps persisted messages clean, and
   expect(textOf(store.loadMessages(info.id)[0].message)).toBe(query);
   mode = "/rerank"; calls = [];
   await runner.sendAndWait("new question");
-  // A memory service that went away must not block the conversation: the model is still called.
   expect(calls.some((c) => c.body.stream)).toBe(true);
   expect(JSON.stringify(calls.find((c) => c.body.stream)!.body.messages)).not.toContain("memory_context");
-  expect(store.getSession(info.id)?.status).not.toBe("error");
+  expect(store.getSession(info.id)?.status).toBe("idle");
 });
 
 test("durable extraction saves source evidence and usage; truncation and forgetting revoke pending jobs", async () => {
