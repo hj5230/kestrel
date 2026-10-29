@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import type { AppSettings, MemoryStatus } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
 import { rpc } from "@/lib/api"
@@ -46,10 +47,15 @@ export function MemoryModels({ s }: { s: AppSettings }) {
                   <p className="text-xs text-muted-foreground">{t(kind === "embedding" ? "memory.embeddingDesc" : "memory.rerankerDesc")}</p>
                   {kind === "embedding" && <Field>
                     <FieldLabel htmlFor="memory-embedding-api">{t("memory.api")}</FieldLabel>
-                    <select id="memory-embedding-api" className="h-9 w-full rounded-md border bg-background px-3 text-sm pointer-coarse:h-11 pointer-coarse:text-base" value={embedding.api} onChange={(e) => setEmbedding((v) => ({ ...v, api: e.currentTarget.value as "ollama" | "openai" }))}>
-                      <option value="ollama">Ollama /api/embed</option>
-                      <option value="openai">OpenAI-compatible /v1/embeddings</option>
-                    </select>
+                    <Select value={embedding.api} onValueChange={(v) => setEmbedding((cur) => ({ ...cur, api: v as "ollama" | "openai" }))}>
+                      <SelectTrigger id="memory-embedding-api" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ollama">Ollama /api/embed</SelectItem>
+                        <SelectItem value="openai">OpenAI-compatible /v1/embeddings</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </Field>}
                   <Field>
                     <FieldLabel htmlFor={`memory-${kind}-url`}>{t("memory.endpoint")}</FieldLabel>

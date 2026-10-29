@@ -1,5 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks"
-import { BookTextIcon, BrainIcon, CpuIcon, FolderOpenIcon, InfoIcon, LaptopIcon, PaletteIcon, PlugIcon, RotateCcwIcon, ShieldCheckIcon, SmartphoneIcon, SparklesIcon } from "lucide-react"
+import {
+  BookTextIcon,
+  BoxesIcon,
+  BrainIcon,
+  FolderOpenIcon,
+  HistoryIcon,
+  InfoIcon,
+  LaptopIcon,
+  PaletteIcon,
+  PlugIcon,
+  RotateCcwIcon,
+  SearchIcon,
+  ShieldCheckIcon,
+  ShrinkIcon,
+  SmartphoneIcon,
+  SparklesIcon,
+  TerminalSquareIcon,
+  XIcon,
+} from "lucide-react"
 import { toast } from "sonner"
 import type { AppSettings, SkillInfo } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
@@ -18,6 +36,7 @@ import { McpSettings } from "@/components/settings/mcp"
 import { HistorySettings, MemorySettings } from "@/components/settings/memory"
 import { MobileSettings } from "@/components/settings/mobile"
 import { ConnectionSettings } from "@/components/settings/connection"
+import { searchSettings } from "@/components/settings/search"
 import { CwdPicker, ModelPicker, PermissionPicker, ThinkingPicker, permissionModes } from "@/components/chat/pickers"
 import { VIEWS } from "@/components/chat/view-picker"
 import { rpc } from "@/lib/api"
@@ -29,14 +48,14 @@ import { cn } from "@/lib/utils"
 
 const TABS = [
   { key: "general", icon: PaletteIcon },
-  { key: "execution", icon: CpuIcon },
-  { key: "automation", icon: BrainIcon },
-  { key: "models", icon: CpuIcon },
+  { key: "execution", icon: TerminalSquareIcon },
+  { key: "automation", icon: ShrinkIcon },
+  { key: "models", icon: BoxesIcon },
   { key: "mcp", icon: PlugIcon },
   { key: "skills", icon: SparklesIcon },
   { key: "instructions", icon: BookTextIcon },
   { key: "memory", icon: BrainIcon },
-  { key: "history", icon: BookTextIcon },
+  { key: "history", icon: HistoryIcon },
   { key: "permissions", icon: ShieldCheckIcon },
   // Pairing phones is managed on the Mac; the phone shows which Mac it drives instead.
   ...(!isMobileApp ? [{ key: "mobile", icon: SmartphoneIcon }] : []),
@@ -227,7 +246,33 @@ function Execution({ s }: { s: AppSettings }) {
           </Row>
         </Panel>
       </Section>
+      <Section title={t("settings.media")}>
+        <Panel>
+          <FfmpegRow s={s} />
+        </Panel>
+      </Section>
     </div>
+  )
+}
+
+function FfmpegRow({ s }: { s: AppSettings }) {
+  const [status, setStatus] = useState<{ path: string | null; configured: boolean; version: string | null } | null>(null)
+  useEffect(() => {
+    rpc("media.status").then(setStatus).catch(() => setStatus(null))
+  }, [s.ffmpegPath])
+  const note = !status ? "" : status.path ? t("settings.ffmpegFound", { path: status.path, version: status.version ?? "?" }) : status.configured ? t("settings.ffmpegBad") : t("settings.ffmpegMissing")
+  return (
+    <Row
+      label={t("settings.ffmpeg")}
+      desc={
+        <>
+          {t("settings.ffmpegDesc")}
+          {note && <span className={cn("mt-1 block font-mono text-[11px] break-all", !status?.path && "text-warning")}>{note}</span>}
+        </>
+      }
+    >
+      <BlurInput className="w-64 font-mono text-xs" placeholder="/opt/homebrew/bin/ffmpeg" spellcheck={false} value={s.ffmpegPath} onCommit={(v) => save({ ffmpegPath: v.trim() })} />
+    </Row>
   )
 }
 
@@ -410,7 +455,6 @@ function Permissions({ s }: { s: AppSettings }) {
                 s.defaultPermissionMode === m.value && "border-primary ring-2 ring-primary/20",
               )}
             >
-              <m.icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <div>
                 <div className="text-sm font-medium">{m.label}</div>
                 <div className="mt-0.5 text-xs text-muted-foreground">{m.desc}</div>
@@ -492,14 +536,65 @@ export function SettingsPage({ tab }: { tab?: string }) {
   // On phones the tabs are a sideways strip: keep the selected one in view.
   const activeTab = useRef<HTMLButtonElement>(null)
   useEffect(() => activeTab.current?.scrollIntoView({ block: "nearest", inline: "nearest" }), [current])
+  const [query, setQuery] = useState("")
+  const hits = useMemo(() => searchSettings(query, TABS.map((tb) => tb.key)), [query])
   return (
     <div className="flex h-full flex-col">
       <PageHeader>
         <span className="text-sm font-medium">{t("settings.title")}</span>
       </PageHeader>
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <nav className="shrink-0 overflow-x-auto border-b p-2 [scrollbar-width:none] md:w-52 md:border-r md:border-b-0 md:p-3 [&::-webkit-scrollbar]:hidden">
-          <div className="flex gap-0.5 md:grid">
+        <nav className="shrink-0 border-b md:w-52 md:overflow-y-auto md:border-r md:border-b-0">
+          <div className="px-2 pt-2 md:px-3 md:pt-3">
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={query}
+                aria-label={t("settings.search")}
+                placeholder={t("settings.search")}
+                className="h-8 pr-8 pl-8 text-sm [&::-webkit-search-cancel-button]:hidden"
+                onInput={(e) => setQuery(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setQuery("")
+                  if (e.key === "Enter" && hits[0]) {
+                    route.value = { name: "settings", tab: hits[0].tab }
+                    setQuery("")
+                  }
+                }}
+              />
+              {query && (
+                <button
+                  type="button"
+                  aria-label={t("common.clear")}
+                  className="absolute top-1/2 right-1 flex size-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:text-foreground pointer-coarse:size-9"
+                  onClick={() => setQuery("")}
+                >
+                  <XIcon className="size-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+          {query ? (
+            <div className="grid max-h-[50vh] gap-0.5 overflow-y-auto p-2 md:max-h-none md:p-3">
+              {hits.length === 0 && <div className="px-2.5 py-2 text-sm text-muted-foreground">{t("settings.noResults")}</div>}
+              {hits.map((h) => (
+                <button
+                  key={`${h.tab}:${h.label}`}
+                  type="button"
+                  className="grid rounded-lg px-2.5 py-1.5 text-left hover:bg-muted/60 pointer-coarse:min-h-11"
+                  onClick={() => {
+                    route.value = { name: "settings", tab: h.tab }
+                    setQuery("")
+                  }}
+                >
+                  <span className="truncate text-sm">{h.label}</span>
+                  <span className="truncate text-xs text-muted-foreground">{t(`settings.tab.${h.tab}` as MessageKey)}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+          <div className="flex gap-0.5 overflow-x-auto p-2 [scrollbar-width:none] md:grid md:p-3 [&::-webkit-scrollbar]:hidden">
             {TABS.map((tb) => (
               <button
                 key={tb.key}
@@ -516,6 +611,7 @@ export function SettingsPage({ tab }: { tab?: string }) {
               </button>
             ))}
           </div>
+          )}
         </nav>
         <div className="min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-3xl px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-8 md:py-8">
