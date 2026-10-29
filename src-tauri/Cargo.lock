@@ -2037,8 +2037,6 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "objc2",
- "objc2-foundation",
- "objc2-ui-kit",
  "reqwest",
  "rustls",
  "security-framework",
