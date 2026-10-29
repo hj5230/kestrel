@@ -12,6 +12,7 @@ import type {
 } from "@shared/protocol"
 import { connectEvents, disconnectEvents, onConnection, onRevoked, onServerEvent, rpc } from "./api"
 import { setLang, t } from "./i18n"
+import { connectionGeneration } from "./connection-generation"
 import { forgetMac, getPairedMac, listMacs, onPairedMacChanged, selectMac, type PairedMac } from "./pairing"
 import { isMobileApp, isTauri } from "./platform"
 
@@ -28,6 +29,8 @@ export interface DetailState extends SessionDetail {
 // Desktop restores the route per window session; iOS kills backgrounded apps, so the phone keeps
 // it across launches to come back where the user left off.
 const routeStore = () => (isMobileApp ? localStorage : sessionStorage)
+let routeHost = ""
+const routeKey = () => isMobileApp && routeHost ? `kestrel-route:${routeHost}` : "kestrel-route"
 
 function initialRoute(): Route {
   try {
@@ -40,7 +43,7 @@ function initialRoute(): Route {
 export const route = signal<Route>(initialRoute())
 route.subscribe((r) => {
   try {
-    routeStore().setItem("kestrel-route", JSON.stringify(r))
+    routeStore().setItem(routeKey(), JSON.stringify(r))
   } catch {}
 })
 export const sessions = signal<SessionInfo[]>([])
@@ -281,16 +284,24 @@ function handleEvents() {
 }
 
 export async function boot() {
+  const generation = connectionGeneration.capture()
   handleEvents()
   bootError.value = null
   try {
     if (isMobileApp) {
       const [active, all] = await Promise.all([getPairedMac(), listMacs().catch(() => null)])
+      if (!connectionGeneration.current(generation)) return
       pairedMac.value = active
       pairedMacs.value = all?.macs ?? (active ? [active] : [])
       if (!pairedMac.value) return
+      routeHost = pairedMac.value.fingerprint
+      try {
+        const saved = localStorage.getItem(routeKey())
+        route.value = saved ? JSON.parse(saved) : { name: "home" }
+      } catch { route.value = { name: "home" } }
     }
     const [info, s] = await Promise.all([rpc<AppInfo>("app.info"), rpc<AppSettings>("settings.get")])
+    if (!connectionGeneration.current(generation)) return
     appInfo.value = info
     settings.value = s
     setLang(s.language)
@@ -300,8 +311,9 @@ export async function boot() {
     if (r.name === "chat" && !sessions.value.some((x) => x.id === r.sessionId)) {
       await rpc("sessions.get", { id: r.sessionId }).catch(() => (route.value = { name: "home" }))
     }
-    connectEvents()
+    if (connectionGeneration.current(generation)) connectEvents()
   } catch (e: any) {
+    if (!connectionGeneration.current(generation)) return
     const msg = e?.message ?? String(e)
     if (isMobileApp && msg === "unauthorized") deviceRevoked.value = true
     else bootError.value = msg
@@ -314,7 +326,15 @@ function resetForMacChange() {
   connected.value = false
   settings.value = null
   sessions.value = []
+  providers.value = []
+  models.value = []
+  mcpServers.value = []
+  appInfo.value = null
+  remoteStatus.value = null
+  paletteOpen.value = false
   details.clear()
+  routeHost = ""
+  pairedMac.value = undefined
   route.value = { name: "home" }
   deviceRevoked.value = false
   bootError.value = null
@@ -330,20 +350,26 @@ export function adoptPairedMac(mac: PairedMac) {
 }
 
 /** Mobile: move to another paired Mac without pairing again. */
+let switching = false
+
 export async function switchMac(deviceId: string) {
+  if (switching) return
   if (deviceId === pairedMac.value?.deviceId && !deviceRevoked.value) {
     addingMac.value = false
     return
   }
   try {
-    const mac = await selectMac(deviceId)
+    switching = true
+    const previous = pairedMac.value
     resetForMacChange()
+    let mac: PairedMac
+    try { mac = await selectMac(deviceId) } catch (e) { pairedMac.value = previous; void boot(); throw e }
     pairedMac.value = mac
     addingMac.value = false
     void boot()
   } catch (e: any) {
     toast.error(String(e?.message ?? e))
-  }
+  } finally { switching = false }
 }
 
 /** Mobile: forget one paired Mac. If it was the one in use, the phone moves to another, or to the pairing screen. */
@@ -362,4 +388,9 @@ export async function forgetPairedMac(deviceId: string) {
 export async function unpairMac() {
   const id = pairedMac.value?.deviceId
   if (id) await forgetPairedMac(id)
+}
+
+/** Host-local drafts must never appear on another paired Mac. */
+export function draftKeyForHost(key: string) {
+  return isMobileApp ? `${pairedMac.value?.fingerprint ?? "unpaired"}:${key}` : key
 }

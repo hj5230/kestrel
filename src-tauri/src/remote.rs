@@ -48,10 +48,12 @@ pub struct Remote {
     /// Last address that answered; re-probed when it stops working.
     host: Mutex<Option<String>>,
     events: Mutex<Option<JoinHandle<()>>>,
+    stream_id: Mutex<String>,
 }
 
 #[derive(Clone, Serialize)]
 struct ConnStatus {
+    stream_id: String,
     connected: bool,
     /// WebSocket close code when the server ended the stream (4401 = this device was revoked).
     code: Option<u16>,
@@ -499,6 +501,7 @@ async fn refresh_hosts<R: Runtime>(app: AppHandle<R>, conn: Conn, host: String) 
 }
 
 fn disconnect_events(state: &Remote) {
+    state.stream_id.lock().unwrap().clear();
     if let Some(task) = state.events.lock().unwrap().take() {
         task.abort();
     }
@@ -507,8 +510,9 @@ fn disconnect_events(state: &Remote) {
 /// Opens the event stream and returns once it is live; the stream then runs until it drops,
 /// reported through `remote://status`. Reconnection policy stays in the frontend, shared with desktop.
 #[tauri::command]
-async fn remote_events_connect<R: Runtime>(app: AppHandle<R>, state: State<'_, Remote>) -> Result<(), String> {
+async fn remote_events_connect<R: Runtime>(app: AppHandle<R>, state: State<'_, Remote>, stream_id: String) -> Result<(), String> {
     disconnect_events(&state);
+    *state.stream_id.lock().unwrap() = stream_id.clone();
     let conn = current(&app, &state)?;
     let mut h = host(&state, &conn, false).await?;
     let open = |h: String| {
@@ -530,10 +534,13 @@ async fn remote_events_connect<R: Runtime>(app: AppHandle<R>, state: State<'_, R
         }
     };
 
-    let _ = app.emit(STATUS, ConnStatus { connected: true, code: None });
+    if *state.stream_id.lock().unwrap() != stream_id { return Err("Connection changed".into()); }
+    let _ = app.emit(STATUS, ConnStatus { stream_id: stream_id.clone(), connected: true, code: None });
     tauri::async_runtime::spawn(refresh_hosts(app.clone(), conn.clone(), h.clone()));
     let handle = app.clone();
+    let event_stream_id = stream_id.clone();
     let task = tauri::async_runtime::spawn(async move {
+        let stream_id = event_stream_id;
         let (mut tx, mut rx) = ws.split();
         let mut ping = tokio::time::interval(PING_EVERY);
         let mut last_seen = Instant::now();
@@ -543,7 +550,7 @@ async fn remote_events_connect<R: Runtime>(app: AppHandle<R>, state: State<'_, R
                 msg = rx.next() => match msg {
                     Some(Ok(Message::Text(text))) => {
                         last_seen = Instant::now();
-                        let _ = handle.emit(EVENT, text.to_string());
+                        let _ = handle.emit(EVENT, json!({ "streamId": stream_id, "event": text.to_string() }));
                     }
                     Some(Ok(Message::Close(frame))) => {
                         code = frame.map(|f| u16::from(f.code));
@@ -561,15 +568,18 @@ async fn remote_events_connect<R: Runtime>(app: AppHandle<R>, state: State<'_, R
             }
         }
         let _ = tx.send(Message::Close(None)).await;
-        let _ = handle.emit(STATUS, ConnStatus { connected: false, code: code.filter(|c| *c != u16::from(CloseCode::Normal)) });
+        let _ = handle.emit(STATUS, ConnStatus { stream_id: stream_id.clone(), connected: false, code: code.filter(|c| *c != u16::from(CloseCode::Normal)) });
     });
+    let current = state.stream_id.lock().unwrap();
+    if *current != stream_id { task.abort(); return Err("Connection changed".into()); }
     *state.events.lock().unwrap() = Some(task);
     Ok(())
 }
 
 #[tauri::command]
-fn remote_events_disconnect(state: State<'_, Remote>) {
-    disconnect_events(&state);
+fn remote_events_disconnect(state: State<'_, Remote>, stream_id: String) {
+    let matches = *state.stream_id.lock().unwrap() == stream_id;
+    if matches { disconnect_events(&state); }
 }
 
 /// Let the page draw edge to edge. By default the WKWebView's scroll view insets its content by

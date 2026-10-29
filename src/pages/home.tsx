@@ -7,7 +7,7 @@ import { Composer, type Attachment } from "@/components/chat/composer"
 import { ModelControl, PermissionPicker } from "@/components/chat/pickers"
 import { rpc, stageAttachments, type StagedFile } from "@/lib/api"
 import { shortPath } from "@/lib/format"
-import { appInfo, enabledModels, findModel, openSession, route, settings } from "@/lib/store"
+import { appInfo, draftKeyForHost, enabledModels, findModel, openSession, route, settings } from "@/lib/store"
 import { t } from "@/lib/i18n"
 
 export function HomeView() {
@@ -68,7 +68,7 @@ export function HomeView() {
           <Composer
             cwd={cwd}
             autoFocus
-            draftKey="home"
+            draftKey={draftKeyForHost("home")}
             onSubmit={start}
             placeholder={t("home.placeholder")}
             folder={{ value: cwd, onChange: setCwd }}

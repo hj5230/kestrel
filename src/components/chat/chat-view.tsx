@@ -39,7 +39,7 @@ import { rpc, stageAttachments, type StagedFile } from "@/lib/api"
 import { isMobileApp } from "@/lib/platform"
 import { downloadText } from "@/lib/download"
 import { shortPath } from "@/lib/format"
-import { appInfo, createSession, detailSignal, enabledModels, findModel, loadDetail, openSession, settings } from "@/lib/store"
+import { appInfo, createSession, detailSignal, draftKeyForHost, enabledModels, findModel, loadDetail, openSession, settings } from "@/lib/store"
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { cn } from "@/lib/utils"
@@ -310,7 +310,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
               <Composer
                 cwd={s.cwd}
                 running={running}
-                draftKey={s.id}
+                draftKey={draftKeyForHost(s.id)}
                 history={history}
                 autoFocus
                 initial={editing ? { text: editing.text, nonce: editing.nonce } : null}

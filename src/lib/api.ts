@@ -1,5 +1,6 @@
 import type { FileAttachment, ServerEvent } from "@shared/protocol"
 import { isMobileApp, isTauri } from "./platform"
+import { connectionGeneration } from "./connection-generation"
 
 export { isTauri }
 
@@ -110,19 +111,21 @@ function nativeTransport(): Transport {
     },
     async openEvents(onEvent, onClose) {
       const [{ invoke }, { listen }] = await Promise.all([core, events])
-      const unEvent = await listen<string>("remote://event", (e) => {
+      const streamId = crypto.randomUUID()
+      const unEvent = await listen<{ streamId: string; event: string }>("remote://event", (e) => {
+        if (e.payload.streamId !== streamId) return
         try {
-          onEvent(JSON.parse(e.payload))
+          onEvent(JSON.parse(e.payload.event))
         } catch {}
       })
-      const unStatus = await listen<{ connected: boolean; code: number | null }>("remote://status", (e) => {
-        if (e.payload.connected) return
+      const unStatus = await listen<{ stream_id: string; connected: boolean; code: number | null }>("remote://status", (e) => {
+        if (e.payload.stream_id !== streamId || e.payload.connected) return
         unEvent()
         unStatus()
         onClose(e.payload.code ?? undefined)
       })
       try {
-        await invoke("remote_events_connect")
+        await invoke("remote_events_connect", { streamId })
       } catch (e) {
         unEvent()
         unStatus()
@@ -131,7 +134,7 @@ function nativeTransport(): Transport {
       return () => {
         unEvent()
         unStatus()
-        invoke("remote_events_disconnect").catch(() => {})
+        invoke("remote_events_disconnect", { streamId }).catch(() => {})
       }
     },
   }
@@ -139,8 +142,11 @@ function nativeTransport(): Transport {
 
 const transport = isMobileApp ? nativeTransport() : httpTransport()
 
-export function rpc<T = any>(method: string, params: unknown = {}): Promise<T> {
-  return transport.rpc(method, params) as Promise<T>
+export async function rpc<T = any>(method: string, params: unknown = {}): Promise<T> {
+  const generation = connectionGeneration.capture()
+  const result = await transport.rpc(method, params)
+  if (!connectionGeneration.current(generation)) throw new RpcError("Connection changed")
+  return result as T
 }
 
 /** A file waiting to be stored with the session: either bytes from the page, or a path from the native picker. */
@@ -224,10 +230,12 @@ function scheduleReconnect(delay = Math.min(5000, 300 * 2 ** retry++)) {
 async function open() {
   if (stopped || connecting || live) return
   connecting = true
+  const generation = connectionGeneration.capture()
   try {
-    close = await transport.openEvents(
-      (e) => listeners.forEach((fn) => fn(e)),
+    const opened = await transport.openEvents(
+      (e) => { if (connectionGeneration.current(generation)) listeners.forEach((fn) => fn(e)) },
       (code) => {
+        if (!connectionGeneration.current(generation)) return
         close = null
         setLive(false)
         if (code === REVOKED_CLOSE_CODE) {
@@ -238,9 +246,12 @@ async function open() {
         scheduleReconnect()
       },
     )
+    if (!connectionGeneration.current(generation) || stopped) { opened(); return }
+    close = opened
     retry = 0
     setLive(true)
   } catch (e) {
+    if (!connectionGeneration.current(generation)) return
     if (String(e).includes("unauthorized")) {
       stopped = true
       revokedListeners.forEach((fn) => fn())
@@ -248,7 +259,7 @@ async function open() {
       scheduleReconnect()
     }
   } finally {
-    connecting = false
+    if (connectionGeneration.current(generation)) connecting = false
   }
 }
 
@@ -259,6 +270,8 @@ export function connectEvents() {
 }
 
 export function disconnectEvents() {
+  connectionGeneration.invalidate()
+  connecting = false
   stopped = true
   if (retryTimer) clearTimeout(retryTimer)
   retryTimer = null
