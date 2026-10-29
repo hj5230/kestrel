@@ -1,6 +1,7 @@
-import { useMemo, useState } from "preact/hooks"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks"
 import { ChevronRightIcon, CircleDashedIcon, ListTreeIcon } from "lucide-react"
 import type {
+  AskDetails,
   AssistantMsg,
   CompactionInfo,
   StoredMessage,
@@ -9,9 +10,10 @@ import type {
   ToolResultMsg,
   TranscriptView,
 } from "@shared/protocol"
-import { Spinner } from "@/components/ui/spinner"
+import { KestrelMark } from "@/components/kestrel-mark"
 import { Markdown } from "./markdown"
 import { AssistantMeta, CompactionDivider, ErrorCard, Thinking, UserMessage } from "./messages"
+import { QuestionCard, QuestionSummary } from "./question-card"
 import { summary, toolLabel, ToolCallView, type ToolState } from "./tool-call"
 import { t, type MessageKey } from "@/lib/i18n"
 import type { DetailState } from "@/lib/store"
@@ -27,12 +29,16 @@ type Step =
   | { k: "thinking"; key: string; block: ThinkingBlock; streaming: boolean }
   | { k: "tool"; key: string; block: ToolCallBlock; msg: AssistantMsg; streaming: boolean }
 
+/** Questions to the user are part of the conversation, not process: they stay in place in every view. */
+type Ask = { k: "ask"; key: string; block: ToolCallBlock }
+
 type Item =
   | { k: "user"; key: string; stored: StoredMessage }
   | { k: "compaction"; key: string; c: CompactionInfo }
   | { k: "text"; key: string; text: string; streaming: boolean }
   | { k: "meta"; key: string; msg: AssistantMsg }
   | { k: "aborted"; key: string }
+  | Ask
   | Step
 
 type Row =
@@ -65,7 +71,8 @@ function assistantItems(msg: AssistantMsg, keyBase: string, streaming: boolean):
     } else if (c.type === "text") {
       if (c.text.trim()) out.push({ k: "text", key, text: c.text, streaming: live })
     } else if (c.type === "toolCall") {
-      out.push({ k: "tool", key: c.id || key, block: c, msg, streaming })
+      if (c.name === "ask_user") out.push({ k: "ask", key: c.id || key, block: c })
+      else out.push({ k: "tool", key: c.id || key, block: c, msg, streaming })
     }
   })
   if (streaming) return out
@@ -229,7 +236,7 @@ function ProcessGroup({
         {waiting ? (
           <CircleDashedIcon className="size-3.5 shrink-0 text-warning" />
         ) : active ? (
-          <Spinner className="size-3.5 shrink-0" />
+          <KestrelMark />
         ) : (
           <ListTreeIcon className="size-3.5 shrink-0" />
         )}
@@ -248,10 +255,46 @@ function ProcessGroup({
   )
 }
 
+/** Rows mounted at first, and how many more each time the reader nears the top. Long sessions used to mount
+ *  every message (and highlight every code block) before showing anything. */
+const WINDOW = 40
+
+/** Mounts the last `limit` rows; a sentinel above them grows the window, keeping the reader's place. */
+function useRowWindow(total: number) {
+  const [limit, setLimit] = useState(WINDOW)
+  const sentinel = useRef<HTMLDivElement>(null)
+  const anchor = useRef<{ el: HTMLElement; height: number; top: number } | null>(null)
+  const hidden = Math.max(0, total - limit)
+  useEffect(() => {
+    const el = sentinel.current
+    if (!el || !hidden) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return
+        const scroller = el.closest("[data-transcript-scroll]") as HTMLElement | null
+        if (scroller) anchor.current = { el: scroller, height: scroller.scrollHeight, top: scroller.scrollTop }
+        setLimit((n) => n + WINDOW)
+      },
+      { rootMargin: "800px 0px 0px 0px" },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [hidden > 0, limit])
+  // Rows were added above the reader: move down by exactly what was added, so nothing on screen shifts.
+  useLayoutEffect(() => {
+    const a = anchor.current
+    if (!a) return
+    anchor.current = null
+    a.el.scrollTop = a.top + (a.el.scrollHeight - a.height)
+  }, [limit])
+  return { start: hidden, sentinel: hidden ? <div ref={sentinel} className="h-px" aria-hidden="true" /> : null }
+}
+
 function spacing(row: Row, prev: Row | undefined) {
   if (!prev) return ""
   if (row.k === "user" || prev.k === "user" || row.k === "compaction" || prev.k === "compaction") return "mt-6"
   if (row.k === "meta") return "mt-1"
+  if (row.k === "ask" || prev.k === "ask") return "mt-3"
   if (row.k === "text" || prev.k === "text") return "mt-3"
   return "mt-1.5"
 }
@@ -280,7 +323,7 @@ export function Transcript({
   }, [d.messages])
   const running = d.session.status === "running" || d.session.status === "waiting"
   const rt: Runtime = { results, running: d.runningTools, runActive: running }
-  const rows = toRows(buildItems(d), view)
+  const rows = useMemo(() => toRows(buildItems(d), view), [d.messages, d.streaming, d.compactions, view])
   const lastRow = rows[rows.length - 1]
   const last = d.messages[d.messages.length - 1]
   const lastAssistantError = !running && last?.message.role === "assistant" && last.message.stopReason === "error" ? (last.message as AssistantMsg) : null
@@ -288,8 +331,10 @@ export function Transcript({
   const busy = running && (!lastRow || lastRow.k === "user" || lastRow.k === "compaction") && d.approvals.length === 0 && d.questions.length === 0
   const waiting = d.approvals.length > 0 || d.questions.length > 0
 
+  const win = useRowWindow(rows.length)
   const rendered: preact.JSX.Element[] = []
   rows.forEach((row, i) => {
+    if (i < win.start) return
     const cls = spacing(row, rows[i - 1])
     let el: preact.JSX.Element | null = null
     switch (row.k) {
@@ -312,6 +357,15 @@ export function Transcript({
       case "meta":
         el = <AssistantMeta msg={row.msg} />
         break
+      case "ask": {
+        const pending = d.questions.find((q) => q.toolCallId === row.block.id)
+        const result = results.get(row.block.id)
+        if (pending) el = <QuestionCard req={pending} readOnly={readOnly} />
+        else if (result?.details) el = <QuestionSummary details={result.details as AskDetails} />
+        // Still streaming the call, or it failed before asking: the process row shows those states.
+        else el = <ProcessGroup steps={[{ k: "tool", key: row.key, block: row.block, msg: d.streaming ?? ({} as AssistantMsg), streaming: !result }]} rt={rt} waiting={false} expandable={view !== "answer"} />
+        break
+      }
       case "aborted":
         el = <div className="text-xs text-muted-foreground">{t("msg.stopped")}</div>
         break
@@ -339,10 +393,11 @@ export function Transcript({
 
   return (
     <div className="flex flex-col">
+      {win.sentinel}
       {rendered}
       {(busy || d.compacting) && (
         <div className={cn("flex items-center gap-2 text-[13px] text-muted-foreground", rendered.length && "mt-6")}>
-          <Spinner className="size-3.5" />
+          <KestrelMark />
           <span className="text-shimmer">{d.compacting ? t("chat.compacting") : t("chat.thinking")}</span>
         </div>
       )}

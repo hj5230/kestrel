@@ -151,7 +151,7 @@ export function UserMessage({
       {text && (
         <div
           className={cn(
-            "max-w-[85%] rounded-2xl bg-muted px-4 py-2.5 text-[0.94rem] leading-relaxed whitespace-pre-wrap break-words select-text",
+            "max-w-[85%] rounded-2xl bg-muted px-4 py-2.5 text-[0.875rem] leading-relaxed whitespace-pre-wrap break-words select-text",
             isCommand && "font-mono text-[13px]",
           )}
         >

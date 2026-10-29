@@ -52,7 +52,8 @@ function OptionRow({ q, option, on, onToggle }: { q: Question; option: Question[
   )
 }
 
-export function QuestionCard({ req }: { req: QuestionRequest }) {
+/** The live question, in place in the transcript. readOnly: a subagent's transcript, where nobody can answer. */
+export function QuestionCard({ req, readOnly }: { req: QuestionRequest; readOnly?: boolean }) {
   const [busy, setBusy] = useState(false)
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
   const draft = (q: Question): Draft => drafts[q.id] ?? { picked: [], other: "" }
@@ -92,11 +93,11 @@ export function QuestionCard({ req }: { req: QuestionRequest }) {
         <CircleHelpIcon className="size-4 text-primary" />
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{req.title || t("ask.title")}</span>
       </div>
-      <div className="grid max-h-[60vh] gap-4 overflow-auto px-4 py-3">
+      <div className="grid gap-4 px-4 py-3">
         {req.questions.map((q) => {
           const cur = draft(q)
           return (
-            <fieldset key={q.id} className="grid gap-2" disabled={busy}>
+            <fieldset key={q.id} className="grid gap-2" disabled={busy || readOnly}>
               <legend className="mb-0.5 text-sm font-medium">
                 {q.prompt}
                 {q.allowMultiple && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{t("ask.multiple")}</span>}
@@ -116,11 +117,11 @@ export function QuestionCard({ req }: { req: QuestionRequest }) {
         })}
       </div>
       <div className="flex items-center gap-2 border-t px-3 py-2.5">
-        <Button size="sm" type="submit" disabled={!ready || busy}>
+        <Button size="sm" type="submit" disabled={!ready || busy || readOnly}>
           {t("ask.submit")}
         </Button>
         <div className="flex-1" />
-        <Button size="sm" variant="ghost" type="button" disabled={busy} onClick={() => send(null)}>
+        <Button size="sm" variant="ghost" type="button" disabled={busy || readOnly} onClick={() => send(null)}>
           {t("ask.dismiss")}
         </Button>
       </div>
