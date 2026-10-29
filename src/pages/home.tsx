@@ -69,6 +69,7 @@ export function HomeView() {
             cwd={cwd}
             autoFocus
             draftKey={draftKeyForHost("home")}
+            vision={findModel(model.providerId, model.modelId)?.vision ?? true}
             onSubmit={start}
             placeholder={t("home.placeholder")}
             folder={{ value: cwd, onChange: setCwd }}

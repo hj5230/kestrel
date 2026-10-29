@@ -4,12 +4,8 @@ import {
   BrainIcon,
   CheckIcon,
   ChevronDownIcon,
-  FilePenLineIcon,
   FolderIcon,
   FolderOpenIcon,
-  ShieldCheckIcon,
-  ShieldOffIcon,
-  SparklesIcon,
   Settings2Icon,
   EyeIcon,
 } from "lucide-react"
@@ -276,19 +272,18 @@ export function ThinkingPicker({ value, choices = PREFERRED_EFFORTS, onChange }:
   )
 }
 
-export function permissionModes(): { value: PermissionMode; label: string; desc: string; icon: any }[] {
+export function permissionModes(): { value: PermissionMode; label: string; desc: string }[] {
   return [
-    { value: "manual", label: t("perm.manual"), desc: t("perm.manual.desc"), icon: ShieldCheckIcon },
-    { value: "acceptEdits", label: t("perm.acceptEdits"), desc: t("perm.acceptEdits.desc"), icon: FilePenLineIcon },
-    { value: "auto", label: t("perm.auto"), desc: t("perm.auto.desc"), icon: SparklesIcon },
-    { value: "bypass", label: t("perm.bypass"), desc: t("perm.bypass.desc"), icon: ShieldOffIcon },
+    { value: "manual", label: t("perm.manual"), desc: t("perm.manual.desc") },
+    { value: "acceptEdits", label: t("perm.acceptEdits"), desc: t("perm.acceptEdits.desc") },
+    { value: "auto", label: t("perm.auto"), desc: t("perm.auto.desc") },
+    { value: "bypass", label: t("perm.bypass"), desc: t("perm.bypass.desc") },
   ]
 }
 
 export function PermissionPicker({ value, onChange }: { value: PermissionMode; onChange: (v: PermissionMode) => void }) {
   const modes = permissionModes()
   const cur = modes.find((m) => m.value === value) ?? modes[2]
-  const Icon = cur.icon
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -300,7 +295,6 @@ export function PermissionPicker({ value, onChange }: { value: PermissionMode; o
             value === "bypass" && "text-destructive hover:text-destructive",
           )}
         >
-          <Icon />
           <span>{cur.label}</span>
         </Button>
       </DropdownMenuTrigger>
