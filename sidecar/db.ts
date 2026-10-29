@@ -166,6 +166,8 @@ const MIGRATIONS: string[] = [
   `UPDATE providers SET kind = 'amazon-q',
      name = CASE WHEN name = 'Kiro' THEN 'Amazon Q' ELSE name END
    WHERE kind = 'kiro';`,
+  `ALTER TABLE models ADD COLUMN metadata_source TEXT NOT NULL DEFAULT 'catalog';
+   ALTER TABLE models ADD COLUMN metadata TEXT;`,
 ];
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -336,6 +338,8 @@ const rowToModel = (r: any): ModelConfig => ({
   efforts: r.efforts == null || r.efforts === "" ? null : json<string[]>(r.efforts, []),
   effortDefault: r.effort_default ?? null,
   locked: r.locked ? String(r.locked).split(",").filter(Boolean) : [],
+  metadataSource: r.metadata_source === "codex" ? "codex" : "catalog",
+  metadata: r.metadata ? json(r.metadata, undefined) : undefined,
 });
 
 export function listModels(providerId?: string): ModelConfig[] {
@@ -352,13 +356,14 @@ export function getModel(providerId: string, id: string): ModelConfig | null {
 
 export function upsertModel(m: ModelConfig) {
   db.run(
-    `INSERT INTO models (provider_id, id, name, context_window, max_tokens, reasoning, vision, cost_input, cost_output, cost_cache_read, cost_cache_write, enabled, efforts, effort_default, locked)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO models (provider_id, id, name, context_window, max_tokens, reasoning, vision, cost_input, cost_output, cost_cache_read, cost_cache_write, enabled, efforts, effort_default, locked, metadata_source, metadata)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(provider_id, id) DO UPDATE SET name = excluded.name, context_window = excluded.context_window,
        max_tokens = excluded.max_tokens, reasoning = excluded.reasoning, vision = excluded.vision,
        cost_input = excluded.cost_input, cost_output = excluded.cost_output, cost_cache_read = excluded.cost_cache_read,
        cost_cache_write = excluded.cost_cache_write, enabled = excluded.enabled, efforts = excluded.efforts,
-       effort_default = excluded.effort_default, locked = excluded.locked`,
+       effort_default = excluded.effort_default, locked = excluded.locked,
+       metadata_source = excluded.metadata_source, metadata = excluded.metadata`,
     [
       m.providerId,
       m.id,
@@ -375,6 +380,8 @@ export function upsertModel(m: ModelConfig) {
       m.efforts == null ? null : JSON.stringify(m.efforts),
       m.effortDefault ?? null,
       (m.locked ?? []).join(","),
+      m.metadataSource ?? "catalog",
+      m.metadata ? JSON.stringify(m.metadata) : null,
     ],
   );
 }

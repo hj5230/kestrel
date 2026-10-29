@@ -115,20 +115,20 @@ const handlers: Record<string, Handler> = {
   },
 
   "models.list": ({ providerId } = {}) => store.listModels(providerId),
-  "models.defaults": async ({ providerId, id, name, contextWindow }) => {
+  "models.defaults": async ({ providerId, id, name, contextWindow, metadataSource }) => {
     const p = store.getProvider(providerId);
     if (p?.kind === "amazon-q") {
       const remote = (await fetchRemoteModels(p)).find((m) => m.id === id);
       if (!remote) throw new Error(`Amazon Q model is unavailable for this API key: ${id}`);
       return { providerId, ...modelDefaults(p.kind, id, name || remote.name, contextWindow ?? remote.contextWindow, remote) };
     }
-    return { providerId, ...modelDefaults(p?.kind ?? "openai-compatible", id, name, contextWindow, { baseUrl: p?.baseUrl }) };
+    return { providerId, ...modelDefaults(p?.kind ?? "openai-compatible", id, name, contextWindow, { baseUrl: p?.baseUrl, metadataSource }) };
   },
-  "models.upsert": (m: ModelConfig) => {
+  "models.upsert": (m: ModelConfig & { resetAutomatic?: boolean }) => {
     const p = store.getProvider(m.providerId);
-    const facts = p ? lookupFacts(p.kind, p.baseUrl, m.id) : null;
+    const facts = p ? lookupFacts(p.kind, p.baseUrl, m.id, m.metadataSource === "codex" ? "codex" : undefined) : null;
     const efforts = m.efforts == null ? null : sortEfforts(m.efforts);
-    store.upsertModel({ ...m, efforts, locked: locksFor({ ...m, efforts }, facts) });
+    store.upsertModel({ ...m, efforts, locked: m.resetAutomatic ? locksFor({ ...m, efforts }, facts) : locksFor({ ...m, efforts }, facts, store.getModel(m.providerId, m.id)) });
   },
   "models.addMany": async ({ providerId, models }: { providerId: string; models: (Partial<RemoteModel> & { id: string })[] }) => {
     const p = store.getProvider(providerId);

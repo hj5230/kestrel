@@ -19,7 +19,10 @@ test("legacy provider migration preserves IDs, credentials, model settings and s
   store.saveSettings({ defaultProviderId: provider.id, defaultModelId: "test-model" });
   // Recreate the state immediately before the new migration was introduced.
   store.db.run("UPDATE providers SET kind = 'kiro'");
-  store.db.run("DELETE FROM _migrations WHERE version = (SELECT max(version) FROM _migrations)");
+  // Roll back the later metadata migration too, rather than assuming the rename is last forever.
+  store.db.run("ALTER TABLE models DROP COLUMN metadata_source");
+  store.db.run("ALTER TABLE models DROP COLUMN metadata");
+  store.db.run("DELETE FROM _migrations WHERE version >= (SELECT max(version) - 1 FROM _migrations)");
   store.db.close();
   store.openDb(dir, true);
   expect(store.getProvider(provider.id)).toEqual({ ...provider, kind: "amazon-q", name: "Amazon Q" });

@@ -58,6 +58,14 @@ export interface ModelConfig {
   effortDefault?: string | null;
   /** Fields a person set to something other than the catalog, so a refresh does not overwrite them. */
   locked?: string[];
+  /** Local Codex subscription facts are opt-in, never inferred from the model ID. */
+  metadataSource?: "catalog" | "codex";
+  /** Last values supplied automatically; enables refresh without mistaking old facts for edits. */
+  metadata?: {
+    source: "catalog" | "codex" | "endpoint";
+    checkedAt: number;
+    values: Partial<Pick<ModelConfig, "contextWindow" | "maxTokens" | "reasoning" | "vision" | "cost" | "efforts" | "effortDefault">>;
+  };
 }
 
 export interface RemoteModel {

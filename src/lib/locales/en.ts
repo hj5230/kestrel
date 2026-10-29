@@ -662,6 +662,13 @@ export const en = {
   "approval.note.review_blocked": "Auto review blocked this and the agent kept trying: {detail}",
   "approval.note.review_error": "Auto review could not be reached ({detail}), so it is up to you.",
   "approval.note.review_paused": "Auto review is paused after repeated blocks. Approving this resumes it.",
+  "models.metadataSource": "Model information source",
+  "models.sourceCatalog": "Provider / public catalog",
+  "models.sourceCodex": "Local Codex subscription cache",
+  "models.metadataDesc": "Use Codex only for a subscription-backed endpoint. Preview changes before applying; edited fields remain manual.",
+  "models.previewMetadata": "Preview model information",
+  "models.metadataPreview": "Context {context} · output {output} · ${input}/${price} per 1M tokens",
+  "models.applyAutomatic": "Apply and restore automatic updates",
 }
 
 export type MessageKey = keyof typeof en

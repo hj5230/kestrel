@@ -231,19 +231,14 @@ function ModelDialog({ model, onClose }: { model: ModelConfig | null; onClose: (
   const [m, setM] = useState<ModelConfig | null>(model)
   const [effortsText, setEffortsText] = useState("")
   const [filling, setFilling] = useState(false)
+  const [preview, setPreview] = useState<ModelConfig | null>(null)
+  const [automatic, setAutomatic] = useState(false)
   useEffect(() => {
     setM(model)
+    setPreview(null)
+    setAutomatic(false)
     setEffortsText((model?.efforts ?? []).join(", "))
-    if (!model || model.efforts != null) return
-    let cancel = false
-    rpc<ModelConfig>("models.defaults", { providerId: model.providerId, id: model.id, name: model.name })
-      .then((d) => {
-        if (!cancel && d.efforts?.length) setEffortsText(d.efforts.join(", "))
-      })
-      .catch(() => {})
-    return () => {
-      cancel = true
-    }
+
   }, [model])
   if (!m) return null
   const set = (patch: Partial<ModelConfig>) => setM({ ...m, ...patch })
@@ -251,7 +246,7 @@ function ModelDialog({ model, onClose }: { model: ModelConfig | null; onClose: (
   const save = async (e: Event) => {
     e.preventDefault()
     try {
-      await rpc("models.upsert", { ...m, efforts: parseEfforts(effortsText) })
+      await rpc("models.upsert", { ...m, efforts: parseEfforts(effortsText), resetAutomatic: automatic })
       await refreshProviders()
       onClose()
     } catch (err: any) {
@@ -261,9 +256,8 @@ function ModelDialog({ model, onClose }: { model: ModelConfig | null; onClose: (
   const fill = async () => {
     setFilling(true)
     try {
-      const d = await rpc<ModelConfig>("models.defaults", { providerId: m.providerId, id: m.id, name: m.name })
-      setM({ ...m, ...d, name: m.name, enabled: m.enabled, providerId: m.providerId, id: m.id })
-      setEffortsText((d.efforts ?? []).join(", "))
+      const d = await rpc<ModelConfig>("models.defaults", { providerId: m.providerId, id: m.id, name: m.name, metadataSource: m.metadataSource })
+      setPreview(d)
     } catch (err: any) {
       toast.error(err.message)
     } finally {
@@ -272,7 +266,7 @@ function ModelDialog({ model, onClose }: { model: ModelConfig | null; onClose: (
   }
   return (
     <Dialog open={!!model} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
         <form onSubmit={save} className="grid gap-5">
           <DialogHeader>
             <DialogTitle>{t("models.params")}</DialogTitle>
@@ -282,6 +276,28 @@ function ModelDialog({ model, onClose }: { model: ModelConfig | null; onClose: (
             <Field>
               <FieldLabel>{t("models.displayName")}</FieldLabel>
               <Input value={m.name} onInput={(e) => set({ name: e.currentTarget.value })} />
+            </Field>
+            <Field>
+              <FieldLabel>{t("models.metadataSource")}</FieldLabel>
+              <Select value={m.metadataSource ?? "catalog"} onValueChange={(value) => { set({ metadataSource: value as "catalog" | "codex" }); setPreview(null) }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="catalog">{t("models.sourceCatalog")}</SelectItem>
+                  <SelectItem value="codex">{t("models.sourceCodex")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <FieldDescription>{t("models.metadataDesc")}</FieldDescription>
+              <Button type="button" variant="outline" disabled={filling} onClick={fill}>{t("models.previewMetadata")}</Button>
+              {preview && <div className="grid gap-2 rounded-md border p-3 text-sm">
+                <p>{t("models.metadataPreview", { context: formatTokens(preview.contextWindow), output: formatTokens(preview.maxTokens), input: preview.cost.input, price: preview.cost.output })}</p>
+                <p className="break-words">{preview.efforts?.join(", ") || t("picker.effortDefault")}</p>
+                <Button type="button" variant="secondary" onClick={() => {
+                  setM({ ...m, ...preview, name: m.name, enabled: m.enabled, locked: [] })
+                  setEffortsText((preview.efforts ?? []).join(", "))
+                  setAutomatic(true)
+                  setPreview(null)
+                }}>{t("models.applyAutomatic")}</Button>
+              </div>}
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field>
@@ -327,9 +343,6 @@ function ModelDialog({ model, onClose }: { model: ModelConfig | null; onClose: (
             <Field>
               <div className="flex items-center justify-between gap-2">
                 <FieldLabel>{t("models.efforts")}</FieldLabel>
-                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={filling} onClick={fill}>
-                  {t("models.fill")}
-                </Button>
               </div>
               <Input className="font-mono text-xs" value={effortsText} placeholder="low, high, max" onInput={(e) => setEffortsText(e.currentTarget.value)} />
               <FieldDescription>{t("models.effortsDesc")}</FieldDescription>

@@ -175,6 +175,7 @@ export function lookupKnownModel(kind: ProviderKind, id: string): Model<any> | n
 }
 
 export interface ModelHint {
+  metadataSource?: "catalog" | "codex";
   baseUrl?: string;
   maxTokens?: number;
   reasoning?: boolean;
@@ -186,7 +187,7 @@ export interface ModelHint {
 }
 
 export function modelDefaults(kind: ProviderKind, id: string, name?: string, contextHint?: number, hint?: ModelHint): Omit<ModelConfig, "providerId"> {
-  const facts = lookupFacts(kind, hint?.baseUrl ?? "", id);
+  const facts = lookupFacts(kind, hint?.baseUrl ?? "", id, hint?.metadataSource === "codex" ? "codex" : undefined);
   const known = kind === "amazon-q" ? null : lookupKnownModel(kind, id);
   const long = LONG_CONTEXT.test(id);
   const lower = id.toLowerCase();
@@ -210,6 +211,8 @@ export function modelDefaults(kind: ProviderKind, id: string, name?: string, con
     efforts,
     effortDefault,
     locked: [],
+    metadataSource: hint?.metadataSource ?? "catalog",
+    metadata: facts ? { source: hint?.metadataSource === "codex" ? "codex" : "catalog", checkedAt: Date.now(), values: { ...facts, cost: facts.cost ?? undefined } } : undefined,
   };
 }
 

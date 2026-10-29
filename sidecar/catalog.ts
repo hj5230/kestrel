@@ -211,12 +211,12 @@ function codexRow(rows: Map<string, CodexRow>, keys: string[]): CodexRow | null 
  * A ChatGPT/Codex subscription slug takes its effort list and context from the local Codex cache;
  * that serving config is not the public API card. Pass `codex` as an empty map to ignore the file.
  */
-export function lookupFacts(kind: ProviderKind, baseUrl: string, id: string, codex?: Map<string, CodexRow>): CatalogFacts | null {
+export function lookupFacts(kind: ProviderKind, baseUrl: string, id: string, codex?: Map<string, CodexRow> | "codex"): CatalogFacts | null {
   // Amazon Q entitlements and credit billing come from its authenticated model discovery.
   if (kind === "amazon-q") return null;
   const keys = modelKeys(id);
   const entry = loaded ? pickEntry(kind, baseUrl, keys) : null;
-  const row = codexRow(codex ?? readCodexRows(), keys);
+  const row = codexRow(codex === "codex" ? readCodexRows() : codex ?? new Map(), keys);
   if (!entry && !row) return null;
   const long = /\[1m\]$/i.test(id);
   let contextWindow = row?.contextWindow ?? entry?.contextWindow;
@@ -259,7 +259,9 @@ export function planBackfill(model: ModelConfig, facts: CatalogFacts | null): Mo
   let changed = false;
   const take = (field: string, apply: () => void, equal: boolean, isDefault: boolean) => {
     if (locked.has(field) || equal) return;
-    if (!isDefault) {
+    const previous = model.metadata?.values as Record<string, unknown> | undefined;
+    const unchangedAutomatic = previous && Object.hasOwn(previous, field) && JSON.stringify(previous[field]) === JSON.stringify((model as any)[field]);
+    if (!isDefault && !unchangedAutomatic) {
       locked.add(field);
       changed = true;
       return;
@@ -277,7 +279,7 @@ export function planBackfill(model: ModelConfig, facts: CatalogFacts | null): Mo
     take("cost", () => (next.cost = { ...facts.cost! }), sameCost(next.cost, facts.cost), zeroCost(model.cost));
   }
   take("efforts", () => (next.efforts = facts.efforts), sameEfforts(model.efforts, facts.efforts), model.efforts == null);
-  if (model.efforts == null && !locked.has("efforts")) {
+  if ((model.efforts == null || model.metadata?.values.effortDefault === model.effortDefault) && !locked.has("efforts") && !locked.has("effortDefault")) {
     const fallback = facts.effortDefault ?? null;
     if ((next.effortDefault ?? null) !== fallback) {
       next.effortDefault = fallback;
@@ -286,11 +288,11 @@ export function planBackfill(model: ModelConfig, facts: CatalogFacts | null): Mo
   }
   const untouched =
     model.efforts == null && model.contextWindow === CONTEXT_DEFAULT && model.maxTokens === MAX_DEFAULT && zeroCost(model.cost) && !(model.locked ?? []).length;
-  if (untouched && facts.reasoning != null && !locked.has("reasoning") && model.reasoning !== facts.reasoning) {
+  if ((untouched || model.metadata?.values.reasoning === model.reasoning) && facts.reasoning != null && !locked.has("reasoning") && model.reasoning !== facts.reasoning) {
     next.reasoning = facts.reasoning;
     changed = true;
   }
-  if (untouched && facts.vision != null && !locked.has("vision") && model.vision !== facts.vision) {
+  if ((untouched || model.metadata?.values.vision === model.vision) && facts.vision != null && !locked.has("vision") && model.vision !== facts.vision) {
     next.vision = facts.vision;
     changed = true;
   }
@@ -299,11 +301,23 @@ export function planBackfill(model: ModelConfig, facts: CatalogFacts | null): Mo
     next.locked = lockedList;
     changed = true;
   }
+  const values = Object.fromEntries(["contextWindow", "maxTokens", "reasoning", "vision", "cost", "efforts", "effortDefault"].filter((key) => (facts as any)[key] != null).map((key) => [key, (facts as any)[key]]));
+  if (!model.metadata || JSON.stringify(model.metadata.values) !== JSON.stringify(values)) {
+    next.metadata = { source: model.metadataSource === "codex" ? "codex" : "catalog", checkedAt: Date.now(), values };
+    changed = true;
+  }
   return changed ? next : null;
 }
 
 /** Fields the user changed away from the catalog. A miss (no facts yet) leaves the locks alone. */
-export function locksFor(model: ModelConfig, facts: CatalogFacts | null): string[] {
+export function locksFor(model: ModelConfig, facts: CatalogFacts | null, previous?: ModelConfig | null): string[] {
+  if (previous) {
+    const locked = new Set(previous.locked ?? []);
+    for (const key of ["contextWindow", "maxTokens", "reasoning", "vision", "cost", "efforts", "effortDefault"]) {
+      if (JSON.stringify((model as any)[key]) !== JSON.stringify((previous as any)[key])) locked.add(key);
+    }
+    return [...locked];
+  }
   if (!facts) return [...(model.locked ?? [])];
   const locked: string[] = [];
   if (facts.contextWindow && model.contextWindow !== facts.contextWindow) locked.push("contextWindow");

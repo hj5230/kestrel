@@ -664,4 +664,11 @@ export const zhCN: Record<MessageKey, string> = {
   "approval.note.review_blocked": "自动审查拦下了这个操作，但 agent 仍在坚持：{detail}",
   "approval.note.review_error": "无法连接自动审查（{detail}），由你决定。",
   "approval.note.review_paused": "连续被拦截后自动审查已暂停，批准这个操作会恢复。",
+  "models.metadataSource": "模型信息来源",
+  "models.sourceCatalog": "服务商 / 公开目录",
+  "models.sourceCodex": "本机 Codex 订阅缓存",
+  "models.metadataDesc": "仅订阅代理接口使用 Codex 缓存。应用前预览变更，手动修改的字段会保留。",
+  "models.previewMetadata": "预览模型信息",
+  "models.metadataPreview": "上下文 {context} · 输出 {output} · 每百万 token ${input}/${price}",
+  "models.applyAutomatic": "应用并恢复自动更新",
 }

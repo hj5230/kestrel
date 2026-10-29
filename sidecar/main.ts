@@ -32,7 +32,7 @@ try { initializeMemory(); } catch (e) { console.error("Memory initialization fai
 const fillModels = () =>
   backfillModels((model) => {
     const provider = getProvider(model.providerId);
-    return provider ? lookupFacts(provider.kind, provider.baseUrl, model.id) : null;
+    return provider ? lookupFacts(provider.kind, provider.baseUrl, model.id, model.metadataSource === "codex" ? "codex" : undefined) : null;
   });
 fillModels();
 const envReady = resolveShellEnv();

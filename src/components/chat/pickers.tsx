@@ -253,21 +253,21 @@ export function ModelControl({
   )
 }
 
-export function ThinkingPicker({ value, onChange }: { value: ThinkingLevel; onChange: (v: ThinkingLevel) => void }) {
+export function ThinkingPicker({ value, choices = PREFERRED_EFFORTS, onChange }: { value: ThinkingLevel; choices?: string[]; onChange: (v: ThinkingLevel) => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="gap-1 px-2 text-muted-foreground hover:text-foreground" title={t("picker.thinking")}>
           <BrainIcon />
-          <span>{effortLabel(value)}</span>
+          <span>{choices.includes(value) ? effortLabel(value) : t("picker.effortDefault")}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-40">
         <DropdownMenuLabel>{t("picker.thinking")}</DropdownMenuLabel>
-        <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v as ThinkingLevel)}>
-          {PREFERRED_EFFORTS.map((v) => (
-            <DropdownMenuRadioItem key={v} value={v}>
-              {effortLabel(v)}
+        <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v === "__default" ? "" : v)}>
+          {["", ...choices].map((v) => (
+            <DropdownMenuRadioItem key={v} value={v || "__default"}>
+              {v ? effortLabel(v) : t("picker.effortDefault")}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

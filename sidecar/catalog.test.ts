@@ -144,3 +144,20 @@ test("an unknown level is not rewritten to a neighbor", () => {
   expect(resolveThinking("max", ["low", "high", "max"], null)).toBe("max");
   expect(resolveThinking("high", [], null)).toBe(null);
 });
+
+
+test("catalog changes update previously automatic fields without locking them", () => {
+  const first = planBackfill(model(), { contextWindow: 200000, efforts: ["low", "high"], reasoning: true })!;
+  const next = planBackfill(first, { contextWindow: 300000, efforts: ["low", "high", "max"], reasoning: true })!;
+  expect(next.contextWindow).toBe(300000);
+  expect(next.efforts).toEqual(["low", "high", "max"]);
+  expect(next.locked).not.toContain("contextWindow");
+  expect(next.locked).not.toContain("efforts");
+});
+
+test("manual zero prices and explicit locks survive a catalog revision", () => {
+  const current = model({ cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, locked: ["cost"] });
+  const next = planBackfill(current, { cost: { input: 5, output: 20, cacheRead: 1, cacheWrite: 2 }, efforts: [] })!;
+  expect(next.cost.input).toBe(0);
+  expect(next.locked).toContain("cost");
+});
