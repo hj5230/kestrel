@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from "preact/hooks"
 import {
+  ArchiveIcon,
   ArrowDownIcon,
-  DownloadIcon,
+  ClipboardCopyIcon,
+  EyeIcon,
   FolderIcon,
+  FolderInputIcon,
+  FolderOpenIcon,
   GitBranchIcon,
   ListChecksIcon,
   MoreHorizontalIcon,
@@ -12,38 +16,37 @@ import {
   XIcon,
 } from "lucide-react"
 import { toast } from "sonner"
-import type { SessionInfo, ThinkingLevel, PermissionMode } from "@shared/protocol"
+import type { SessionInfo, ThinkingLevel, PermissionMode, TranscriptView } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { ActionMenu, type MenuNode } from "@/components/action-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Spinner } from "@/components/ui/spinner"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { ConfirmDeleteDialog, RenameDialog } from "@/components/session-dialogs"
 import { Composer, type Attachment } from "./composer"
 import { ApprovalCard } from "./approval-card"
-import { QuestionCard } from "./question-card"
 import { userText } from "./messages"
 import { Transcript } from "./transcript"
-import { ViewPicker } from "./view-picker"
-import { ModelControl, PermissionPicker } from "./pickers"
+import { VIEWS } from "./view-picker"
+import { CwdBrowser, ModelControl, PermissionPicker } from "./pickers"
 import { ContextMeter } from "./context-meter"
 import { TodoList } from "./tool-call"
 import { rpc, stageAttachments, type StagedFile } from "@/lib/api"
 import { isMobileApp } from "@/lib/platform"
-import { downloadText } from "@/lib/download"
 import { shortPath } from "@/lib/format"
-import { appInfo, createSession, detailSignal, draftKeyForHost, enabledModels, findModel, loadDetail, openSession, settings } from "@/lib/store"
+import { appInfo, createSession, detailSignal, draftKeyForHost, enabledModels, findModel, loadDetail, openSession, route, settings, updateSettings } from "@/lib/store"
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { cn } from "@/lib/utils"
-import { t } from "@/lib/i18n"
+import { t, type MessageKey } from "@/lib/i18n"
+
+function copy(text: string) {
+  navigator.clipboard.writeText(text).then(
+    () => toast.success(t("common.copied")),
+    (e) => toast.error(String(e?.message ?? e)),
+  )
+}
 
 function SubagentSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
   const sig = id ? detailSignal(id) : null
@@ -58,7 +61,7 @@ function SubagentSheet({ id, onClose }: { id: string | null; onClose: () => void
           <SheetTitle>{d?.session.title ?? t("chat.subagent")}</SheetTitle>
           <SheetDescription>{t("chat.subagentDesc")}</SheetDescription>
         </SheetHeader>
-        <div className="flex-1 overflow-y-auto px-6 py-5">{d ? <Transcript d={d} view={settings.value?.transcriptView ?? "compact"} readOnly /> : <Spinner />}</div>
+        <div data-transcript-scroll className="flex-1 overflow-y-auto px-6 py-5">{d ? <Transcript d={d} view={settings.value?.transcriptView ?? "compact"} readOnly /> : <Spinner />}</div>
       </SheetContent>
     </Sheet>
   )
@@ -140,7 +143,67 @@ export function ChatView({ sessionId }: { sessionId: string }) {
     toast.success(t("chat.forked"))
   }
 
-  const exportMd = async () => downloadText(`${s.title || "session"}.md`, await rpc<string>("sessions.export", { id: s.id }))
+  const exportMd = async () => (await import("@/lib/download")).downloadText(`${s.title || "session"}.md`, await rpc<string>("sessions.export", { id: s.id }))
+  const archive = async () => {
+    await rpc("sessions.update", { id: s.id, patch: { archived: true } }).catch((e) => toast.error(e.message))
+    route.value = { name: "home" }
+    toast.success(t("sidebar.archivedToast"))
+  }
+  const home = appInfo.value?.home
+  const view = settings.value?.transcriptView ?? "compact"
+
+  const sessionMenu: MenuNode[] = [
+    { kind: "item", label: t("common.rename"), icon: PencilIcon, onSelect: () => setRenaming(s) },
+    { kind: "item", label: t("chat.compact"), icon: ShrinkIcon, onSelect: () => compact(), disabled: running },
+    { kind: "item", label: t("chat.fork"), icon: GitBranchIcon, onSelect: () => fork(d.messages[d.messages.length - 1]?.seq ?? -1) },
+    {
+      kind: "radio",
+      label: t("view.label"),
+      icon: EyeIcon,
+      value: view,
+      options: VIEWS.map((v) => ({ value: v.value, label: t(`view.${v.value}` as MessageKey), desc: t(`view.${v.value}.desc` as MessageKey) })),
+      onChange: (v) => updateSettings({ transcriptView: v as TranscriptView }).catch((e) => toast.error(e.message)),
+    },
+    {
+      kind: "sub",
+      label: t("chat.copyTranscript"),
+      icon: ClipboardCopyIcon,
+      children: [
+        { kind: "item", label: t("chat.copyMarkdown"), onSelect: () => rpc<string>("sessions.export", { id: s.id }).then(copy, (e) => toast.error(e.message)) },
+        { kind: "item", label: t("chat.copyJsonl"), onSelect: () => rpc<string>("sessions.jsonl", { id: s.id }).then(copy, (e) => toast.error(e.message)) },
+        // Kestrel keeps sessions as rows in its SQLite database, not one transcript file per session like
+        // Claude Code's JSONL, so there is no path to copy. Kept visible and disabled until sessions are files.
+        { kind: "item", label: t("chat.copySessionPath"), onSelect: () => {}, disabled: true },
+      ],
+    },
+    { kind: "item", label: t("sidebar.archive"), icon: ArchiveIcon, onSelect: archive },
+    { kind: "separator" },
+    { kind: "item", label: t("chat.delete"), icon: Trash2Icon, destructive: true, onSelect: () => setDeleting(s) },
+  ]
+
+  // The folder can only change before the first message: after that the transcript refers to its files.
+  // The entry stays visible, disabled, so it's clear why it can't be used.
+  const folderMenu: MenuNode[] = [
+    {
+      kind: "panel",
+      label: t("chat.changeDir"),
+      icon: FolderInputIcon,
+      disabled: s.messageCount > 0,
+      className: "w-[min(24rem,calc(100vw-1.5rem))]",
+      render: (close) => <CwdBrowser value={shortPath(s.cwd, home)} onChange={(cwd) => update({ cwd })} onDone={close} />,
+    },
+    // The folder lives on the Mac; a phone has no Finder to show it in.
+    ...(isMobileApp ? [] : [{ kind: "item" as const, label: t("chat.openInFinder"), icon: FolderOpenIcon, onSelect: () => rpc("app.open", { path: s.cwd }) }]),
+    {
+      kind: "sub",
+      label: t("chat.copyPath"),
+      icon: ClipboardCopyIcon,
+      children: [
+        { kind: "item", label: t("chat.copyPathHome"), onSelect: () => copy(shortPath(s.cwd, home)) },
+        { kind: "item", label: t("chat.copyPathRoot"), onSelect: () => copy(s.cwd) },
+      ],
+    },
+  ]
 
   const compact = (instructions?: string) =>
     rpc("chat.compact", { sessionId: s.id, instructions }).then(
@@ -182,29 +245,23 @@ export function ChatView({ sessionId }: { sessionId: string }) {
           <span className={cn("truncate text-sm font-medium", !s.title && "text-muted-foreground")}>{s.title || t("common.untitled")}</span>
           <PencilIcon className="size-3 shrink-0 text-muted-foreground opacity-0 group-hover/title:opacity-100" />
         </button>
-        {isMobileApp ? (
-          // The folder lives on the Mac; there is no Finder to open it in from here.
-          <span className="hidden min-w-0 shrink items-center gap-1 px-1.5 py-1 text-xs text-muted-foreground sm:flex">
-            <FolderIcon className="size-3.5 shrink-0" />
-            <span className="truncate font-mono">{shortPath(s.cwd, appInfo.value?.home)}</span>
-          </span>
-        ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => rpc("app.open", { path: s.cwd })}
-                className="flex min-w-0 shrink items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <FolderIcon className="size-3.5 shrink-0" />
-                <span className="truncate font-mono">{shortPath(s.cwd, appInfo.value?.home)}</span>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{t("chat.openInFinder")}</TooltipContent>
-          </Tooltip>
-        )}
+        <ActionMenu
+          title={t("chat.folder")}
+          align="start"
+          anchorClassName="min-w-0 shrink"
+          nodes={folderMenu}
+          trigger={
+            <button
+              type="button"
+              aria-label={t("chat.folder")}
+              className="flex min-w-0 shrink items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground aria-expanded:bg-muted pointer-coarse:min-h-10"
+            >
+              <FolderIcon className="size-3.5 shrink-0" />
+              <span className="truncate font-mono max-sm:hidden">{shortPath(s.cwd, home)}</span>
+            </button>
+          }
+        />
         <div className="ml-auto flex items-center gap-1">
-          <ViewPicker />
           <ContextMeter session={s} model={model} onCompact={() => compact()} compacting={d.compacting} />
           {s.todos.length > 0 && (
             <Tooltip>
@@ -221,42 +278,21 @@ export function ChatView({ sessionId }: { sessionId: string }) {
               <TooltipContent>{t("chat.plan")}</TooltipContent>
             </Tooltip>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <ActionMenu
+            title={t("common.moreActions")}
+            nodes={sessionMenu}
+            trigger={
               <Button variant="ghost" size="icon-sm" aria-label={t("common.moreActions")}>
                 <MoreHorizontalIcon />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onSelect={() => setRenaming(s)}>
-                <PencilIcon />
-                {t("common.rename")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => compact()} disabled={running}>
-                <ShrinkIcon />
-                {t("chat.compact")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => fork(d.messages[d.messages.length - 1]?.seq ?? -1)}>
-                <GitBranchIcon />
-                {t("chat.fork")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={exportMd}>
-                <DownloadIcon />
-                {t("sidebar.exportMd")}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(s)}>
-                <Trash2Icon />
-                {t("chat.delete")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            }
+          />
         </div>
       </PageHeader>
 
       <div className="flex min-h-0 flex-1">
         <div className="relative flex min-w-0 flex-1 flex-col">
-          <div ref={ref} className="min-h-0 flex-1 overflow-y-auto">
+          <div ref={ref} data-transcript-scroll className="min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-3xl px-4 pt-5 pb-8 md:px-6 md:pt-8 md:pb-10">
               {d.messages.length === 0 && !d.streaming ? (
                 <div className="py-16 text-center text-sm text-muted-foreground">{t("chat.empty")}</div>
@@ -281,9 +317,6 @@ export function ChatView({ sessionId }: { sessionId: string }) {
             <div className="flex flex-col gap-2">
               {d.approvals.map((a) => (
                 <ApprovalCard key={a.id} req={a} />
-              ))}
-              {d.questions.map((q) => (
-                <QuestionCard key={q.id} req={q} />
               ))}
               {d.queued.length > 0 && (
                 <div className="flex flex-col gap-1">
@@ -311,6 +344,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
                 cwd={s.cwd}
                 running={running}
                 draftKey={draftKeyForHost(s.id)}
+                vision={model ? model.vision : true}
                 history={history}
                 autoFocus
                 initial={editing ? { text: editing.text, nonce: editing.nonce } : null}
