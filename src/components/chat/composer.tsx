@@ -149,6 +149,8 @@ export function Composer({
     if (!el) return
     el.style.height = "0px"
     el.style.height = `${Math.min(el.scrollHeight, 320)}px`
+    // Sub-pixel line heights make a one-line box a fraction taller than its content; only scroll once the cap is hit.
+    el.style.overflowY = el.scrollHeight > 320 ? "auto" : "hidden"
     if (mirror.current) mirror.current.scrollTop = el.scrollTop
   }
   useLayoutEffect(fit, [text])
@@ -514,13 +516,13 @@ export function Composer({
             ))}
           </div>
         )}
-        <div className="flex items-end gap-1.5 pr-1.5 pb-1.5">
+        <div className="flex items-end gap-1.5">
           <div className="relative min-w-0 flex-1">
             {/* The highlighted copy sits under a transparent textarea: same box, font and wrapping, so the caret and IME stay native. */}
             <div
               ref={mirror}
               aria-hidden="true"
-              className="md-source pointer-events-none absolute inset-0 overflow-hidden px-4 pt-3.5 pb-2 text-[0.94rem] leading-relaxed break-words whitespace-pre-wrap"
+              className="md-source pointer-events-none absolute inset-0 overflow-hidden px-4 py-3 text-[0.94rem] leading-relaxed break-words whitespace-pre-wrap"
               dangerouslySetInnerHTML={{ __html: text ? highlightMarkdownSource(text) : "" }}
             />
             <textarea
@@ -528,7 +530,7 @@ export function Composer({
               rows={1}
               value={text}
               placeholder={placeholder ?? t("composer.placeholder")}
-              className="relative block max-h-80 min-h-[52px] w-full resize-none bg-transparent px-4 pt-3.5 pb-2 text-[0.94rem] leading-relaxed break-words whitespace-pre-wrap text-transparent caret-foreground outline-none selection:bg-primary/25 selection:text-transparent placeholder:text-muted-foreground/70"
+              className="relative block max-h-80 w-full resize-none bg-transparent px-4 py-3 text-[0.94rem] leading-relaxed break-words whitespace-pre-wrap text-transparent caret-foreground outline-none selection:bg-primary/25 selection:text-transparent placeholder:text-muted-foreground/70"
               onScroll={(e) => mirror.current && (mirror.current.scrollTop = e.currentTarget.scrollTop)}
               onInput={(e) => {
                 setText(e.currentTarget.value)
@@ -550,7 +552,7 @@ export function Composer({
               }}
             />
           </div>
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="mr-2 mb-2.5 flex shrink-0 items-center gap-1.5">
             {running && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -578,7 +580,7 @@ export function Composer({
           </div>
         </div>
       </div>
-      <div data-slot="composer-toolbar" className="flex min-w-0 items-center gap-0.5 px-1 pt-1">
+      <div data-slot="composer-toolbar" className="flex min-w-0 items-center gap-0.5 px-1">
         {isTouch ? (
           <Sheet open={addOpen} onOpenChange={closeAdd}>
             <SheetTrigger asChild>{addButton}</SheetTrigger>

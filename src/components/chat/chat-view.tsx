@@ -313,7 +313,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
               <ArrowDownIcon />
             </Button>
           )}
-          <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-[max(0.5rem,calc(var(--safe-bottom)-0.75rem))] md:px-6 md:pb-5">
+          <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-[max(0.25rem,calc(var(--safe-bottom)-1rem))] md:px-6 md:pb-3">
             <div className="flex flex-col gap-2">
               {d.approvals.map((a) => (
                 <ApprovalCard key={a.id} req={a} />
