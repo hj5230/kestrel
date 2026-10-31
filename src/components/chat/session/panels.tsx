@@ -1,10 +1,12 @@
-// What opens beside a conversation: the plan (docked on wide windows, a drawer otherwise) and a subagent's transcript.
+// What opens beside a conversation: the plan (docked on wide windows, a drawer on narrow ones, a bottom sheet on
+// touch screens like every other menu there) and a subagent's transcript.
 import { useEffect } from "preact/hooks"
 import { ListChecksIcon, XIcon } from "lucide-react"
 import type { SessionInfo } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { isTouch } from "@/lib/platform"
 import { detailSignal, loadDetail, settings } from "@/lib/store"
 import { cn } from "@/lib/utils"
 import { t } from "@/lib/i18n"
@@ -38,7 +40,13 @@ export function PlanPanel({ todos, onClose }: { todos: SessionInfo["todos"]; onC
 export function PlanSheet({ open, onOpenChange, todos }: { open: boolean; onOpenChange: (o: boolean) => void; todos: SessionInfo["todos"] }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent showCloseButton={false} onOpenAutoFocus={(e) => e.preventDefault()} className="w-[min(22rem,88vw)] gap-0 p-0">
+      <SheetContent
+        side={isTouch ? "bottom" : "right"}
+        showCloseButton={false}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        style={isTouch ? { bottom: "var(--kb, 0px)", maxHeight: "min(80vh, calc(var(--app-height, 100vh) - 24px))" } : undefined}
+        className={cn("gap-0 p-0", isTouch ? "overflow-y-auto overscroll-contain rounded-t-2xl pb-[var(--inset-bottom)]" : "w-[min(22rem,88vw)]")}
+      >
         <SheetHeader className="sr-only">
           <SheetTitle>{t("chat.plan")}</SheetTitle>
           <SheetDescription>{t("chat.plan")}</SheetDescription>
