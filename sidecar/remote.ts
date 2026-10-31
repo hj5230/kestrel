@@ -6,10 +6,8 @@
 // Mac. Phones authenticate with a per-device token obtained once by redeeming a short-lived,
 // single-use pairing code; tokens are stored hashed and can be revoked individually.
 import { spawnSync } from "node:child_process";
-import { createHash, generateKeyPairSync, randomBytes, randomUUID, timingSafeEqual, X509Certificate } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import type { Server, ServerWebSocket } from "bun";
 import type { RemoteStatus } from "../shared/protocol";
 import * as store from "./db";
@@ -17,11 +15,12 @@ import { emit } from "./hub";
 import { handleApi, registerHandlers, socketHandlers, type Caller, type SocketData } from "./server";
 import { setSleepDisabled, sleepDisabled } from "./power";
 import { DOWNLOAD_URL, openTailscaleApp, tailscaleConnect, tailscaleStatus } from "./tailscale";
+import { certPaths, ensureCertificate, fingerprint, candidateHosts, serverName } from "./remote/identity";
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 const MAX_PAIR_ATTEMPTS = 5;
 
-let dataDir = "";
+export let dataDir = "";
 let server: Server<SocketData> | null = null;
 let listenError: string | null = null;
 let pairing: { code: string; expiresAt: number; failures: number } | null = null;
@@ -31,101 +30,7 @@ const lastTouched = new Map<string, number>();
 
 // ---------- certificate ----------
 
-function certPaths() {
-  const dir = path.join(dataDir, "remote");
-  return { dir, cert: path.join(dir, "cert.pem"), key: path.join(dir, "key.pem") };
-}
-
-function ensureCertificate() {
-  const p = certPaths();
-  if (fs.existsSync(p.cert) && fs.existsSync(p.key)) return p;
-  fs.mkdirSync(p.dir, { recursive: true, mode: 0o700 });
-  // PKCS#8 from node:crypto: Bun's TLS stack rejects the SEC1 EC keys LibreSSL writes.
-  const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
-  fs.writeFileSync(p.key, privateKey.export({ type: "pkcs8", format: "pem" }) as string, { mode: 0o600 });
-  // Extensions make it an X.509 v3 certificate; without them LibreSSL writes v1, which rustls
-  // (webpki) on the phone refuses to parse. A config file rather than -addext, which older
-  // LibreSSL builds lack.
-  const conf = path.join(p.dir, "openssl.cnf");
-  fs.writeFileSync(
-    conf,
-    [
-      "[req]",
-      "distinguished_name = dn",
-      "x509_extensions = v3",
-      "prompt = no",
-      "[dn]",
-      "CN = Kestrel",
-      "[v3]",
-      "basicConstraints = critical, CA:FALSE",
-      "keyUsage = critical, digitalSignature",
-      "extendedKeyUsage = serverAuth",
-      "subjectAltName = DNS:kestrel.local",
-      "",
-    ].join("\n"),
-  );
-  const r = spawnSync(
-    "/usr/bin/openssl",
-    ["req", "-x509", "-new", "-sha256", "-key", p.key, "-out", p.cert, "-days", "3650", "-config", conf],
-    { encoding: "utf8" },
-  );
-  fs.rmSync(conf, { force: true });
-  if (r.status !== 0) {
-    fs.rmSync(p.key, { force: true });
-    throw new Error(`certificate generation failed: ${(r.stderr || r.error?.message || "").trim()}`);
-  }
-  return p;
-}
-
-function fingerprint(): string {
-  const { cert } = certPaths();
-  if (!fs.existsSync(cert)) return "";
-  return new X509Certificate(fs.readFileSync(cert)).fingerprint256.replace(/:/g, "").toLowerCase();
-}
-
 // ---------- addresses ----------
-
-const octets = (ip: string) => ip.split(".").map(Number);
-const isTailscale = (ip: string) => {
-  const [a, b] = octets(ip);
-  return a === 100 && b >= 64 && b <= 127;
-};
-// 198.18.0.0/15 is what proxy apps (Clash, Surge…) put on their TUN interface; unreachable from a phone.
-const isProxyTun = (ip: string) => {
-  const [a, b] = octets(ip);
-  return a === 198 && (b === 18 || b === 19);
-};
-
-/** Addresses the phone can try, most likely first: LAN IPs, then the tailnet, then names. */
-function candidateHosts(): string[] {
-  const lan: string[] = [];
-  const tailnet: string[] = [];
-  for (const addrs of Object.values(os.networkInterfaces())) {
-    for (const a of addrs ?? []) {
-      if (a.family !== "IPv4" || a.internal || a.address.startsWith("169.254.") || isProxyTun(a.address)) continue;
-      (isTailscale(a.address) ? tailnet : lan).push(a.address);
-    }
-  }
-  const ts = tailscaleStatus();
-  const names: string[] = [];
-  if (ts.dnsName) names.push(ts.dnsName);
-  const host = os.hostname();
-  if (host) names.push(host.endsWith(".local") ? host : `${host}.local`);
-  return [...new Set([...lan, ...ts.ips, ...tailnet, ...names])];
-}
-
-let cachedName: { at: number; name: string } | null = null;
-
-function serverName(): string {
-  if (cachedName && Date.now() - cachedName.at < 60_000) return cachedName.name;
-  let name = "";
-  if (process.platform === "darwin") {
-    name = spawnSync("scutil", ["--get", "ComputerName"], { encoding: "utf8", timeout: 1000 }).stdout?.trim() ?? "";
-  }
-  name ||= os.hostname().replace(/\.local$/, "");
-  cachedName = { at: Date.now(), name };
-  return name;
-}
 
 // ---------- status ----------
 

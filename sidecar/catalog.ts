@@ -4,13 +4,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import { sortEfforts } from "../shared/effort";
-import type { ModelConfig, ProviderKind } from "../shared/protocol";
-import { HOME } from "./env";
+import type { ProviderKind } from "../shared/protocol";
+import { readCodexRows, codexRow, type CodexRow } from "./catalog/codex";
+export { readCodexRows } from "./catalog/codex";
+export { planBackfill, locksFor } from "./catalog/backfill";
 
 const CATALOG_URL = "https://models.dev/api.json";
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
-const CONTEXT_DEFAULT = 128_000;
-const MAX_DEFAULT = 16_384;
+export const CONTEXT_DEFAULT = 128_000;
+export const MAX_DEFAULT = 16_384;
 
 /** What one catalog row knows. `efforts` is empty when the model has no effort enum (a switch or a token budget). */
 export interface CatalogFacts {
@@ -32,13 +34,6 @@ interface Entry {
   reasoning: boolean;
   cost: CatalogFacts["cost"];
   efforts: string[];
-}
-
-interface CodexRow {
-  contextWindow: number;
-  vision: boolean;
-  efforts: string[];
-  effortDefault: string | null;
 }
 
 const OFFICIAL: Partial<Record<ProviderKind, string>> = {
@@ -169,43 +164,6 @@ function pickEntry(kind: ProviderKind, baseUrl: string, keys: string[]): Entry |
   return null;
 }
 
-let codexCache: { mtime: number; rows: Map<string, CodexRow> } | null = null;
-
-export function readCodexRows(file = path.join(HOME, ".codex", "models_cache.json")): Map<string, CodexRow> {
-  let mtime = -1;
-  try {
-    mtime = fs.statSync(file).mtimeMs;
-  } catch {
-    return new Map();
-  }
-  if (codexCache && codexCache.mtime === mtime) return codexCache.rows;
-  const rows = new Map<string, CodexRow>();
-  try {
-    for (const model of JSON.parse(fs.readFileSync(file, "utf8")).models ?? []) {
-      if (typeof model?.slug !== "string" || !(model.context_window > 0)) continue;
-      const efforts = Array.isArray(model.supported_reasoning_levels)
-        ? model.supported_reasoning_levels.map((level: any) => level?.effort).filter((effort: unknown): effort is string => typeof effort === "string" && !!effort)
-        : [];
-      rows.set(model.slug, {
-        contextWindow: model.context_window,
-        vision: Array.isArray(model.input_modalities) && model.input_modalities.includes("image"),
-        efforts: sortEfforts(efforts),
-        effortDefault: typeof model.default_reasoning_level === "string" ? model.default_reasoning_level : null,
-      });
-    }
-  } catch {}
-  codexCache = { mtime, rows };
-  return rows;
-}
-
-function codexRow(rows: Map<string, CodexRow>, keys: string[]): CodexRow | null {
-  for (const key of keys) {
-    const hit = rows.get(key);
-    if (hit) return hit;
-  }
-  return null;
-}
-
 /**
  * Facts for a model on a particular endpoint.
  * A ChatGPT/Codex subscription slug takes its effort list and context from the local Codex cache;
@@ -232,102 +190,6 @@ export function lookupFacts(kind: ProviderKind, baseUrl: string, id: string, cod
     efforts,
     effortDefault: row?.effortDefault && efforts.includes(row.effortDefault) ? row.effortDefault : null,
   };
-}
-
-function sameCost(a: ModelConfig["cost"], b: NonNullable<CatalogFacts["cost"]>): boolean {
-  return a.input === b.input && a.output === b.output && a.cacheRead === b.cacheRead && a.cacheWrite === b.cacheWrite;
-}
-
-function sameEfforts(current: string[] | null | undefined, incoming: string[]): boolean {
-  if (current == null) return false;
-  return current.length === incoming.length && current.every((value, i) => value === incoming[i]);
-}
-
-function zeroCost(cost: ModelConfig["cost"]): boolean {
-  return cost.input === 0 && cost.output === 0 && cost.cacheRead === 0 && cost.cacheWrite === 0;
-}
-
-/**
- * Fills fields that are still at the generic default. A field that already differs from both the
- * default and the catalog is locked, so a hand edit is not overwritten on the next refresh.
- * Returns null when nothing changes.
- */
-export function planBackfill(model: ModelConfig, facts: CatalogFacts | null): ModelConfig | null {
-  if (!facts) return null;
-  const locked = new Set(model.locked ?? []);
-  const next: ModelConfig = { ...model, cost: { ...model.cost }, locked: [...(model.locked ?? [])] };
-  let changed = false;
-  const take = (field: string, apply: () => void, equal: boolean, isDefault: boolean) => {
-    if (locked.has(field) || equal) return;
-    const previous = model.metadata?.values as Record<string, unknown> | undefined;
-    const unchangedAutomatic = previous && Object.hasOwn(previous, field) && JSON.stringify(previous[field]) === JSON.stringify((model as any)[field]);
-    if (!isDefault && !unchangedAutomatic) {
-      locked.add(field);
-      changed = true;
-      return;
-    }
-    apply();
-    changed = true;
-  };
-  if (facts.contextWindow) {
-    take("contextWindow", () => (next.contextWindow = facts.contextWindow!), next.contextWindow === facts.contextWindow, model.contextWindow === CONTEXT_DEFAULT);
-  }
-  if (facts.maxTokens) {
-    take("maxTokens", () => (next.maxTokens = facts.maxTokens!), next.maxTokens === facts.maxTokens, model.maxTokens === MAX_DEFAULT);
-  }
-  if (facts.cost) {
-    take("cost", () => (next.cost = { ...facts.cost! }), sameCost(next.cost, facts.cost), zeroCost(model.cost));
-  }
-  take("efforts", () => (next.efforts = facts.efforts), sameEfforts(model.efforts, facts.efforts), model.efforts == null);
-  if ((model.efforts == null || model.metadata?.values.effortDefault === model.effortDefault) && !locked.has("efforts") && !locked.has("effortDefault")) {
-    const fallback = facts.effortDefault ?? null;
-    if ((next.effortDefault ?? null) !== fallback) {
-      next.effortDefault = fallback;
-      changed = true;
-    }
-  }
-  const untouched =
-    model.efforts == null && model.contextWindow === CONTEXT_DEFAULT && model.maxTokens === MAX_DEFAULT && zeroCost(model.cost) && !(model.locked ?? []).length;
-  if ((untouched || model.metadata?.values.reasoning === model.reasoning) && facts.reasoning != null && !locked.has("reasoning") && model.reasoning !== facts.reasoning) {
-    next.reasoning = facts.reasoning;
-    changed = true;
-  }
-  if ((untouched || model.metadata?.values.vision === model.vision) && facts.vision != null && !locked.has("vision") && model.vision !== facts.vision) {
-    next.vision = facts.vision;
-    changed = true;
-  }
-  const lockedList = [...locked];
-  if (lockedList.join(",") !== (model.locked ?? []).join(",")) {
-    next.locked = lockedList;
-    changed = true;
-  }
-  const values = Object.fromEntries(["contextWindow", "maxTokens", "reasoning", "vision", "cost", "efforts", "effortDefault"].filter((key) => (facts as any)[key] != null).map((key) => [key, (facts as any)[key]]));
-  if (!model.metadata || JSON.stringify(model.metadata.values) !== JSON.stringify(values)) {
-    next.metadata = { source: model.metadataSource === "codex" ? "codex" : "catalog", checkedAt: Date.now(), values };
-    changed = true;
-  }
-  return changed ? next : null;
-}
-
-/** Fields the user changed away from the catalog. A miss (no facts yet) leaves the locks alone. */
-export function locksFor(model: ModelConfig, facts: CatalogFacts | null, previous?: ModelConfig | null): string[] {
-  if (previous) {
-    const locked = new Set(previous.locked ?? []);
-    for (const key of ["contextWindow", "maxTokens", "reasoning", "vision", "cost", "efforts", "effortDefault"]) {
-      if (JSON.stringify((model as any)[key]) !== JSON.stringify((previous as any)[key])) locked.add(key);
-    }
-    return [...locked];
-  }
-  if (!facts) return [...(model.locked ?? [])];
-  const locked: string[] = [];
-  if (facts.contextWindow && model.contextWindow !== facts.contextWindow) locked.push("contextWindow");
-  if (facts.maxTokens && model.maxTokens !== facts.maxTokens) locked.push("maxTokens");
-  if (facts.cost && !sameCost(model.cost, facts.cost)) locked.push("cost");
-  if (facts.reasoning != null && model.reasoning !== facts.reasoning) locked.push("reasoning");
-  if (facts.vision != null && model.vision !== facts.vision) locked.push("vision");
-  // Null means the list was never set, not that the user cleared it.
-  if (model.efforts != null && !sameEfforts(model.efforts, facts.efforts)) locked.push("efforts");
-  return locked;
 }
 
 export function catalogPath(dataDir: string): string {
