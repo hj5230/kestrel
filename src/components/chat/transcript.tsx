@@ -12,7 +12,7 @@ import type {
 } from "@shared/protocol"
 import { KestrelMark } from "@/components/kestrel-mark"
 import { Markdown } from "./markdown"
-import { AssistantMeta, CompactionDivider, ErrorCard, Thinking, UserMessage } from "./messages"
+import { AssistantMeta, CompactionDivider, ErrorCard, MergeNote, Thinking, UserMessage, type ReplyMeta, type TurnStats } from "./messages"
 import { QuestionCard, QuestionSummary } from "./question-card"
 import { summary, toolLabel, ToolCallView, type ToolState } from "./tool-call"
 import { t, type MessageKey } from "@/lib/i18n"
@@ -36,14 +36,14 @@ type Item =
   | { k: "user"; key: string; stored: StoredMessage }
   | { k: "compaction"; key: string; c: CompactionInfo }
   | { k: "text"; key: string; text: string; streaming: boolean }
-  | { k: "meta"; key: string; msg: AssistantMsg }
+  | { k: "meta"; key: string; meta: ReplyMeta }
   | { k: "aborted"; key: string }
   | Ask
   | Step
 
 type Row =
   | Exclude<Item, Step | { k: "text" }>
-  | { k: "text"; key: string; text: string; streaming: boolean; meta?: AssistantMsg }
+  | { k: "text"; key: string; text: string; streaming: boolean; meta?: ReplyMeta }
   | { k: "group"; key: string; steps: Step[]; last: boolean }
 
 function toolState(step: Extract<Step, { k: "tool" }>, rt: Runtime): ToolState {
@@ -60,7 +60,9 @@ function toolState(step: Extract<Step, { k: "tool" }>, rt: Runtime): ToolState {
   return "interrupted"
 }
 
-function assistantItems(msg: AssistantMsg, keyBase: string, streaming: boolean): Item[] {
+const freshTurn = (): TurnStats => ({ calls: 0, tools: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 })
+
+function assistantItems(msg: AssistantMsg, keyBase: string, streaming: boolean, seq = -1, turn: TurnStats = freshTurn()): Item[] {
   const out: Item[] = []
   const lastIdx = msg.content.length - 1
   msg.content.forEach((c, i) => {
@@ -78,7 +80,7 @@ function assistantItems(msg: AssistantMsg, keyBase: string, streaming: boolean):
   if (streaming) return out
   if (msg.stopReason === "aborted") out.push({ k: "aborted", key: `${keyBase}:aborted` })
   if (msg.stopReason !== "toolUse" && msg.content.some((c) => c.type === "text" && c.text.trim())) {
-    out.push({ k: "meta", key: `${keyBase}:meta`, msg })
+    out.push({ k: "meta", key: `${keyBase}:meta`, meta: { msg, seq, turn: { ...turn } } })
   }
   return out
 }
@@ -88,12 +90,27 @@ function buildItems(d: DetailState): Item[] {
   const byCut = new Map<number, CompactionInfo[]>()
   for (const c of d.compactions) byCut.set(c.cutSeq, [...(byCut.get(c.cutSeq) ?? []), c])
   let maxSeq = -1
+  let turn = freshTurn()
   for (const s of d.messages) {
     maxSeq = s.seq
     for (const c of byCut.get(s.seq) ?? []) items.push({ k: "compaction", key: `c${c.id}`, c })
     const m = s.message
-    if (m.role === "user") items.push({ k: "user", key: `u${s.seq}`, stored: s })
-    else if (m.role === "assistant") items.push(...assistantItems(m, `a${s.seq}`, false))
+    if (m.role === "user") {
+      if (!m.merge) turn = freshTurn()
+      items.push({ k: "user", key: `u${s.seq}`, stored: s })
+    } else if (m.role === "assistant") {
+      const u = m.usage
+      turn = {
+        calls: turn.calls + 1,
+        tools: turn.tools + m.content.filter((c) => c.type === "toolCall").length,
+        input: turn.input + u.input,
+        output: turn.output + u.output,
+        cacheRead: turn.cacheRead + u.cacheRead,
+        cacheWrite: turn.cacheWrite + u.cacheWrite,
+        cost: turn.cost + u.cost.total,
+      }
+      items.push(...assistantItems(m, `a${s.seq}`, false, s.seq, turn))
+    }
   }
   for (const c of d.compactions) if (c.cutSeq > maxSeq) items.push({ k: "compaction", key: `c${c.id}`, c })
   if (d.streaming) items.push(...assistantItems(d.streaming, "stream", true))
@@ -104,7 +121,7 @@ function attachMeta(rows: Row[]): Row[] {
   const out: Row[] = []
   for (const row of rows) {
     const prev = out[out.length - 1]
-    if (row.k === "meta" && prev?.k === "text" && !prev.meta) prev.meta = row.msg
+    if (row.k === "meta" && prev?.k === "text" && !prev.meta) prev.meta = row.meta
     else out.push(row.k === "text" ? { ...row } : row)
   }
   return out
@@ -341,7 +358,11 @@ export function Transcript({
     let el: preact.JSX.Element | null = null
     switch (row.k) {
       case "user":
-        el = <UserMessage stored={row.stored} canEdit={!readOnly && !running} onEdit={(seq, text) => onEdit?.(seq, text)} onFork={(seq) => onFork?.(seq)} />
+        el = row.stored.message.role === "user" && row.stored.message.merge ? (
+          <MergeNote merge={row.stored.message.merge} />
+        ) : (
+          <UserMessage stored={row.stored} canEdit={!readOnly && !running} onEdit={(seq, text) => onEdit?.(seq, text)} onFork={(seq) => onFork?.(seq)} />
+        )
         break
       case "compaction":
         el = <CompactionDivider c={row.c} />
@@ -350,14 +371,14 @@ export function Transcript({
         el = row.meta ? (
           <div className="group/assistant">
             <Markdown text={row.text} streaming={row.streaming} />
-            <AssistantMeta msg={row.meta} hover />
+            <AssistantMeta meta={row.meta} hover onFork={readOnly ? undefined : onFork} />
           </div>
         ) : (
           <Markdown text={row.text} streaming={row.streaming} />
         )
         break
       case "meta":
-        el = <AssistantMeta msg={row.msg} />
+        el = <AssistantMeta meta={row.meta} onFork={readOnly ? undefined : onFork} />
         break
       case "ask": {
         const pending = d.questions.find((q) => q.toolCallId === row.block.id)
