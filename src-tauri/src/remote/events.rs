@@ -22,10 +22,14 @@ pub async fn remote_events_connect<R: Runtime>(app: AppHandle<R>, state: State<'
         async move {
             let url = format!("{}/events?token={}", base(&h, conn.profile.port).replacen("https", "wss", 1), conn.token);
             let req = url.into_client_request().map_err(|e| e.to_string())?;
-            tokio_tungstenite::connect_async_tls_with_config(req, None, false, Some(Connector::Rustls(conn.tls.clone())))
-                .await
-                .map(|(ws, _)| ws)
-                .map_err(|e| e.to_string())
+            let connect = tokio_tungstenite::connect_async_tls_with_config(req, None, false, Some(Connector::Rustls(conn.tls.clone())));
+            // A route that is coming back (Tailscale re-establishing its path after the Mac or the phone slept)
+            // accepts the connection and stalls for a minute. Give up on it so the re-probe below can take
+            // whichever address answers now, such as the Mac's address on the same Wi-Fi.
+            match tokio::time::timeout(OPEN_TIMEOUT, connect).await {
+                Ok(r) => r.map(|(ws, _)| ws).map_err(|e| e.to_string()),
+                Err(_) => Err(format!("{h}: timed out")),
+            }
         }
     };
     let ws = match open(h.clone()).await {

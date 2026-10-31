@@ -41,6 +41,8 @@ const STATUS: &str = "remote://status";
 const PROFILE: &str = "remote://profile";
 const MAX_HOSTS: usize = 8;
 const PROBE_TIMEOUT: Duration = Duration::from_secs(4);
+/// Opening the event stream: TCP, TLS and the WebSocket upgrade, about four round trips even over a relay.
+const OPEN_TIMEOUT: Duration = Duration::from_secs(8);
 const PING_EVERY: Duration = Duration::from_secs(20);
 const DEAD_AFTER: Duration = Duration::from_secs(50);
 
