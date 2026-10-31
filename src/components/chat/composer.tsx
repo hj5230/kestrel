@@ -165,7 +165,7 @@ export function Composer(props: ComposerProps) {
       <div data-slot="composer-toolbar" className="flex min-w-0 items-center gap-0.5 px-1">
         <AddMenu vision={vision} folder={folder} onImages={att.addImages} onFiles={att.addFiles} onStage={att.stage} />
         {props.toolbarStart}
-        <div className="min-w-0 flex-1" />
+        <div className="min-w-2 flex-1" />
         {props.toolbarEnd}
       </div>
       {props.footer}
