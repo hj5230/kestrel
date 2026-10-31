@@ -183,7 +183,10 @@ export const zhCN: Record<MessageKey, string> = {
   "picker.browse": "浏览文件夹…",
 
   "chat.compacting": "正在压缩上下文…",
-  "chat.thinking": "思考中…",
+  "phase.preparing": "准备中…",
+  "phase.recalling": "检索记忆中…",
+  "phase.requesting": "等待模型响应…",
+  "phase.responding": "模型开始回复…",
   "chat.subagent": "子代理",
   "chat.subagentDesc": "子代理的完整执行过程（只读）",
   "chat.addProviderFirst": "请先在设置中添加模型供应商",

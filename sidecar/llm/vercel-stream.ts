@@ -209,8 +209,10 @@ export function createVercelStreamFn(resolve: ModelResolver) {
 
         let stopReason: StopReason = "stop";
         let failure: string | undefined;
-        start();
         for await (const part of result.fullStream as AsyncIterable<any>) {
+          // The SDK emits "start" before the request goes out; anything after it means the provider has answered.
+          // Starting the message there keeps "waiting for the model" and "the model is replying" apart.
+          if (part.type !== "start") start();
           switch (part.type) {
             case "text-start": {
               output.content.push({ type: "text", text: "" });
@@ -340,6 +342,7 @@ export function createVercelStreamFn(resolve: ModelResolver) {
         if (output.content.some((c) => c.type === "toolCall") && stopReason === "stop") stopReason = "toolUse";
         if (!failure && !options?.signal?.aborted && output.usage.totalTokens === 0 && output.content.length) estimateUsage(output, context);
         output.usage.cost = calculateCost(model, output.usage);
+        start();
         if (options?.signal?.aborted) {
           output.stopReason = "aborted";
           output.errorMessage = "Aborted";

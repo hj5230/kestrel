@@ -328,7 +328,9 @@ export function Transcript({
   const last = d.messages[d.messages.length - 1]
   const lastAssistantError = !running && last?.message.role === "assistant" && last.message.stopReason === "error" ? (last.message as AssistantMsg) : null
   const configError = !running && d.session.status === "error" && !lastAssistantError && d.session.lastError
-  const busy = running && (!lastRow || lastRow.k === "user" || lastRow.k === "compaction") && d.approvals.length === 0 && d.questions.length === 0
+  // Before anything of the reply is visible the row says what is actually happening, not "Thinking".
+  const pending = running && !!d.phase && d.approvals.length === 0 && d.questions.length === 0
+  const busy = pending || (running && (!lastRow || lastRow.k === "user" || lastRow.k === "compaction") && d.approvals.length === 0 && d.questions.length === 0)
   const waiting = d.approvals.length > 0 || d.questions.length > 0
 
   const win = useRowWindow(rows.length)
@@ -398,7 +400,7 @@ export function Transcript({
       {(busy || d.compacting) && (
         <div className={cn("flex items-center gap-2 text-[13px] text-muted-foreground", rendered.length && "mt-6")}>
           <KestrelMark />
-          <span className="text-shimmer">{d.compacting ? t("chat.compacting") : t("chat.thinking")}</span>
+          <span className="text-shimmer">{d.compacting ? t("chat.compacting") : t(`phase.${d.phase ?? "preparing"}` as MessageKey)}</span>
         </div>
       )}
       {lastAssistantError && (

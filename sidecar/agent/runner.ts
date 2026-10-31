@@ -18,6 +18,7 @@ import type {
   SessionInfo,
   SubagentDetails,
   Todo,
+  RunPhase,
 } from "../../shared/protocol";
 import * as store from "../db";
 import { shellEnvReady } from "../env";
@@ -112,9 +113,17 @@ export function sessionDetail(id: string): SessionDetail {
     approvals: [...approvals.values()].filter((a) => a.request.sessionId === id).map((a) => a.request),
     questions: [...pendingQuestions.values()].filter((q) => q.request.sessionId === id).map((q) => q.request),
     streaming: r?.streaming ?? null,
+    phase: r?.phase ?? null,
     runningTools: r?.runningTools ?? {},
     queued: r?.queued.map(({ id, text, mode, files }) => ({ id, text, mode, files })) ?? [],
   };
+}
+
+/** A block the transcript shows; reasoning that arrives without text (redacted or hidden) shows nothing yet. */
+function visibleBlock(c: any): boolean {
+  if (c.type === "text") return !!c.text.trim();
+  if (c.type === "thinking") return !!c.thinking.trim();
+  return c.type === "toolCall";
 }
 
 function textOf(m: AgentMessage | undefined): string {
@@ -173,6 +182,7 @@ export class SessionRunner {
   private memoryContext = new MemoryContext();
   queued: (QueuedMessage & { ts: number; msg: AgentMessage })[] = [];
   streaming: AssistantMsg | null = null;
+  phase: RunPhase | null = null;
   runningTools: SessionDetail["runningTools"] = {};
   compacting = false;
   private compaction: { cutSeq: number; summary: string; at: number } | null = null;
@@ -233,6 +243,12 @@ export class SessionRunner {
   private emitSession() {
     const s = store.getSession(this.id);
     if (s) emit({ type: "session_updated", session: s });
+  }
+
+  private setPhase(phase: RunPhase | null) {
+    if (this.phase === phase) return;
+    this.phase = phase;
+    emit({ type: "phase", sessionId: this.id, phase });
   }
 
   private emitQueue() {
@@ -359,8 +375,11 @@ export class SessionRunner {
     const rest = messages.slice(start);
     const context = this.compaction ? [summaryMessage(this.compaction.summary), ...rest] : rest;
     const settings = store.getSettings();
+    if (settings.memoryEnabled && memoryConfigured(settings)) this.setPhase("recalling");
     const result = await this.memoryContext.inject(settings, context, messages, signal, (text) => emit({ type: "notice", sessionId: this.rootId, level: "warn", text }));
     if (memoryConfigKey(settings) !== memoryConfigKey(store.getSettings())) throw new Error("Memory configuration changed during retrieval. Retry the request.");
+    // The request goes out right after this returns; the reply's first event moves the phase on.
+    this.setPhase("requesting");
     return result;
   }
 
@@ -581,12 +600,14 @@ export class SessionRunner {
       case "message_start":
         if (e.message.role === "assistant") {
           this.streaming = e.message;
+          this.setPhase("responding");
           this.flushStream();
         }
         break;
       case "message_update":
         if (e.message.role === "assistant") {
           this.streaming = e.message;
+          if (e.message.content.some(visibleBlock)) this.setPhase(null);
           const wait = 40 - (Date.now() - this.lastStreamEmit);
           if (wait <= 0) this.flushStream();
           else if (!this.streamTimer) this.streamTimer = setTimeout(() => this.flushStream(), wait);
@@ -710,6 +731,7 @@ export class SessionRunner {
     }
     store.updateSession(this.id, { status: "running", lastError: null }, true);
     this.emitSession();
+    this.setPhase("preparing");
     let ok = true;
     try {
       await fn();
@@ -739,6 +761,7 @@ export class SessionRunner {
     } finally {
       this.overflowRetried = false;
       this.streaming = null;
+      this.setPhase(null);
       this.runningTools = {};
       if (this.queued.length && !this.agent.hasQueuedMessages()) {
         this.queued = [];

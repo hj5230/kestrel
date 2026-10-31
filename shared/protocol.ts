@@ -88,6 +88,9 @@ export interface Todo {
 }
 
 export type SessionStatus = "idle" | "running" | "waiting" | "error";
+/** What a running session is doing before the model's reply is visible: set up, memory recall, request sent
+ *  with no response yet, response started with nothing to show yet. Null once there is something to show. */
+export type RunPhase = "preparing" | "recalling" | "requesting" | "responding";
 
 export interface SessionUsage {
   input: number;
@@ -290,6 +293,7 @@ export interface SessionDetail {
   approvals: ApprovalRequest[];
   questions: QuestionRequest[];
   streaming: AssistantMsg | null;
+  phase: RunPhase | null;
   runningTools: Record<string, { toolName: string; args: any; partial: any; startedAt: number }>;
   queued: QueuedMessage[];
 }
@@ -521,6 +525,7 @@ export type ServerEvent =
   | { type: "question_resolved"; sessionId: string; id: string }
   | { type: "compaction"; sessionId: string; compaction: CompactionInfo }
   | { type: "compacting"; sessionId: string; active: boolean }
+  | { type: "phase"; sessionId: string; phase: RunPhase | null }
   | { type: "mcp_status"; servers: McpServerStatus[] }
   | { type: "memory_changed" }
   | { type: "models_updated" }

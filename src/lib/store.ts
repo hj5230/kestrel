@@ -288,6 +288,9 @@ function handleEvents() {
       case "compacting":
         patchDetail(e.sessionId, (d) => ({ ...d, compacting: e.active }))
         break
+      case "phase":
+        patchDetail(e.sessionId, (d) => ({ ...d, phase: e.phase }))
+        break
       case "mcp_status":
         mcpServers.value = e.servers
         break

@@ -181,7 +181,10 @@ export const en = {
   "picker.browse": "Browse…",
 
   "chat.compacting": "Compacting context…",
-  "chat.thinking": "Thinking…",
+  "phase.preparing": "Preparing…",
+  "phase.recalling": "Recalling memory…",
+  "phase.requesting": "Waiting for the model…",
+  "phase.responding": "Model is responding…",
   "chat.subagent": "Subagent",
   "chat.subagentDesc": "Full run of the subagent (read-only)",
   "chat.addProviderFirst": "Add a model provider in Settings first",
