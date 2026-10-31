@@ -170,7 +170,7 @@
     max-height: min(75vh, calc(var(--app-height, 100vh) - 96px));
     overflow-y: auto;
     border-radius: 16px 16px 0 0;
-    padding: 20px 8px calc(8px + env(safe-area-inset-bottom));
+    padding: 20px 8px calc(8px + var(--inset-bottom));
     /* Dims the page behind the sheet. */
     box-shadow: 0 0 0 100vmax oklch(0 0 0 / 0.35);
     translate: none;

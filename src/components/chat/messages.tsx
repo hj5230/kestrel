@@ -256,7 +256,7 @@ export function AssistantMeta({ meta, hover, onFork }: { meta: ReplyMeta; hover?
         open={open}
         onOpenChange={setOpen}
         popoverClassName="w-80 p-0"
-        sheetClassName="p-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+        sheetClassName="p-0 pb-[max(0.5rem,var(--inset-bottom))]"
         trigger={
           <Button variant="ghost" size="icon-xs" aria-label={t("meta.details")} title={t("meta.details")}>
             <InfoIcon />

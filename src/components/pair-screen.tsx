@@ -45,7 +45,7 @@ export function PairScreen() {
   const known = inUse ? [inUse, ...others] : others
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-background px-6 pt-[max(3rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+    <div className="flex h-full flex-col overflow-y-auto bg-background px-6 pt-[max(3rem,var(--inset-top))] pb-[max(1.5rem,var(--inset-bottom))]">
       <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-8">
         {addingMac.value && (
           <Button variant="ghost" className="-mb-4 w-fit self-start text-muted-foreground" onClick={() => (addingMac.value = false)}>

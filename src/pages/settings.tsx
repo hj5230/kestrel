@@ -629,7 +629,7 @@ export function SettingsPage({ tab }: { tab?: string }) {
           )}
         </nav>
         <div className="min-w-0 flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-3xl px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-8 md:py-8">
+          <div className="mx-auto max-w-3xl px-4 py-6 pb-[max(1.5rem,var(--inset-bottom))] md:px-8 md:py-8">
             {current === "general" && <General s={s} />}
             {current === "execution" && <Execution s={s} />}
             {current === "automation" && <Automation s={s} />}

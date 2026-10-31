@@ -274,9 +274,15 @@ html, body, #root {
     overflow: hidden;
 }
 
-/* Bottom inset for content above the home indicator; dropped while the keyboard covers it. */
+/* Safe-area insets go through these variables so the device preview (lib/device-preview.ts) can set them
+   in a desktop browser, where env() is always 0. --safe-bottom is the bottom inset for content above the
+   home indicator, dropped while the keyboard covers it. */
 :root {
-    --safe-bottom: env(safe-area-inset-bottom);
+    --inset-top: env(safe-area-inset-top);
+    --inset-bottom: env(safe-area-inset-bottom);
+    --inset-left: env(safe-area-inset-left);
+    --inset-right: env(safe-area-inset-right);
+    --safe-bottom: var(--inset-bottom);
 }
 html.keyboard-open {
     --safe-bottom: 0px;
@@ -297,8 +303,8 @@ html.mobile-app #root {
     inset-inline: 0;
     top: var(--app-top, 0px);
     height: var(--app-height, 100%);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
+    padding-left: var(--inset-left);
+    padding-right: var(--inset-right);
 }
 
 body {

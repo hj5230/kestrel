@@ -194,7 +194,7 @@ export function ActionMenu({
           showCloseButton={false}
           onOpenAutoFocus={(e) => e.preventDefault()}
           style={{ bottom: "var(--kb, 0px)", maxHeight: "min(80vh, calc(var(--app-height, 100vh) - 24px))" }}
-          className="gap-0 overflow-y-auto overscroll-contain rounded-t-2xl p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] [html.keyboard-open_&]:pb-2"
+          className="gap-0 overflow-y-auto overscroll-contain rounded-t-2xl p-2 pb-[max(0.5rem,var(--inset-bottom))] [html.keyboard-open_&]:pb-2"
         >
           <SheetHeader className="sr-only">
             <SheetTitle>{page?.label ?? title}</SheetTitle>

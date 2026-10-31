@@ -131,7 +131,7 @@ export function ContextMeter({ session, model, onCompact, compacting }: { sessio
       onOpenChange={setOpen}
       align="end"
       popoverClassName="w-80 p-4"
-      sheetClassName="px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+      sheetClassName="px-4 pt-4 pb-[max(1rem,var(--inset-bottom))]"
       trigger={
         <button
           type="button"

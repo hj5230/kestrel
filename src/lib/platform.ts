@@ -18,3 +18,9 @@ export const isDesktopApp = isTauri && !isMobileApp
 
 /** Touch-first device (phone, tablet): no hover, software keyboard. */
 export const isTouch = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches
+
+/** Dev only: the phone interface framed as an iPhone in a desktop browser (lib/device-preview.ts). */
+export const devicePreview = import.meta.env.DEV && typeof location !== "undefined" && new URLSearchParams(location.search).has("device")
+
+/** Laid out as the phone app: the app itself, or the device preview. Pairing and native calls stay on isMobileApp. */
+export const isPhoneShell = isMobileApp || devicePreview

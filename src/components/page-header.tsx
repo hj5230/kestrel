@@ -14,7 +14,7 @@ export function PageHeader({ children, bordered = true, className }: { children?
     <header
       data-tauri-drag-region={isDesktopApp || undefined}
       className={cn(
-        "flex h-[calc(3rem+env(safe-area-inset-top))] shrink-0 items-center gap-2 px-3 pt-[env(safe-area-inset-top)]",
+        "flex h-[calc(3rem+var(--inset-top))] shrink-0 items-center gap-2 px-3 pt-[var(--inset-top)]",
         bordered && "border-b",
         isDesktopApp && state === "collapsed" && "pl-20",
         className,

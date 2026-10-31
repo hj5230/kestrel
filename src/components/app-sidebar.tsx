@@ -55,7 +55,7 @@ import { RenameDialog, ConfirmDeleteDialog, ArchivedDialog, MergeDialog } from "
 import { rpc } from "@/lib/api"
 import { basename, dayBucket, dayBucketId, relativeTime, shortPath } from "@/lib/format"
 import { addingMac, appInfo, connected, pairedMac, pairedMacs, paletteOpen, route, sessions, enabledModels, switchMac, unseen } from "@/lib/store"
-import { isDesktopApp, isMobileApp } from "@/lib/platform"
+import { isDesktopApp, isMobileApp, isPhoneShell } from "@/lib/platform"
 import { downloadText } from "@/lib/download"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -392,7 +392,7 @@ export function AppSidebar() {
   return (
     <Sidebar variant="sidebar" collapsible="offcanvas">
       <SidebarHeader className="gap-1 pt-0">
-        <div data-tauri-drag-region={isDesktopApp || undefined} className={cn("shrink-0", isMobileApp ? "h-[max(0.5rem,env(safe-area-inset-top))]" : "h-9")} />
+        <div data-tauri-drag-region={isDesktopApp || undefined} className={cn("shrink-0", isPhoneShell ? "h-[max(0.5rem,var(--inset-top))]" : "h-9")} />
         <SidebarMenu>
           {nav.map((n) => (
             <SidebarMenuItem key={n.key}>
@@ -497,7 +497,7 @@ export function AppSidebar() {
           )
         })}
       </SidebarContent>
-      <SidebarFooter className="pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <SidebarFooter className="pb-[max(0.5rem,var(--inset-bottom))]">
         <div className="flex items-center gap-1.5 px-1.5 text-xs">
           <span className={cn("size-1.5 shrink-0 rounded-full", connected.value ? "bg-success" : "bg-destructive")} />
           {isMobileApp && pairedMac.value ? (

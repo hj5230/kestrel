@@ -11,7 +11,7 @@ import { ChatView } from "@/components/chat/chat-view"
 import { HomeView } from "@/pages/home"
 import { UsagePage } from "@/pages/usage"
 import { SettingsPage } from "@/pages/settings"
-import { isMobileApp } from "@/lib/platform"
+import { isMobileApp, isPhoneShell } from "@/lib/platform"
 import { addingMac, bootError, deviceRevoked, pairedMac, paletteOpen, route, settings } from "@/lib/store"
 
 function useShortcuts() {
@@ -65,9 +65,9 @@ export default function App() {
       {/* Sonner's top offset ignores the notch and Dynamic Island; start below the safe area on the phone. */}
       <Toaster
         theme={dark ? "dark" : "light"}
-        position={isMobileApp ? "top-center" : "bottom-right"}
-        mobileOffset={isMobileApp ? { top: "calc(env(safe-area-inset-top) + 8px)" } : undefined}
-        offset={isMobileApp ? { top: "calc(env(safe-area-inset-top) + 8px)" } : undefined}
+        position={isPhoneShell ? "top-center" : "bottom-right"}
+        mobileOffset={isPhoneShell ? { top: "calc(var(--inset-top) + 8px)" } : undefined}
+        offset={isPhoneShell ? { top: "calc(var(--inset-top) + 8px)" } : undefined}
       />
     </TooltipProvider>
   )
