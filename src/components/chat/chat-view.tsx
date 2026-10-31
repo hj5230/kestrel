@@ -8,6 +8,7 @@ import {
   FolderInputIcon,
   FolderOpenIcon,
   GitBranchIcon,
+  GitMergeIcon,
   ListChecksIcon,
   MoreHorizontalIcon,
   PencilIcon,
@@ -23,7 +24,7 @@ import { ActionMenu, type MenuNode } from "@/components/action-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Spinner } from "@/components/ui/spinner"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { ConfirmDeleteDialog, RenameDialog } from "@/components/session-dialogs"
+import { ConfirmDeleteDialog, MergeDialog, RenameDialog } from "@/components/session-dialogs"
 import { Composer, type Attachment } from "./composer"
 import { ApprovalCard } from "./approval-card"
 import { userText } from "./messages"
@@ -35,7 +36,7 @@ import { TodoList } from "./tool-call"
 import { rpc, stageAttachments, type StagedFile } from "@/lib/api"
 import { isMobileApp } from "@/lib/platform"
 import { shortPath } from "@/lib/format"
-import { appInfo, createSession, detailSignal, draftKeyForHost, enabledModels, findModel, loadDetail, openSession, route, settings, updateSettings } from "@/lib/store"
+import { appInfo, createSession, detailSignal, draftKeyForHost, enabledModels, findModel, loadDetail, openSession, route, sessions, settings, updateSettings } from "@/lib/store"
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { cn } from "@/lib/utils"
@@ -92,6 +93,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const [editing, setEditing] = useState<{ seq: number; text: string; nonce: number } | null>(null)
   const [renaming, setRenaming] = useState<SessionInfo | null>(null)
   const [deleting, setDeleting] = useState<SessionInfo | null>(null)
+  const [merging, setMerging] = useState<{ target: SessionInfo | null } | null>(null)
   const [showPlan, setShowPlan] = useState(true)
   // Wide windows dock the plan beside the transcript; narrower screens open it as a drawer on demand.
   const wide = useMediaQuery("(min-width: 1024px)")
@@ -152,6 +154,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const home = appInfo.value?.home
   const view = settings.value?.transcriptView ?? "compact"
 
+  const forkSource = s.forkOf ? sessions.value.find((x) => x.id === s.forkOf) : undefined
   const sessionMenu: MenuNode[] = [
     { kind: "item", label: t("common.rename"), icon: PencilIcon, onSelect: () => setRenaming(s) },
     { kind: "item", label: t("chat.compact"), icon: ShrinkIcon, onSelect: () => compact(), disabled: running },
@@ -176,6 +179,8 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         { kind: "item", label: t("chat.copySessionPath"), onSelect: () => {}, disabled: true },
       ],
     },
+    ...(forkSource ? [{ kind: "item" as const, label: t("sidebar.mergeToMain"), icon: GitMergeIcon, onSelect: () => setMerging({ target: forkSource }), disabled: running }] : []),
+    { kind: "item", label: t("sidebar.mergeInto"), icon: GitMergeIcon, onSelect: () => setMerging({ target: null }), disabled: running },
     { kind: "item", label: t("sidebar.archive"), icon: ArchiveIcon, onSelect: archive },
     { kind: "separator" },
     { kind: "item", label: t("chat.delete"), icon: Trash2Icon, destructive: true, onSelect: () => setDeleting(s) },
@@ -384,6 +389,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
       <SubagentSheet id={subagent} onClose={() => setSubagent(null)} />
       <RenameDialog session={renaming} onClose={() => setRenaming(null)} />
       <ConfirmDeleteDialog session={deleting} onClose={() => setDeleting(null)} />
+      <MergeDialog source={merging ? s : null} target={merging?.target} onClose={() => setMerging(null)} />
     </div>
   )
 }

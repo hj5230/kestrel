@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks"
-import { ArchiveRestoreIcon, Trash2Icon } from "lucide-react"
+import { ArchiveRestoreIcon, ArrowDownIcon, GitMergeIcon, Trash2Icon } from "lucide-react"
+import { toast } from "sonner"
 import type { SessionInfo } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -17,7 +18,9 @@ import { Input } from "@/components/ui/input"
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { rpc } from "@/lib/api"
 import { relativeTime, shortPath } from "@/lib/format"
-import { appInfo, refreshSessions } from "@/lib/store"
+import { Spinner } from "@/components/ui/spinner"
+import { appInfo, openSession, refreshSessions, sessions } from "@/lib/store"
+import { cn } from "@/lib/utils"
 import { t } from "@/lib/i18n"
 
 export function RenameDialog({ session, onClose }: { session: SessionInfo | null; onClose: () => void }) {
@@ -102,7 +105,10 @@ export function ArchivedDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm">{s.title || t("common.untitled")}</div>
                   <div className="truncate text-xs text-muted-foreground">
-                    {shortPath(s.cwd, appInfo.value?.home)} · {relativeTime(s.updatedAt)}
+                    {s.mergedInto
+                      ? t("dialog.mergedInto", { title: sessions.value.find((x) => x.id === s.mergedInto)?.title || t("common.untitled") })
+                      : shortPath(s.cwd, appInfo.value?.home)}{" "}
+                    · {relativeTime(s.updatedAt)}
                   </div>
                 </div>
                 <Button
@@ -131,6 +137,91 @@ export function ArchivedDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             ))
           )}
         </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Merging one session into another. With a target given ("Merge into main" on a fork) it only confirms;
+ *  without one it first asks where to. The source is summarized into the target and then archived. */
+export function MergeDialog({ source, target, onClose }: { source: SessionInfo | null; target?: SessionInfo | null; onClose: () => void }) {
+  const [into, setInto] = useState<SessionInfo | null>(null)
+  const [query, setQuery] = useState("")
+  const [focus, setFocus] = useState("")
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    setInto(target ?? null)
+    setQuery("")
+    setFocus("")
+    setBusy(false)
+  }, [source, target])
+  const title = (s: SessionInfo) => s.title || t("common.untitled")
+  const q = query.trim().toLowerCase()
+  const candidates = sessions.value.filter((s) => s.id !== source?.id && (!q || title(s).toLowerCase().includes(q)))
+  const branch = !!source && !!into && source.forkOf === into.id
+  const submit = async (e?: Event) => {
+    e?.preventDefault()
+    if (!source || !into || busy) return
+    setBusy(true)
+    try {
+      const merged = await rpc<SessionInfo>("sessions.merge", { id: source.id, into: into.id, instructions: focus })
+      onClose()
+      openSession(merged.id)
+      toast.success(t("merge.done", { title: title(merged) }))
+    } catch (err: any) {
+      toast.error(err.message)
+      setBusy(false)
+    }
+  }
+  return (
+    <Dialog open={!!source} onOpenChange={(o) => !o && !busy && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <form onSubmit={submit} className="grid min-w-0 gap-4">
+          <DialogHeader>
+            <DialogTitle>{t("merge.title")}</DialogTitle>
+            <DialogDescription>{into ? t(branch ? "merge.descBranch" : "merge.descWhole", { from: source ? title(source) : "", into: title(into) }) : t("merge.pick")}</DialogDescription>
+          </DialogHeader>
+          {!target && (
+            <div className="grid gap-2">
+              <Input value={query} onInput={(e) => setQuery(e.currentTarget.value)} placeholder={t("merge.search")} aria-label={t("merge.search")} />
+              <div className="-mx-1 max-h-56 overflow-y-auto" role="listbox" aria-label={t("merge.into")}>
+                {candidates.length === 0 && <div className="px-2 py-6 text-center text-sm text-muted-foreground">{t("merge.none")}</div>}
+                {candidates.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    role="option"
+                    aria-selected={into?.id === s.id}
+                    onClick={() => setInto(s)}
+                    className={cn("flex w-full min-w-0 flex-col rounded-md px-2 py-1.5 text-left hover:bg-muted pointer-coarse:min-h-11", into?.id === s.id && "bg-accent text-accent-foreground hover:bg-accent")}
+                  >
+                    <span className="truncate text-sm">{title(s)}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {shortPath(s.cwd, appInfo.value?.home)} · {relativeTime(s.updatedAt)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {target && source && (
+            <div className="grid justify-items-start gap-1 rounded-lg border p-3 text-sm">
+              <span className="max-w-full truncate text-muted-foreground">{title(source)}</span>
+              <ArrowDownIcon className="size-3.5 text-muted-foreground" />
+              <span className="max-w-full truncate font-medium">{title(target)}</span>
+            </div>
+          )}
+          <Input value={focus} onInput={(e) => setFocus(e.currentTarget.value)} placeholder={t("merge.focus")} aria-label={t("merge.focus")} />
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" disabled={!into || busy}>
+              {busy ? <Spinner /> : <GitMergeIcon />}
+              {busy ? t("merge.merging") : t("merge.action")}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

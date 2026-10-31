@@ -5,12 +5,14 @@ import {
   ArchiveRestoreIcon,
   BarChart3Icon,
   CheckIcon,
+  ChevronDownIcon,
   ChevronRightIcon,
   ChevronsUpDownIcon,
   CircleAlertIcon,
   DownloadIcon,
   FolderOpenIcon,
   FolderTreeIcon,
+  GitMergeIcon,
   LaptopIcon,
   MoreHorizontalIcon,
   PencilIcon,
@@ -49,7 +51,7 @@ import { Kbd } from "@/components/ui/kbd"
 import { useEdgeSwipe } from "@/hooks/use-edge-swipe"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
-import { RenameDialog, ConfirmDeleteDialog, ArchivedDialog } from "@/components/session-dialogs"
+import { RenameDialog, ConfirmDeleteDialog, ArchivedDialog, MergeDialog } from "@/components/session-dialogs"
 import { rpc } from "@/lib/api"
 import { basename, dayBucket, dayBucketId, relativeTime, shortPath } from "@/lib/format"
 import { addingMac, appInfo, connected, pairedMac, pairedMacs, paletteOpen, route, sessions, enabledModels, switchMac, unseen } from "@/lib/store"
@@ -70,10 +72,11 @@ function loadGroupMode(): GroupMode {
 }
 
 const COLLAPSED_KEY = "kestrel-collapsed-groups"
+const FOLDED_KEY = "kestrel-folded-forks"
 
-function loadCollapsed(): Set<string> {
+function loadCollapsed(key = COLLAPSED_KEY): Set<string> {
   try {
-    const raw = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "[]")
+    const raw = JSON.parse(localStorage.getItem(key) ?? "[]")
     if (!Array.isArray(raw)) return new Set()
     return new Set(raw.filter((x) => typeof x === "string"))
   } catch {
@@ -81,9 +84,9 @@ function loadCollapsed(): Set<string> {
   }
 }
 
-function storeCollapsed(ids: Set<string>) {
+function storeCollapsed(ids: Set<string>, key = COLLAPSED_KEY) {
   try {
-    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...ids]))
+    localStorage.setItem(key, JSON.stringify([...ids]))
   } catch {}
 }
 
@@ -128,18 +131,61 @@ function FadeLabel({ text, className }: { text: string; className?: string }) {
   )
 }
 
-function SessionItem({ s, active, onRename, onDelete }: { s: SessionInfo; active: boolean; onRename: () => void; onDelete: () => void }) {
+/** Where a fork sits under its source: a line down the side, turning in at the last one. */
+const branchLine = {
+  middle: "ml-[17px] pl-2.5 before:absolute before:top-0 before:left-0 before:h-[calc(100%+1px)] before:w-px before:bg-muted-foreground/25",
+  last: "ml-[17px] pl-2.5 before:absolute before:top-0 before:left-0 before:h-1/2 before:w-2 before:rounded-bl-md before:border-b before:border-l before:border-muted-foreground/25",
+}
+
+function SessionItem({
+  s,
+  active,
+  parent,
+  branch,
+  folded,
+  onToggleFold,
+  onRename,
+  onDelete,
+  onMerge,
+}: {
+  s: SessionInfo
+  active: boolean
+  /** The session this one was forked from, when it is in the list. */
+  parent?: SessionInfo
+  /** Drawn as a fork under its source. */
+  branch?: "middle" | "last"
+  /** Set on a session with forks under it. */
+  folded?: boolean
+  onToggleFold?: () => void
+  onRename: () => void
+  onDelete: () => void
+  onMerge: (target: SessionInfo | null) => void
+}) {
   const status = s.status !== "idle" || unseen.value.has(s.id) ? <StatusDot status={s.status} unseen={unseen.value.has(s.id)} /> : null
-  const title = s.title || t("common.untitled")
+  const title = s.title || (s.forkOf ? t("sidebar.branch") : t("common.untitled"))
   return (
-    <SidebarMenuItem>
+    <SidebarMenuItem className={branch && branchLine[branch]}>
       <SidebarMenuButton
         isActive={active}
         onClick={() => (route.value = { name: "chat", sessionId: s.id })}
         className={rowClass}
+        aria-expanded={onToggleFold ? !folded : undefined}
         title={`${title}\n${shortPath(s.cwd, appInfo.value?.home)}\n${relativeTime(s.updatedAt)}`}
       >
-        <FadeLabel text={title} className={!s.title && !active ? "text-muted-foreground/70" : undefined} />
+        <FadeLabel text={title} className={cn(onToggleFold && "flex-initial", !s.title && !active && "text-muted-foreground/70")} />
+        {onToggleFold && (
+          // Inside the row so the title and its fold control read as one; it only folds, never navigates.
+          <span
+            aria-hidden="true"
+            className="-mx-1 flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground pointer-coarse:size-8"
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleFold()
+            }}
+          >
+            <ChevronDownIcon className={cn("size-3.5 transition-transform", folded && "-rotate-90")} />
+          </span>
+        )}
       </SidebarMenuButton>
       {status && (
         <span
@@ -181,6 +227,16 @@ function SessionItem({ s, active, onRename, onDelete }: { s: SessionInfo; active
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
+          {parent && (
+            <DropdownMenuItem onSelect={() => onMerge(parent)}>
+              <GitMergeIcon />
+              {t("sidebar.mergeToMain")}
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem onSelect={() => onMerge(null)}>
+            <GitMergeIcon />
+            {t("sidebar.mergeInto")}
+          </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={async () => {
               await rpc("sessions.update", { id: s.id, patch: { archived: true } })
@@ -250,6 +306,8 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
   const [renaming, setRenaming] = useState<SessionInfo | null>(null)
   const [deleting, setDeleting] = useState<SessionInfo | null>(null)
+  const [merging, setMerging] = useState<{ source: SessionInfo; target: SessionInfo | null } | null>(null)
+  const [folded, setFolded] = useState<Set<string>>(() => loadCollapsed(FOLDED_KEY))
   const [archivedOpen, setArchivedOpen] = useState(false)
   const r = route.value
   const activeId = r.name === "chat" ? r.sessionId : null
@@ -259,9 +317,33 @@ export function AppSidebar() {
   useEffect(() => setOpenMobile(false), [JSON.stringify(r)])
   const list = sessions.value
 
+  // Forks are listed under the session they came from (a fork of a fork too), not as sessions of their own.
+  // One whose source is gone (archived, merged, deleted) stands on its own again.
+  const tree = useMemo(() => {
+    const byId = new Map(list.map((s) => [s.id, s]))
+    const children = new Map<string, SessionInfo[]>()
+    const rootOf = (s: SessionInfo) => {
+      let cur = s
+      const seen = new Set([s.id])
+      while (cur.forkOf && byId.has(cur.forkOf) && !seen.has(cur.forkOf)) {
+        cur = byId.get(cur.forkOf)!
+        seen.add(cur.id)
+      }
+      return cur
+    }
+    const top: SessionInfo[] = []
+    for (const s of list) {
+      const root = rootOf(s)
+      if (root === s) top.push(s)
+      else children.set(root.id, [...(children.get(root.id) ?? []), s])
+    }
+    for (const kids of children.values()) kids.sort((a, b) => a.createdAt - b.createdAt)
+    return { top, children, byId }
+  }, [list])
+
   const groups = useMemo(() => {
-    const pinned = list.filter((s) => s.pinned)
-    const rest = list.filter((s) => !s.pinned)
+    const pinned = tree.top.filter((s) => s.pinned)
+    const rest = tree.top.filter((s) => !s.pinned)
     const home = appInfo.value?.home
     const out: { id: string; label: string; title: string; items: SessionInfo[] }[] = []
     if (pinned.length) {
@@ -282,7 +364,7 @@ export function AppSidebar() {
       group.items.push(s)
     }
     return out
-  }, [list, groupMode, lang.value])
+  }, [tree, groupMode, lang.value])
 
   const setMode = (m: GroupMode) => {
     setGroupMode(m)
@@ -380,9 +462,34 @@ export function AppSidebar() {
               {open && (
                 <SidebarGroupContent>
                   <SidebarMenu className="gap-px">
-                    {g.items.map((s) => (
-                      <SessionItem key={s.id} s={s} active={s.id === activeId} onRename={() => setRenaming(s)} onDelete={() => setDeleting(s)} />
-                    ))}
+                    {g.items.flatMap((s) => {
+                      const kids = tree.children.get(s.id) ?? []
+                      const isFolded = folded.has(s.id)
+                      const item = (x: SessionInfo, extra: Partial<Parameters<typeof SessionItem>[0]> = {}) => (
+                        <SessionItem
+                          key={x.id}
+                          s={x}
+                          active={x.id === activeId}
+                          parent={x.forkOf ? tree.byId.get(x.forkOf) : undefined}
+                          onRename={() => setRenaming(x)}
+                          onDelete={() => setDeleting(x)}
+                          onMerge={(target) => setMerging({ source: x, target })}
+                          {...extra}
+                        />
+                      )
+                      if (!kids.length) return [item(s)]
+                      const toggle = () => {
+                        const next = new Set(folded)
+                        if (isFolded) next.delete(s.id)
+                        else next.add(s.id)
+                        storeCollapsed(next, FOLDED_KEY)
+                        setFolded(next)
+                      }
+                      return [
+                        item(s, { folded: isFolded, onToggleFold: toggle }),
+                        ...(isFolded ? [] : kids.map((k, j) => item(k, { branch: j === kids.length - 1 ? "last" : "middle" }))),
+                      ]
+                    })}
                   </SidebarMenu>
                 </SidebarGroupContent>
               )}
@@ -416,6 +523,7 @@ export function AppSidebar() {
       </SidebarFooter>
       <RenameDialog session={renaming} onClose={() => setRenaming(null)} />
       <ConfirmDeleteDialog session={deleting} onClose={() => setDeleting(null)} />
+      <MergeDialog source={merging?.source ?? null} target={merging?.target} onClose={() => setMerging(null)} />
       <ArchivedDialog open={archivedOpen} onOpenChange={setArchivedOpen} />
     </Sidebar>
   )
