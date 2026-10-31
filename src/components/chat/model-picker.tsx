@@ -130,12 +130,8 @@ export function ModelControl({
       trigger={
         <Button variant="ghost" size="sm" className="max-w-[42vw] gap-1 px-2 text-muted-foreground hover:text-foreground pointer-coarse:min-h-10 sm:max-w-56">
           <span className="truncate">{current?.name ?? (modelId || t("picker.selectModel"))}</span>
-          {choices && (
-            <>
-              <span className="hidden shrink-0 sm:inline">· {selected ? effortLabel(selected) : t("picker.effortDefault")}</span>
-              <span className="size-1.5 shrink-0 rounded-full bg-current opacity-70 sm:hidden" />
-            </>
-          )}
+          {/* The effort stays whole on narrow screens; the model name gives up its width first. */}
+          {choices && <span className="shrink-0">· {selected ? effortLabel(selected) : t("picker.effortDefault")}</span>}
           <ChevronDownIcon className="opacity-60" />
         </Button>
       }
