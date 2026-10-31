@@ -15,6 +15,7 @@ import { setLang, t } from "./i18n"
 import { connectionGeneration } from "./connection-generation"
 import { forgetMac, getPairedMac, listMacs, onPairedMacChanged, selectMac, type PairedMac } from "./pairing"
 import { isMobileApp, isTauri } from "./platform"
+import { feedback } from "./feedback"
 
 export type Route =
   | { name: "home" }
@@ -270,6 +271,7 @@ function handleEvents() {
         break
       case "approval_request":
         patchDetail(e.request.sessionId, (d) => ({ ...d, approvals: [...d.approvals.filter((a) => a.id !== e.request.id), e.request] }))
+        feedback("input")
         notify(t("notify.approval"), e.request.kind === "bash" ? e.request.detail.slice(0, 120) : e.request.path ?? e.request.toolName)
         break
       case "approval_resolved":
@@ -277,6 +279,7 @@ function handleEvents() {
         break
       case "question_request":
         patchDetail(e.request.sessionId, (d) => ({ ...d, questions: [...d.questions.filter((q) => q.id !== e.request.id), e.request] }))
+        feedback("input")
         notify(t("notify.question"), e.request.questions[0]?.prompt.slice(0, 120) ?? "")
         break
       case "question_resolved":
@@ -309,6 +312,7 @@ function handleEvents() {
         if (!(route.value.name === "chat" && route.value.sessionId === e.sessionId && document.visibilityState === "visible")) {
           setUnseen(new Set(unseen.value).add(e.sessionId))
         }
+        feedback(e.ok ? "done" : "error")
         if (settings.value?.notifyOnFinish) notify(e.ok ? t("notify.done") : t("notify.failed"), e.title)
         break
       case "remote_status":

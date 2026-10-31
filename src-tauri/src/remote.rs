@@ -585,6 +585,35 @@ fn remote_events_disconnect(state: State<'_, Remote>, stream_id: String) {
 /// Let the page draw edge to edge. By default the WKWebView's scroll view insets its content by
 /// the safe areas, which shrinks the layout viewport (fixed elements stop short of the bottom);
 /// the frontend already pads for the notch and home indicator with `env(safe-area-inset-*)`.
+/// Plays the Taptic Engine pattern for an event: UIKit's success, warning and error notifications for a
+/// finished run, a question waiting for the user and a failed run; a single impact for an error in the app.
+#[tauri::command]
+fn haptic<R: Runtime>(app: AppHandle<R>, kind: String) -> Result<(), String> {
+    app.run_on_main_thread(move || unsafe {
+        use objc2::rc::Retained;
+        use objc2::runtime::AnyObject;
+        use objc2::{class, msg_send};
+        let notification: Option<isize> = match kind.as_str() {
+            "done" => Some(0),
+            "input" => Some(1),
+            "error" => Some(2),
+            _ => None,
+        };
+        if let Some(kind) = notification {
+            let generator: Option<Retained<AnyObject>> = msg_send![class!(UINotificationFeedbackGenerator), new];
+            if let Some(g) = generator {
+                let _: () = msg_send![&*g, notificationOccurred: kind];
+            }
+        } else {
+            let generator: Option<Retained<AnyObject>> = msg_send![class!(UIImpactFeedbackGenerator), new];
+            if let Some(g) = generator {
+                let _: () = msg_send![&*g, impactOccurred];
+            }
+        }
+    })
+    .map_err(|e| e.to_string())
+}
+
 fn edge_to_edge<R: Runtime>(app: &tauri::App<R>) {
     let Some(window) = app.get_webview_window("main") else { return };
     let _ = window.with_webview(|webview| unsafe {
@@ -619,6 +648,7 @@ pub fn setup<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
             remote_rpc,
             remote_upload,
             remote_events_connect,
-            remote_events_disconnect
+            remote_events_disconnect,
+            haptic
         ])
 }

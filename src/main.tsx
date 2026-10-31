@@ -4,6 +4,7 @@ import { boot } from "./lib/store"
 import { isMobileApp } from "./lib/platform"
 import { trackVisualViewport } from "./lib/viewport"
 import { routeExternalLinks } from "./lib/links"
+import { initFeedback } from "./lib/feedback"
 import "./index.css"
 
 if (isMobileApp) {
@@ -18,5 +19,6 @@ try {
 } catch {}
 
 routeExternalLinks()
+initFeedback()
 boot()
 render(<App />, document.getElementById("root")!)

@@ -24,6 +24,8 @@ const ENTRIES: Entry[] = [
   { tab: "general", label: "settings.sendKey", also: "enter shortcut 快捷键" },
   { tab: "general", label: "settings.transcriptView", desc: "settings.transcriptViewDesc" },
   { tab: "general", label: "settings.notify", desc: "settings.notifyDesc" },
+  { tab: "general", label: "settings.sounds", desc: "settings.soundsDesc", also: "audio chime 提示音 音效" },
+  { tab: "general", label: "settings.haptics", desc: "settings.hapticsDesc", also: "vibration taptic 震动 振动" },
   { tab: "execution", label: "settings.bashTimeout", desc: "settings.bashTimeoutDesc" },
   { tab: "execution", label: "settings.proxy", desc: "settings.proxyDesc", also: "http https" },
   { tab: "execution", label: "settings.tavilyKey", desc: "settings.tavilyKeyDesc", also: "web search 搜索" },

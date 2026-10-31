@@ -44,6 +44,7 @@ import { shortPath } from "@/lib/format"
 import { t, type MessageKey } from "@/lib/i18n"
 import { appInfo, enabledModels, providerName, route, settings, updateSettings } from "@/lib/store"
 import { isMobileApp, isTouch } from "@/lib/platform"
+import { feedbackPrefs, previewSound, setFeedbackPrefs } from "@/lib/feedback"
 import { cn } from "@/lib/utils"
 
 const TABS = [
@@ -197,6 +198,20 @@ function General({ s }: { s: AppSettings }) {
           <Row label={t("settings.notify")} desc={t("settings.notifyDesc")}>
             <Switch checked={s.notifyOnFinish} onCheckedChange={(v) => save({ notifyOnFinish: v })} />
           </Row>
+          <Row label={t("settings.sounds")} desc={t("settings.soundsDesc")}>
+            <Switch
+              checked={feedbackPrefs.value.sound}
+              onCheckedChange={(v) => {
+                setFeedbackPrefs({ sound: v })
+                if (v) previewSound()
+              }}
+            />
+          </Row>
+          {isMobileApp && (
+            <Row label={t("settings.haptics")} desc={t("settings.hapticsDesc")}>
+              <Switch checked={feedbackPrefs.value.haptics} onCheckedChange={(v) => setFeedbackPrefs({ haptics: v })} />
+            </Row>
+          )}
         </Panel>
       </Section>
     </div>
