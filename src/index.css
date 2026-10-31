@@ -292,7 +292,10 @@ html.mobile-app body {
     overscroll-behavior: none;
 }
 html.mobile-app #root {
-    /* Follows the visual viewport (see lib/viewport.ts) so the composer stays above the keyboard. */
+    /* Fixed to the visual viewport (see lib/viewport.ts) so the composer stays above the keyboard. */
+    position: fixed;
+    inset-inline: 0;
+    top: var(--app-top, 0px);
     height: var(--app-height, 100%);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
