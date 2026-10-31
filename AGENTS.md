@@ -16,13 +16,19 @@ Guidance for coding agents (and people) working in this repository. See README.m
 - Conventional Commits with a scope: `feat(remote): …`, `fix(ui): …`, `docs: …`, `refactor(tauri): …`. The subject is lowercase and says what changed for the user, e.g. `fix(composer): keep send button on screen on narrow widths`.
 - A body when the reason isn't obvious: what was wrong and why this fixes it.
 - The default branch is `master`. Never push unless asked.
-- Run `npm run typecheck` before committing.
+- Run `npm run check` before committing.
 
 ## Code style
 
 - Match the surrounding code. The front end (`src/`) has no semicolons; the sidecar (`sidecar/`, `shared/`) uses them. Double quotes everywhere.
 - Each module opens with a short comment on what it is for and any non-obvious constraint. Comments explain why, not what.
 - Prefer one well-placed abstraction to scattered conditionals. Before adding a branch, look for the seam that already exists (below).
+
+## Size
+
+- No file over 300 lines, no Preact component over 200. `npm run check` enforces both (`scripts/check-size.ts`).
+- Split along a real seam: one concern per module, a component per piece of UI, data and logic out of render code. Don't cut a file in two halves that still need each other's internals.
+- Exempt only what is a table rather than logic, listed in the script with the reason: the locale files and the vendored shadcn kit (`src/components/ui`).
 
 ## Architecture rules
 
@@ -49,11 +55,12 @@ Guidance for coding agents (and people) working in this repository. See README.m
 
 ## Verifying
 
-- `npm run typecheck` for both the front end and the sidecar.
+- `npm run check`: the type check for the front end and the sidecar, and the size limits.
 - `npm test` for the sidecar tests (shell parser, permission rules, auto review, and an end-to-end run of auto mode against a scripted model server).
 - For UI changes:
   - Check the desktop window.
   - Check 375pt width with touch emulation in a browser: no horizontal overflow, targets of 44pt or more.
+  - Check the phone frame: the dev server's `/?device` at 440×956 with touch emulation draws an iPhone 17 Pro Max over the app (rounded corners, Dynamic Island, home indicator) and sets the safe-area insets, so a screenshot shows what the phone shows. `&keyboard` adds a stand-in keyboard and shrinks the app as iOS does; `&still` skips animations for screenshots. It uses the local sidecar, so pairing and native calls aren't covered.
   - Check the iOS Simulator (`npm run ios:sim`).
 - Things only a real device can show: the software keyboard, camera scanning, the local-network permission prompt, Tailscale on cellular.
 - Report what was and wasn't verified.
@@ -61,5 +68,5 @@ Guidance for coding agents (and people) working in this repository. See README.m
 ## Environment notes
 
 - The Mac reaches the network through a proxy: FlClash in TUN mode, plus `HTTP(S)_PROXY=127.0.0.1:7890`. Addresses in `198.18.0.0/15` are its fake IPs and must never be offered to phones.
-- Tailscale on the Mac is the Homebrew CLI daemon (`brew services`), not the app. Kestrel drives either through the `tailscale` CLI.
+- Tailscale on the Mac is the standalone app; the Homebrew daemon was removed because the two fought over the tunnel. `/usr/local/bin/tailscale` is the app's CLI shim. Kestrel drives either install through the `tailscale` CLI.
 - iOS device builds are unsigned (`npm run ios:ipa`) and installed with SideStore or iloader, which re-sign them with a free Apple ID.
