@@ -1,0 +1,46 @@
+/* Animations: the streaming caret, shimmer on running steps, the kestrel's wings, status dots and the home greeting.
+   Each one stops under prefers-reduced-motion. */
+
+@keyframes caret-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+.streaming-caret::after, .markdown.is-streaming > :last-child:not(pre):not(ul):not(ol)::after {
+    content: "";
+    display: inline-block;
+    width: 0.5em;
+    height: 1em;
+    margin-left: 2px;
+    vertical-align: -0.15em;
+    border-radius: 2px;
+    background: currentColor;
+    opacity: 0.6;
+    animation: caret-blink 1s steps(2) infinite;
+}
+
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+/* KestrelMark: wings beat about the shoulders while the body hangs still. */
+.kestrel-mark .kestrel-wing { transform-box: view-box; animation: kestrel-beat 0.38s ease-in-out infinite alternate; }
+.kestrel-mark .kestrel-wing-l { transform-origin: 11.3px 10px; }
+.kestrel-mark .kestrel-wing-r { transform-origin: 12.7px 10px; animation-name: kestrel-beat-r; }
+@keyframes kestrel-beat { from { transform: rotate(16deg) scaleY(0.7); } to { transform: rotate(-14deg); } }
+@keyframes kestrel-beat-r { from { transform: rotate(-16deg) scaleY(0.7); } to { transform: rotate(14deg); } }
+@media (prefers-reduced-motion: reduce) { .kestrel-mark .kestrel-wing { animation: none; } }
+@keyframes breathe { 0%, 100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.15); } }
+@utility animate-breathe { animation: breathe 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .animate-breathe { animation: none; } }
+.text-shimmer {
+    background: linear-gradient(90deg, var(--muted-foreground) 25%, var(--foreground) 50%, var(--muted-foreground) 75%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 2.2s linear infinite;
+}
+
+/* Home greeting: each letter fades up out of a slight blur. */
+.greet-char { display: inline-block; white-space: pre; animation: greet-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes greet-in {
+  from { opacity: 0; transform: translateY(0.18em); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .greet-char { animation: none; }
+}

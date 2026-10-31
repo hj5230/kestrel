@@ -1,0 +1,71 @@
+/* Rendered Markdown in the transcript, code highlighting, and the composer's live Markdown highlighting. */
+
+.markdown {
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+}
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown p, .markdown ul, .markdown ol, .markdown blockquote, .markdown table, .markdown pre { margin: 0.65em 0; }
+.markdown h1, .markdown h2, .markdown h3, .markdown h4 { font-weight: 600; line-height: 1.35; margin: 1.2em 0 0.5em; }
+.markdown h1 { font-size: 1.35em; }
+.markdown h2 { font-size: 1.2em; }
+.markdown h3 { font-size: 1.07em; }
+.markdown h4 { font-size: 1em; }
+.markdown ul { list-style: disc; padding-left: 1.4em; }
+.markdown ol { list-style: decimal; padding-left: 1.5em; }
+.markdown li { margin: 0.2em 0; }
+.markdown li > ul, .markdown li > ol { margin: 0.2em 0; }
+.markdown a { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in oklch, var(--primary) 40%, transparent); }
+.markdown blockquote { border-left: 3px solid var(--border); padding-left: 0.9em; color: var(--muted-foreground); }
+.markdown hr { border: 0; border-top: 1px solid var(--border); margin: 1.2em 0; }
+.markdown :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+    background: var(--muted);
+    border-radius: 5px;
+    padding: 0.12em 0.36em;
+}
+.markdown pre {
+    font-family: var(--font-mono);
+    font-size: 0.82em;
+    line-height: 1.6;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) * 1.1);
+    overflow: hidden;
+}
+.markdown pre .code-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3em 0.5em 0.3em 0.9em;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-sans);
+    font-size: 0.85em;
+    color: var(--muted-foreground);
+}
+.markdown pre code { display: block; padding: 0.8em 1em; overflow-x: auto; }
+.markdown table { border-collapse: collapse; display: block; overflow-x: auto; font-size: 0.92em; }
+.markdown th, .markdown td { border: 1px solid var(--border); padding: 0.4em 0.75em; text-align: left; }
+.markdown th { background: var(--muted); font-weight: 600; }
+.markdown img { max-width: 100%; border-radius: var(--radius); }
+
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-doctag, .hljs-type { color: var(--hl-keyword); }
+.hljs-string, .hljs-regexp, .hljs-addition, .hljs-template-tag { color: var(--hl-string); }
+.hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet { color: var(--hl-number); }
+.hljs-comment, .hljs-quote { color: var(--hl-comment); font-style: italic; }
+.hljs-title, .hljs-section, .hljs-title.function_, .hljs-name { color: var(--hl-title); }
+.hljs-attr, .hljs-attribute, .hljs-variable, .hljs-property, .hljs-params { color: var(--hl-attr); }
+.hljs-meta, .hljs-selector-class, .hljs-selector-id, .hljs-tag { color: var(--hl-meta); }
+.hljs-deletion { color: var(--destructive); }
+
+/* Composer Markdown highlighting. Only paint changes here: anything that changes glyph widths (weight,
+   size, italics) would push the visible text out of line with the transparent textarea above it. */
+.md-source { color: var(--foreground); }
+.md-source .md-mark { color: var(--muted-foreground); opacity: 0.75; }
+.md-source .md-heading { color: var(--foreground); -webkit-text-stroke: 0.35px currentColor; }
+.md-source .md-strong { -webkit-text-stroke: 0.35px currentColor; }
+.md-source .md-em { color: color-mix(in oklch, var(--foreground) 80%, var(--primary)); }
+.md-source .md-code, .md-source .md-codeblock { color: var(--hl-string); background: color-mix(in oklch, var(--muted) 70%, transparent); border-radius: 3px; }
+.md-source .md-link { color: var(--primary); }
