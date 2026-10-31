@@ -1,21 +1,14 @@
+// The app's state as signals: route, sessions and their transcripts, settings, providers and models, and the
+// phone's paired Macs. boot() loads it; server events (store/events.ts) keep it current.
 import { computed, signal, type Signal } from "@preact/signals"
-import { toast } from "sonner"
-import type {
-  AppInfo,
-  AppSettings,
-  McpServerStatus,
-  ModelConfig,
-  ProviderConfig,
-  RemoteStatus,
-  SessionDetail,
-  SessionInfo,
-} from "@shared/protocol"
-import { connectEvents, disconnectEvents, onConnection, onRevoked, onServerEvent, rpc } from "./api"
-import { setLang, t } from "./i18n"
+import type { AppInfo, AppSettings, McpServerStatus, ModelConfig, ProviderConfig, RemoteStatus, SessionDetail, SessionInfo } from "@shared/protocol"
+import { connectEvents, disconnectEvents, rpc } from "./api"
+import { setLang } from "./i18n"
 import { connectionGeneration } from "./connection-generation"
-import { forgetMac, getPairedMac, listMacs, onPairedMacChanged, selectMac, type PairedMac } from "./pairing"
-import { isMobileApp, isTauri } from "./platform"
-import { feedback } from "./feedback"
+import { getPairedMac, listMacs, type PairedMac } from "./pairing"
+import { isMobileApp } from "./platform"
+import { handleEvents } from "./store/events"
+export { adoptPairedMac, switchMac, forgetPairedMac, unpairMac } from "./store/macs"
 
 export type Route =
   | { name: "home" }
@@ -82,13 +75,13 @@ function loadUnseen(): Set<string> {
   }
 }
 export const unseen = signal<Set<string>>(new Set())
-function setUnseen(next: Set<string>) {
+export function setUnseen(next: Set<string>) {
   unseen.value = next
   try {
     localStorage.setItem(unseenKey(), JSON.stringify([...next]))
   } catch {}
 }
-function markSeen(id: string) {
+export function markSeen(id: string) {
   if (!unseen.value.has(id)) return
   const next = new Set(unseen.value)
   next.delete(id)
@@ -98,7 +91,7 @@ route.subscribe((r) => {
   if (r.name === "chat") markSeen(r.sessionId)
 })
 
-const details = new Map<string, Signal<DetailState | null>>()
+export const details = new Map<string, Signal<DetailState | null>>()
 
 export function detailSignal(id: string): Signal<DetailState | null> {
   let s = details.get(id)
@@ -116,7 +109,7 @@ export async function loadDetail(id: string) {
   return sig.value
 }
 
-function patchDetail(id: string, fn: (d: DetailState) => DetailState) {
+export function patchDetail(id: string, fn: (d: DetailState) => DetailState) {
   const sig = details.get(id)
   if (sig?.value) sig.value = fn(sig.value)
 }
@@ -179,7 +172,7 @@ export async function createSession(input: Partial<SessionInfo> = {}) {
   return s
 }
 
-function upsertSession(s: SessionInfo) {
+export function upsertSession(s: SessionInfo) {
   if (s.kind !== "main") return
   const list = sessions.value.filter((x) => x.id !== s.id)
   if (s.archived) {
@@ -189,137 +182,6 @@ function upsertSession(s: SessionInfo) {
   list.push(s)
   list.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt)
   sessions.value = list
-}
-
-async function notify(title: string, body: string) {
-  if (!isTauri || document.hasFocus()) return
-  try {
-    const n = await import("@tauri-apps/plugin-notification")
-    let granted = await n.isPermissionGranted()
-    if (!granted) granted = (await n.requestPermission()) === "granted"
-    if (granted) n.sendNotification({ title, body })
-  } catch {}
-}
-
-let eventsWired = false
-
-function handleEvents() {
-  if (eventsWired) return
-  eventsWired = true
-  onRevoked(() => {
-    deviceRevoked.value = true
-  })
-  if (isMobileApp) {
-    void onPairedMacChanged((mac) => {
-      if (pairedMac.value?.deviceId === mac.deviceId) pairedMac.value = mac
-      pairedMacs.value = pairedMacs.value.map((m) => (m.deviceId === mac.deviceId ? mac : m))
-    })
-  }
-  onConnection((c) => {
-    const was = connected.value
-    connected.value = c
-    if (c && !was) {
-      refreshSessions().catch(() => {})
-      for (const [id, sig] of details) if (sig.value) loadDetail(id).catch(() => {})
-    }
-  })
-  onServerEvent((e) => {
-    switch (e.type) {
-      case "session_updated":
-        upsertSession(e.session)
-        patchDetail(e.session.id, (d) => ({ ...d, session: e.session }))
-        break
-      case "session_deleted":
-        markSeen(e.id)
-        sessions.value = sessions.value.filter((s) => s.id !== e.id)
-        details.delete(e.id)
-        if (route.value.name === "chat" && route.value.sessionId === e.id) route.value = { name: "home" }
-        break
-      case "message_appended":
-        patchDetail(e.sessionId, (d) =>
-          d.messages.some((m) => m.seq === e.stored.seq) ? d : { ...d, messages: [...d.messages, e.stored] },
-        )
-        break
-      case "messages_reset":
-        if (details.get(e.sessionId)?.value) loadDetail(e.sessionId).catch(() => {})
-        break
-      case "stream":
-        patchDetail(e.sessionId, (d) => ({ ...d, streaming: e.message }))
-        break
-      case "tool_start":
-        patchDetail(e.sessionId, (d) => ({
-          ...d,
-          runningTools: { ...d.runningTools, [e.toolCallId]: { toolName: e.toolName, args: e.args, partial: null, startedAt: Date.now() } },
-        }))
-        break
-      case "tool_update":
-        patchDetail(e.sessionId, (d) => {
-          const cur = d.runningTools[e.toolCallId]
-          if (!cur) return d
-          return { ...d, runningTools: { ...d.runningTools, [e.toolCallId]: { ...cur, partial: e.partial } } }
-        })
-        break
-      case "tool_end":
-        patchDetail(e.sessionId, (d) => {
-          const next = { ...d.runningTools }
-          delete next[e.toolCallId]
-          return { ...d, runningTools: next }
-        })
-        break
-      case "queue":
-        patchDetail(e.sessionId, (d) => ({ ...d, queued: e.queued }))
-        break
-      case "approval_request":
-        patchDetail(e.request.sessionId, (d) => ({ ...d, approvals: [...d.approvals.filter((a) => a.id !== e.request.id), e.request] }))
-        feedback("input")
-        notify(t("notify.approval"), e.request.kind === "bash" ? e.request.detail.slice(0, 120) : e.request.path ?? e.request.toolName)
-        break
-      case "approval_resolved":
-        patchDetail(e.sessionId, (d) => ({ ...d, approvals: d.approvals.filter((a) => a.id !== e.id) }))
-        break
-      case "question_request":
-        patchDetail(e.request.sessionId, (d) => ({ ...d, questions: [...d.questions.filter((q) => q.id !== e.request.id), e.request] }))
-        feedback("input")
-        notify(t("notify.question"), e.request.questions[0]?.prompt.slice(0, 120) ?? "")
-        break
-      case "question_resolved":
-        patchDetail(e.sessionId, (d) => ({ ...d, questions: d.questions.filter((q) => q.id !== e.id) }))
-        break
-      case "compaction":
-        patchDetail(e.sessionId, (d) => ({ ...d, compactions: [...d.compactions, e.compaction] }))
-        break
-      case "compacting":
-        patchDetail(e.sessionId, (d) => ({ ...d, compacting: e.active }))
-        break
-      case "phase":
-        patchDetail(e.sessionId, (d) => ({ ...d, phase: e.phase }))
-        break
-      case "mcp_status":
-        mcpServers.value = e.servers
-        break
-      case "memory_changed":
-        memoryRev.value++
-        break
-      case "models_updated":
-        void refreshProviders()
-        break
-      case "notice":
-        if (e.level === "error") toast.error(e.text)
-        else if (e.level === "warn") toast.warning(e.text)
-        else toast.info(e.text)
-        break
-      case "run_finished":
-        if (!(route.value.name === "chat" && route.value.sessionId === e.sessionId && document.visibilityState === "visible")) {
-          setUnseen(new Set(unseen.value).add(e.sessionId))
-        }
-        feedback(e.ok ? "done" : "error")
-        if (settings.value?.notifyOnFinish) notify(e.ok ? t("notify.done") : t("notify.failed"), e.title)
-        break
-      case "remote_status":
-        remoteStatus.value = e.status
-        break
-    }
-  })
 }
 
 export async function boot() {
@@ -361,7 +223,7 @@ export async function boot() {
 }
 
 /** Forget everything shown for the previous Mac; the next one loads from scratch. */
-function resetForMacChange() {
+export function resetForMacChange() {
   disconnectEvents()
   connected.value = false
   settings.value = null
@@ -379,56 +241,6 @@ function resetForMacChange() {
   route.value = { name: "home" }
   deviceRevoked.value = false
   bootError.value = null
-}
-
-/** Mobile: start using a freshly paired Mac. */
-export function adoptPairedMac(mac: PairedMac) {
-  resetForMacChange()
-  pairedMac.value = mac
-  addingMac.value = false
-  pairedMacs.value = [...pairedMacs.value.filter((m) => m.deviceId !== mac.deviceId), mac]
-  void boot()
-}
-
-/** Mobile: move to another paired Mac without pairing again. */
-let switching = false
-
-export async function switchMac(deviceId: string) {
-  if (switching) return
-  if (deviceId === pairedMac.value?.deviceId && !deviceRevoked.value) {
-    addingMac.value = false
-    return
-  }
-  try {
-    switching = true
-    const previous = pairedMac.value
-    resetForMacChange()
-    let mac: PairedMac
-    try { mac = await selectMac(deviceId) } catch (e) { pairedMac.value = previous; void boot(); throw e }
-    pairedMac.value = mac
-    addingMac.value = false
-    void boot()
-  } catch (e: any) {
-    toast.error(String(e?.message ?? e))
-  } finally { switching = false }
-}
-
-/** Mobile: forget one paired Mac. If it was the one in use, the phone moves to another, or to the pairing screen. */
-export async function forgetPairedMac(deviceId: string) {
-  const wasActive = pairedMac.value?.deviceId === deviceId
-  const left = await forgetMac(deviceId).catch(() => null)
-  if (!left) return
-  pairedMacs.value = left.macs
-  if (!wasActive) return
-  resetForMacChange()
-  pairedMac.value = left.macs.find((m) => m.deviceId === left.active) ?? null
-  if (pairedMac.value) void boot()
-}
-
-/** Mobile: forget the Mac in use. */
-export async function unpairMac() {
-  const id = pairedMac.value?.deviceId
-  if (id) await forgetPairedMac(id)
 }
 
 /** Host-local drafts must never appear on another paired Mac. */

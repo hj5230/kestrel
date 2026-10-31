@@ -1,6 +1,9 @@
+// Talking to the sidecar: RPC and uploads over HTTP on the desktop, or through the native pinned-TLS transport
+// on the phone. The event stream is in events.ts and re-exported here.
 import type { FileAttachment, ServerEvent } from "@shared/protocol"
 import { isMobileApp, isTauri } from "./platform"
 import { connectionGeneration } from "./connection-generation"
+export { onServerEvent, onConnection, onRevoked, connectEvents, disconnectEvents } from "./events"
 
 export { isTauri }
 
@@ -140,7 +143,7 @@ function nativeTransport(): Transport {
   }
 }
 
-const transport = isMobileApp ? nativeTransport() : httpTransport()
+export const transport = isMobileApp ? nativeTransport() : httpTransport()
 
 export async function rpc<T = any>(method: string, params: unknown = {}): Promise<T> {
   const generation = connectionGeneration.capture()
@@ -184,121 +187,3 @@ export async function stageAttachments(sessionId: string, files: StagedFile[]): 
 }
 
 // ---------- event stream ----------
-
-type Listener = (e: ServerEvent) => void
-const listeners = new Set<Listener>()
-const statusListeners = new Set<(connected: boolean) => void>()
-const revokedListeners = new Set<() => void>()
-let close: (() => void) | null = null
-let connecting = false
-let live = false
-let retry = 0
-let retryTimer: ReturnType<typeof setTimeout> | null = null
-let stopped = true
-
-export function onServerEvent(fn: Listener) {
-  listeners.add(fn)
-  return () => listeners.delete(fn)
-}
-
-export function onConnection(fn: (connected: boolean) => void) {
-  statusListeners.add(fn)
-  return () => statusListeners.delete(fn)
-}
-
-/** The backend refused this device (mobile: pairing revoked on the Mac). Reconnecting stops. */
-export function onRevoked(fn: () => void) {
-  revokedListeners.add(fn)
-  return () => revokedListeners.delete(fn)
-}
-
-function setLive(next: boolean) {
-  if (live === next) return
-  live = next
-  statusListeners.forEach((fn) => fn(next))
-}
-
-function scheduleReconnect(delay = Math.min(5000, 300 * 2 ** retry++)) {
-  if (stopped) return
-  if (retryTimer) clearTimeout(retryTimer)
-  retryTimer = setTimeout(() => {
-    retryTimer = null
-    void open()
-  }, delay)
-}
-
-async function open() {
-  if (stopped || connecting || live) return
-  connecting = true
-  const generation = connectionGeneration.capture()
-  try {
-    const opened = await transport.openEvents(
-      (e) => { if (connectionGeneration.current(generation)) listeners.forEach((fn) => fn(e)) },
-      (code) => {
-        if (!connectionGeneration.current(generation)) return
-        close = null
-        setLive(false)
-        if (code === REVOKED_CLOSE_CODE) {
-          stopped = true
-          revokedListeners.forEach((fn) => fn())
-          return
-        }
-        scheduleReconnect()
-      },
-    )
-    if (!connectionGeneration.current(generation) || stopped) { opened(); return }
-    close = opened
-    retry = 0
-    setLive(true)
-  } catch (e) {
-    if (!connectionGeneration.current(generation)) return
-    if (String(e).includes("unauthorized")) {
-      stopped = true
-      revokedListeners.forEach((fn) => fn())
-    } else {
-      scheduleReconnect()
-    }
-  } finally {
-    if (connectionGeneration.current(generation)) connecting = false
-  }
-}
-
-export function connectEvents() {
-  stopped = false
-  retry = 0
-  void open()
-}
-
-export function disconnectEvents() {
-  connectionGeneration.invalidate()
-  connecting = false
-  stopped = true
-  if (retryTimer) clearTimeout(retryTimer)
-  retryTimer = null
-  close?.()
-  close = null
-  setLive(false)
-}
-
-// Coming back to the foreground (a phone unlocking, a laptop waking) should not wait out the
-// backoff. After a longer absence the stream may look alive but be dead (iOS kills sockets of
-// suspended apps without telling anyone), so rebuild it; the reconnect also resyncs state.
-const STALE_AFTER_MS = 10_000
-let hiddenAt = 0
-if (typeof document !== "undefined") {
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") {
-      hiddenAt = Date.now()
-      return
-    }
-    if (stopped) return
-    if (live && Date.now() - hiddenAt > STALE_AFTER_MS) {
-      close?.()
-      close = null
-      setLive(false)
-    }
-    if (live) return
-    retry = 0
-    scheduleReconnect(0)
-  })
-}
