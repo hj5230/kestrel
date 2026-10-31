@@ -1,33 +1,18 @@
 import type { ComponentChildren } from "preact"
 import { useLayoutEffect, useRef, useState } from "preact/hooks"
-import {
-  BrainIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
-  CopyIcon,
-  FileIcon,
-  GitBranchIcon,
-  GitMergeIcon,
-  InfoIcon,
-  PencilIcon,
-  RotateCcwIcon,
-  ShrinkIcon,
-  TriangleAlertIcon,
-  CheckIcon,
-} from "lucide-react"
-import type { AssistantMsg, CompactionInfo, StoredMessage, UserMsg } from "@shared/protocol"
+import { BrainIcon, ChevronDownIcon, ChevronRightIcon, CopyIcon, FileIcon, GitBranchIcon, PencilIcon, RotateCcwIcon, TriangleAlertIcon, CheckIcon } from "lucide-react"
+import type { StoredMessage, UserMsg } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Markdown } from "./markdown"
-import { Panel } from "./pickers"
-import { formatCost, formatTokens, clockTime } from "@/lib/format"
-import { findModel, providerName } from "@/lib/store"
+import { clockTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import { locale, t, type MessageKey } from "@/lib/i18n"
+import { t } from "@/lib/i18n"
+export { AssistantMeta, type TurnStats, type ReplyMeta } from "./reply-meta"
+export { MergeNote, CompactionDivider } from "./dividers"
 
-function CopyButton({ text }: { text: string }) {
+export function CopyButton({ text }: { text: string }) {
   const [done, setDone] = useState(false)
   return (
     <Tooltip>
@@ -213,187 +198,6 @@ export function Thinking({ text, streaming, defaultOpen = false }: { text: strin
         <div className="mt-1 ml-1.5 border-l-2 pl-4 text-[13px] leading-relaxed whitespace-pre-wrap text-muted-foreground select-text">{text}</div>
       </CollapsibleContent>
     </Collapsible>
-  )
-}
-
-/** Totals for everything the agent did between the user's message and this reply. */
-export interface TurnStats {
-  calls: number
-  tools: number
-  input: number
-  output: number
-  cacheRead: number
-  cacheWrite: number
-  cost: number
-}
-
-export interface ReplyMeta {
-  msg: AssistantMsg
-  seq: number
-  turn: TurnStats
-}
-
-export function AssistantMeta({ meta, hover, onFork }: { meta: ReplyMeta; hover?: boolean; onFork?: (seq: number) => void }) {
-  const [open, setOpen] = useState(false)
-  const text = meta.msg.content
-    .filter((c) => c.type === "text")
-    .map((c: any) => c.text)
-    .join("\n\n")
-  return (
-    <div className={cn("mt-1 flex items-center gap-0.5", hover && !open && "opacity-0 transition-opacity group-hover/assistant:opacity-100 pointer-coarse:opacity-100")}>
-      <CopyButton text={text} />
-      {onFork && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-xs" aria-label={t("msg.fork")} onClick={() => onFork(meta.seq)}>
-              <GitBranchIcon />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t("msg.fork")}</TooltipContent>
-        </Tooltip>
-      )}
-      <Panel
-        open={open}
-        onOpenChange={setOpen}
-        popoverClassName="w-80 p-0"
-        sheetClassName="p-0 pb-[max(0.5rem,var(--inset-bottom))]"
-        trigger={
-          <Button variant="ghost" size="icon-xs" aria-label={t("meta.details")} title={t("meta.details")}>
-            <InfoIcon />
-          </Button>
-        }
-      >
-        <ReplyDetails meta={meta} />
-      </Panel>
-      <span className="ml-1 text-[11px] text-muted-foreground tabular-nums">{clockTime(meta.msg.timestamp)}</span>
-    </div>
-  )
-}
-
-function Stat({ label, value, sub, swatch, strong }: { label: string; value: string; sub?: string; swatch?: string; strong?: boolean }) {
-  return (
-    <div className={cn("flex items-baseline gap-2 py-0.5", strong && "font-medium text-foreground")}>
-      {swatch && <span className="size-2 shrink-0 translate-y-[-1px] rounded-[2px]" style={{ background: swatch }} />}
-      <span className={cn("min-w-0 flex-1 truncate", !strong && "text-muted-foreground")}>{label}</span>
-      {sub && <span className="text-xs text-muted-foreground tabular-nums">{sub}</span>}
-      <span className="tabular-nums">{value}</span>
-    </div>
-  )
-}
-
-/** The reply's model, tokens by kind with what each cost, and, when the agent took several steps, the turn's totals. */
-function ReplyDetails({ meta }: { meta: ReplyMeta }) {
-  const { msg, turn } = meta
-  const u = msg.usage
-  const name = findModel(msg.provider, msg.model)?.name ?? msg.model
-  const parts = [
-    { key: "input", value: u.input, cost: u.cost.input, color: "var(--ctx-1)" },
-    { key: "cacheRead", value: u.cacheRead, cost: u.cost.cacheRead, color: "var(--ctx-3)" },
-    { key: "cacheWrite", value: u.cacheWrite, cost: u.cost.cacheWrite, color: "var(--ctx-4)" },
-    { key: "output", value: u.output, cost: u.cost.output, color: "var(--ctx-2)" },
-  ].filter((p) => p.value > 0)
-  const total = parts.reduce((n, p) => n + p.value, 0)
-  const prompt = u.input + u.cacheRead + u.cacheWrite
-  const money = (n: number) => (n > 0 ? formatCost(n) : undefined)
-  const turnTokens = turn.input + turn.output + turn.cacheRead + turn.cacheWrite
-  return (
-    <div className="grid gap-3 p-3 text-sm pointer-coarse:p-4 pointer-coarse:text-base">
-      <div className="min-w-0">
-        <div className="truncate font-medium">{name}</div>
-        <div className="truncate text-xs text-muted-foreground">
-          {providerName(msg.provider)} · {new Date(msg.timestamp).toLocaleString(locale(), { dateStyle: "medium", timeStyle: "short" })}
-        </div>
-        {msg.stopReason === "length" && <div className="mt-1 text-xs text-warning">{t("meta.truncated")}</div>}
-      </div>
-      {total > 0 && (
-        <div className="grid gap-1.5">
-          <div className="text-xs font-medium text-muted-foreground">{t("meta.thisReply")}</div>
-          <div className="flex h-1.5 gap-[2px] overflow-hidden rounded-full" aria-hidden="true">
-            {parts.map((p) => (
-              <div key={p.key} style={{ flexGrow: p.value, background: p.color }} />
-            ))}
-          </div>
-          <div className="grid text-[13px] pointer-coarse:text-sm">
-            {parts.map((p) => (
-              <Stat
-                key={p.key}
-                swatch={p.color}
-                label={t(`meta.${p.key}` as MessageKey)}
-                sub={p.key === "cacheRead" && prompt ? t("meta.hitRate", { n: Math.round((u.cacheRead / prompt) * 100) }) : money(p.cost)}
-                value={formatTokens(p.value)}
-              />
-            ))}
-            <div className="mt-1 border-t pt-1">
-              <Stat strong label={t("meta.total")} sub={formatTokens(total)} value={formatCost(u.cost.total)} />
-            </div>
-          </div>
-        </div>
-      )}
-      {turn.calls > 1 && (
-        <div className="grid gap-1 border-t pt-3">
-          <div className="text-xs font-medium text-muted-foreground">{t("meta.wholeTurn")}</div>
-          <div className="grid text-[13px] pointer-coarse:text-sm">
-            <Stat label={t("meta.modelCalls")} value={String(turn.calls)} />
-            <Stat label={t("meta.toolCalls")} value={String(turn.tools)} />
-            <Stat label={t("meta.tokens")} value={formatTokens(turnTokens)} />
-            <Stat strong label={t("meta.total")} value={formatCost(turn.cost)} />
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/** A session merged into this one: one quiet line in the transcript, the summary the model received on click. */
-export function MergeNote({ merge }: { merge: NonNullable<UserMsg["merge"]> }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="py-2">
-      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-        <div className="h-px flex-1 bg-border" />
-        <button type="button" onClick={() => setOpen(true)} className="flex min-w-0 items-center gap-1.5 rounded-full border px-3 py-1 hover:bg-muted pointer-coarse:min-h-9">
-          <GitMergeIcon className="size-3 shrink-0" />
-          <span className="truncate">{t("msg.merged", { title: merge.title, n: merge.messages })}</span>
-        </button>
-        <div className="h-px flex-1 bg-border" />
-      </div>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{t("msg.mergedTitle", { title: merge.title })}</DialogTitle>
-          </DialogHeader>
-          <div className="max-h-[65vh] overflow-y-auto pr-2">
-            <Markdown text={merge.summary} />
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
-}
-
-export function CompactionDivider({ c }: { c: CompactionInfo }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="py-2">
-      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-        <div className="h-px flex-1 bg-border" />
-        <button type="button" onClick={() => setOpen(true)} className="flex items-center gap-1.5 rounded-full border px-3 py-1 hover:bg-muted pointer-coarse:min-h-9">
-          <ShrinkIcon className="size-3" />
-          {c.auto ? t("msg.autoCompacted") : t("msg.compacted")} · {t("msg.compactedFrom", { n: formatTokens(c.tokensBefore) })}
-        </button>
-        <div className="h-px flex-1 bg-border" />
-      </div>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{t("msg.summary")}</DialogTitle>
-          </DialogHeader>
-          <div className="max-h-[65vh] overflow-y-auto pr-2">
-            <Markdown text={c.summary} />
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
   )
 }
 
