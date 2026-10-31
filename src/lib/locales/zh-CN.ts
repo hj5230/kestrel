@@ -82,8 +82,11 @@ export const zhCN: Record<MessageKey, string> = {
   "time.last30": "近 30 天",
   "time.older": "更早",
 
-  "home.headline": "想让 Kestrel 做点什么？",
-  "home.sub": "在你的目录里工作，每一步都可审阅。",
+  "home.greet.any": "继续吧|Kestrel 在这儿|今天做点什么？|准备好了就开始|接着上次的来|一次做好一件事|做点好东西",
+  "home.greet.morning": "早上好|早，先做哪件？|新的一天",
+  "home.greet.afternoon": "下午好|下午了，还在忙？|午饭吃了吗？",
+  "home.greet.evening": "晚上好|晚间时段|收工，还是刚开始？",
+  "home.greet.night": "这么晚还在忙？|夜深了，正好专注|安静的时候最好干活",
   "home.noModels": "还没有可用的模型",
   "home.noModelsDesc": "添加 Anthropic、OpenAI、Gemini、DeepSeek、OpenRouter、Ollama 或任意 OpenAI 兼容的服务后即可开始。",
   "home.addProvider": "添加模型供应商",

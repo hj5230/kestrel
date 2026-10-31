@@ -8,7 +8,29 @@ import { ModelControl, PermissionPicker } from "@/components/chat/pickers"
 import { rpc, stageAttachments, type StagedFile } from "@/lib/api"
 import { shortPath } from "@/lib/format"
 import { appInfo, draftKeyForHost, enabledModels, findModel, openSession, route, settings } from "@/lib/store"
-import { t } from "@/lib/i18n"
+import { t, type MessageKey } from "@/lib/i18n"
+
+/** A line that changes each visit, leaning on the time of day half the time. */
+function pickGreeting(): string {
+  const h = new Date().getHours()
+  const part = h >= 5 && h < 12 ? "morning" : h < 18 && h >= 12 ? "afternoon" : h >= 18 && h < 23 ? "evening" : "night"
+  const pool = t(Math.random() < 0.5 ? (`home.greet.${part}` as MessageKey) : "home.greet.any").split("|")
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
+function Greeting() {
+  const [text] = useState(pickGreeting)
+  // Letters settle in one after another; the heading itself carries the text for screen readers.
+  return (
+    <h1 aria-label={text} className="text-2xl font-semibold tracking-tight">
+      {[...text].map((ch, i) => (
+        <span key={i} aria-hidden="true" className="greet-char" style={{ animationDelay: `${Math.min(i * 22, 600)}ms` }}>
+          {ch}
+        </span>
+      ))}
+    </h1>
+  )
+}
 
 export function HomeView() {
   const s = settings.value!
@@ -49,8 +71,7 @@ export function HomeView() {
     <div className="flex h-full flex-col">
       <PageHeader bordered={false} />
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-y-auto px-6 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("home.headline")}</h1>
-        <p className="text-sm text-muted-foreground">{t("home.sub")}</p>
+        <Greeting />
         {noModels && (
           <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-dashed p-8 text-center">
             <KeyRoundIcon className="size-6 text-muted-foreground" />

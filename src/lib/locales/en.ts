@@ -80,8 +80,11 @@ export const en = {
   "time.last30": "Previous 30 days",
   "time.older": "Older",
 
-  "home.headline": "What should Kestrel do?",
-  "home.sub": "Works in your folders. Every step is reviewable.",
+  "home.greet.any": "Back at it|Kestrel is here for you|What are we building?|Ready when you are|Pick up where you left off|One thing at a time|Let's make something good",
+  "home.greet.morning": "Good morning|Morning. What's first?|Fresh start",
+  "home.greet.afternoon": "Good afternoon|Afternoon. Still going?|Back from lunch?",
+  "home.greet.evening": "Good evening|Evening session|Winding down, or just starting?",
+  "home.greet.night": "Working late?|Burning the midnight oil|Quiet hours, good focus",
   "home.noModels": "No models available yet",
   "home.noModelsDesc": "Add Anthropic, OpenAI, Gemini, DeepSeek, OpenRouter, Ollama or any OpenAI-compatible service to get started.",
   "home.addProvider": "Add a model provider",
