@@ -9,3 +9,4 @@ src-tauri/binaries/
 .claude/worktrees/
 .claude/launch.json
 .claude/mock-model.ts
+.claude/logo-options/
