@@ -89,18 +89,9 @@ html, body, #root {
 /* Safe-area insets go through these variables so the device preview (lib/device-preview.ts) can set them
    in a desktop browser, where env() is always 0. --safe-bottom is the bottom inset for content above the
    home indicator, dropped while the keyboard covers it; --kb is the keyboard's height over the page
-   (lib/viewport.ts). Both are registered so they can be transitioned. */
-@property --kb {
-    syntax: "<length>";
-    inherits: true;
-    initial-value: 0px;
-}
-@property --safe-bottom {
-    syntax: "<length>";
-    inherits: true;
-    initial-value: 0px;
-}
+   (lib/viewport.ts). */
 :root {
+    --kb: 0px;
     --inset-top: env(safe-area-inset-top);
     --inset-bottom: env(safe-area-inset-bottom);
     --inset-left: env(safe-area-inset-left);
@@ -115,12 +106,12 @@ html.keyboard-open {
 html.mobile-app {
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
-    /* What is visible above the keyboard. Follows the keyboard over its own duration with an ease close to
-       its curve, so the composer at the bottom rides up with it. */
+    /* What is visible above the keyboard. Changes in one step; the dock's own animation covers it. */
     --app-height: calc(100dvh - var(--kb));
-    transition:
-        --kb var(--kb-duration, 0.25s) cubic-bezier(0.25, 0.8, 0.25, 1),
-        --safe-bottom var(--kb-duration, 0.25s) cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+/* The composer slides over the conversation's bottom edge while the keyboard moves, so it needs a backdrop. */
+html.mobile-app [data-keyboard-dock] {
+    background: var(--background);
 }
 html.mobile-app,
 html.mobile-app body {

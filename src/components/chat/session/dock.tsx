@@ -36,7 +36,7 @@ export function ChatDock({
   const s = d.session
   const running = s.status === "running" || s.status === "waiting"
   return (
-    <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-[max(0px,calc(var(--safe-bottom)-1.25rem))] md:px-6">
+    <div data-keyboard-dock className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-[max(0px,calc(var(--safe-bottom)-1.25rem))] md:px-6">
       <div className="flex flex-col gap-2">
         {d.approvals.map((a) => (
           <ApprovalCard key={a.id} req={a} />
