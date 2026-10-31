@@ -7,6 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { clockTime } from "@/lib/format"
+import { isTouch } from "@/lib/platform"
 import { cn } from "@/lib/utils"
 import { t } from "@/lib/i18n"
 export { AssistantMeta, type TurnStats, type ReplyMeta } from "./reply-meta"
@@ -113,6 +114,8 @@ export function UserMessage({
   const images = userImages(m)
   const isCommand = !!(m as any).display
   const [preview, setPreview] = useState<string | null>(null)
+  // A finger has no hover: on touch screens the actions stay folded away until the bubble is tapped.
+  const [shown, setShown] = useState(false)
   return (
     <div className="group/user flex flex-col items-end gap-1">
       {images.length > 0 && (
@@ -139,6 +142,7 @@ export function UserMessage({
       )}
       {text && (
         <div
+          onClick={isTouch ? () => setShown(!shown) : undefined}
           className={cn(
             "max-w-[85%] rounded-2xl bg-muted px-4 py-2.5 text-[0.875rem] leading-relaxed whitespace-pre-wrap break-words select-text",
             isCommand && "font-mono text-[13px]",
@@ -147,8 +151,11 @@ export function UserMessage({
           <Foldable>{text}</Foldable>
         </div>
       )}
-      <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/user:opacity-100 pointer-coarse:opacity-100">
-        <span className="mr-1 text-[11px] text-muted-foreground">{clockTime(m.timestamp)}</span>
+      <div
+        data-msg-actions
+        className={cn("-mr-1.5 flex items-center gap-0.5 text-muted-foreground opacity-0 transition-opacity group-hover/user:opacity-100 pointer-coarse:opacity-100", "pointer-coarse:-mr-[9px]", !shown && "pointer-coarse:hidden")}
+      >
+        <span className="mr-1 text-[11px]">{clockTime(m.timestamp)}</span>
         <CopyButton text={text} />
         {canEdit && (
           <Tooltip>

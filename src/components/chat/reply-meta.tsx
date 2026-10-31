@@ -36,7 +36,7 @@ export function AssistantMeta({ meta, hover, onFork }: { meta: ReplyMeta; hover?
     .map((c: any) => c.text)
     .join("\n\n")
   return (
-    <div className={cn("mt-1 flex items-center gap-0.5", hover && !open && "opacity-0 transition-opacity group-hover/assistant:opacity-100 pointer-coarse:opacity-100")}>
+    <div data-msg-actions className={cn("mt-1 -ml-1.5 flex items-center gap-0.5 text-muted-foreground pointer-coarse:-ml-[9px]", hover && !open && "opacity-0 transition-opacity group-hover/assistant:opacity-100 pointer-coarse:opacity-100")}>
       <CopyButton text={text} />
       {onFork && (
         <Tooltip>
@@ -61,7 +61,7 @@ export function AssistantMeta({ meta, hover, onFork }: { meta: ReplyMeta; hover?
       >
         <ReplyDetails meta={meta} />
       </Panel>
-      <span className="ml-1 text-[11px] text-muted-foreground tabular-nums">{clockTime(meta.msg.timestamp)}</span>
+      <span className="ml-1 text-[11px] tabular-nums">{clockTime(meta.msg.timestamp)}</span>
     </div>
   )
 }

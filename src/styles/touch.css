@@ -32,6 +32,17 @@
     height: 18px;
   }
 
+  /* Message actions are a quiet row of small glyphs, as in Claude's apps, not compact chrome: their
+     row sits apart from everything else, so a smaller target is still easy to hit. */
+  [data-msg-actions] .group\/button {
+    min-width: 34px;
+    min-height: 36px;
+  }
+  [data-msg-actions] .group\/button svg:not([class*="size-"]) {
+    width: 16px;
+    height: 16px;
+  }
+
   /* ---------- fields ---------- */
   [data-slot="input"],
   [data-slot="select-trigger"] {

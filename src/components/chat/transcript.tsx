@@ -82,7 +82,11 @@ export function Transcript({
         )
         break
       case "meta":
-        el = <AssistantMeta meta={row.meta} onFork={readOnly ? undefined : onFork} />
+        el = (
+          <div className="group/assistant">
+            <AssistantMeta meta={row.meta} hover onFork={readOnly ? undefined : onFork} />
+          </div>
+        )
         break
       case "ask": {
         const pending = d.questions.find((q) => q.toolCallId === row.block.id)
