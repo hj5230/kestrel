@@ -168,6 +168,9 @@ const MIGRATIONS: string[] = [
    WHERE kind = 'kiro';`,
   `ALTER TABLE models ADD COLUMN metadata_source TEXT NOT NULL DEFAULT 'catalog';
    ALTER TABLE models ADD COLUMN metadata TEXT;`,
+  `ALTER TABLE sessions ADD COLUMN fork_of TEXT;
+   ALTER TABLE sessions ADD COLUMN fork_seq INTEGER;
+   ALTER TABLE sessions ADD COLUMN merged_into TEXT;`,
 ];
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -448,6 +451,9 @@ const rowToSession = (r: any): SessionInfo => ({
   },
   lastError: r.last_error,
   messageCount: r.message_count ?? 0,
+  forkOf: r.fork_of ?? null,
+  forkSeq: r.fork_seq ?? null,
+  mergedInto: r.merged_into ?? null,
 });
 
 const SESSION_SELECT = `SELECT s.*, (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.id) AS message_count FROM sessions s`;
@@ -466,8 +472,8 @@ export function getSession(id: string): SessionInfo | null {
 
 export function insertSession(s: SessionInfo) {
   db.run(
-    `INSERT INTO sessions (id, title, cwd, provider_id, model_id, thinking, permission_mode, pinned, archived, kind, parent_id, status, todos, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO sessions (id, title, cwd, provider_id, model_id, thinking, permission_mode, pinned, archived, kind, parent_id, status, todos, created_at, updated_at, fork_of, fork_seq)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       s.id,
       s.title,
@@ -484,6 +490,8 @@ export function insertSession(s: SessionInfo) {
       JSON.stringify(s.todos),
       s.createdAt,
       s.updatedAt,
+      s.forkOf,
+      s.forkSeq,
     ],
   );
 }
@@ -499,6 +507,7 @@ const SESSION_COLUMNS: Record<string, string> = {
   archived: "archived",
   status: "status",
   lastError: "last_error",
+  mergedInto: "merged_into",
 };
 
 export function updateSession(id: string, patch: Partial<SessionInfo>, touch = false) {

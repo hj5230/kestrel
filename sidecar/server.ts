@@ -18,6 +18,7 @@ import { sortEfforts } from "../shared/effort";
 import { locksFor, lookupFacts } from "./catalog";
 import { fetchRemoteModels, modelDefaults, PROVIDER_PRESETS } from "./providers";
 import { createSession, exportMarkdown, forkSession, newId } from "./sessions";
+import { mergeSession } from "./merge";
 import { historyStatus, rebuildHistory, setHistorySources, syncHistory } from "./history";
 import { discoverSkills, listSlashCommands } from "./skills";
 import { describeLocalFiles, importLocalFile, removeSessionUploads, storeUpload, UploadError } from "./uploads";
@@ -186,6 +187,12 @@ const handlers: Record<string, Handler> = {
     const s = forkSession(id, seq, appInfo.dataDir);
     emit({ type: "session_updated", session: s });
     return s;
+  },
+  "sessions.merge": async ({ id, into, instructions }) => {
+    const { source, target } = await mergeSession(id, into, instructions?.trim() || undefined);
+    emit({ type: "session_updated", session: source });
+    emit({ type: "session_updated", session: target });
+    return target;
   },
   "sessions.export": ({ id }) => exportMarkdown(id),
   // One stored message per line, as the session's own record (no rendering), for pasting into other tools.

@@ -678,7 +678,9 @@ export class SessionRunner {
   private titlePending = false;
   private maybeTitle(s: SessionInfo) {
     if (s.kind !== "main" || s.title || this.titlePending) return;
-    const firstUser = this.agent.state.messages.find((m: any) => m.role === "user") as any;
+    // A fork is named by the first message sent in it, not by the history it shares with its source.
+    const after = s.forkOf && s.forkSeq !== null ? s.forkSeq : -1;
+    const firstUser = this.agent.state.messages.find((m: any, i) => i > after && m.role === "user" && !m.merge) as any;
     if (!firstUser) return;
     const text: string =
       firstUser.display ??
@@ -874,6 +876,15 @@ export class SessionRunner {
     this.loadCompaction();
     emit({ type: "messages_reset", sessionId: this.id });
     await this.send(text, images, files);
+  }
+
+  /** Adds a message that is not a turn (a merge note): stored, in the model's context, no run started. */
+  appendNote(msg: ChatMessage) {
+    if (this.busy) throw new Error(st("sessionBusy"));
+    const stored = store.appendMessage(this.id, msg);
+    this.agent.state.messages = [...this.agent.state.messages, msg as AgentMessage];
+    emit({ type: "message_appended", sessionId: this.id, stored });
+    this.emitSession();
   }
 
   async manualCompact(instructions?: string) {

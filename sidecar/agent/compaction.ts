@@ -111,6 +111,16 @@ Include these sections:
 
 Be specific (exact names, numbers, paths). Do not invent anything. Output only the summary.`;
 
+export const MERGE_PROMPT = `You are merging a side conversation between a user and an AI agent back into another conversation. Write a concise, structured account of the side conversation so the agent in the other conversation can build on it. Use the same language as the conversation.
+
+Include these sections, skipping any that would be empty:
+1. Goal — what the side conversation set out to do.
+2. What was done — files created or modified (paths and what changed), commands that matter.
+3. Findings and decisions — what was learned, chosen or ruled out, and why.
+4. Open ends — unfinished work, open questions, known problems.
+
+Be specific (exact names, numbers, paths). Do not invent anything. Output only the account.`;
+
 export async function summarize(opts: {
   providerId: string;
   modelId: string;
@@ -119,6 +129,8 @@ export async function summarize(opts: {
   messages: AgentMessage[];
   instructions?: string;
   signal?: AbortSignal;
+  /** Replaces the compaction prompt, e.g. to describe a branch being merged back. */
+  system?: string;
 }): Promise<{ summary: string; usage: { input: number; output: number; cacheRead: number; cacheWrite: number } }> {
   const maxChars = Math.max(20000, Math.floor(opts.contextWindow * 2.2));
   const transcript = serialize(opts.messages, maxChars);
@@ -130,7 +142,7 @@ export async function summarize(opts: {
   ].join("\n");
   const res = await generateText({
     model: languageModel(opts.providerId, opts.modelId),
-    system: SUMMARY_PROMPT,
+    system: opts.system ?? SUMMARY_PROMPT,
     prompt,
     abortSignal: opts.signal,
     maxRetries: 2,

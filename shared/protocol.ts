@@ -120,6 +120,11 @@ export interface SessionInfo {
   usage: SessionUsage;
   lastError: string | null;
   messageCount: number;
+  /** The session this one was forked from, and the last message it shares with it. */
+  forkOf: string | null;
+  forkSeq: number | null;
+  /** Set on a session merged into another; it is archived, not deleted. */
+  mergedInto: string | null;
 }
 
 export interface TextBlock {
@@ -166,6 +171,8 @@ export interface UserMsg {
   content: string | (TextBlock | ImageBlock)[];
   files?: FileAttachment[];
   display?: string;
+  /** A note added by merging another session into this one; the content is the note the model reads. */
+  merge?: { sessionId: string; title: string; messages: number; summary: string };
   timestamp: number;
 }
 export interface AssistantMsg {

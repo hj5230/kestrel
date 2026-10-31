@@ -48,6 +48,9 @@ export function createSession(input: Partial<SessionInfo> = {}): SessionInfo {
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0 },
     lastError: null,
     messageCount: 0,
+    forkOf: input.forkOf ?? null,
+    forkSeq: input.forkSeq ?? null,
+    mergedInto: null,
   };
   store.insertSession(info);
   return store.getSession(info.id)!;
@@ -62,7 +65,10 @@ export function forkSession(sourceId: string, uptoSeq: number, dataDir?: string)
     modelId: src.modelId,
     thinking: src.thinking,
     permissionMode: src.permissionMode,
-    title: `${src.title || st("untitled")}${st("forkSuffix")}`,
+    // Untitled until the first message sent in the fork names it; it is listed under its source meanwhile.
+    title: "",
+    forkOf: sourceId,
+    forkSeq: uptoSeq,
   });
   store.copyMessages(sourceId, info.id, uptoSeq);
   if (dataDir) {
