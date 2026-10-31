@@ -7,6 +7,7 @@ import { CommandPalette } from "@/components/command-palette"
 import { BootScreen } from "@/components/boot-screen"
 import { PairScreen } from "@/components/pair-screen"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { IslandKestrel } from "@/components/island-kestrel"
 import { ChatView } from "@/components/chat/chat-view"
 import { HomeView } from "@/pages/home"
 import { UsagePage } from "@/pages/usage"
@@ -62,6 +63,7 @@ export default function App() {
       <ErrorBoundary compact resetKey={paletteOpen.value}>
         <CommandPalette />
       </ErrorBoundary>
+      {isPhoneShell && <IslandKestrel />}
       {/* Sonner's top offset ignores the notch and Dynamic Island; start below the safe area on the phone. */}
       <Toaster
         theme={dark ? "dark" : "light"}

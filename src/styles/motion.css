@@ -23,6 +23,27 @@
 @keyframes kestrel-beat { from { transform: rotate(16deg) scaleY(0.7); } to { transform: rotate(-14deg); } }
 @keyframes kestrel-beat-r { from { transform: rotate(-16deg) scaleY(0.7); } to { transform: rotate(14deg); } }
 @media (prefers-reduced-motion: reduce) { .kestrel-mark .kestrel-wing { animation: none; } }
+/* IslandKestrel: drops out from under the Dynamic Island, hovers with a slow bob, and slips back under. */
+.island-kestrel {
+    position: fixed;
+    z-index: 60;
+    top: calc(var(--inset-top) - 15px);
+    left: 50%;
+    pointer-events: none;
+    color: #c8743f;
+    transform-origin: 50% 0;
+    transform: translateX(-50%);
+}
+.island-kestrel.is-out { animation: island-out 0.7s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+.island-kestrel.is-out > svg { animation: island-bob 2.4s ease-in-out 0.7s infinite; }
+.island-kestrel.is-back { animation: island-back 0.6s cubic-bezier(0.5, 0, 0.8, 0.4) both; }
+@keyframes island-out { from { opacity: 0; transform: translate(-50%, -12px) scale(0.5); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes island-back { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -12px) scale(0.5); } }
+@keyframes island-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(1.5px); } }
+@media (prefers-reduced-motion: reduce) {
+    .island-kestrel.is-out, .island-kestrel.is-back, .island-kestrel.is-out > svg { animation: none; }
+    .island-kestrel.is-back { visibility: hidden; }
+}
 @keyframes breathe { 0%, 100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.15); } }
 @utility animate-breathe { animation: breathe 1.8s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .animate-breathe { animation: none; } }
