@@ -1,6 +1,6 @@
 // The header's two menus: the session's "…" menu and the working-folder menu.
 import { toast } from "sonner"
-import { ArchiveIcon, ClipboardCopyIcon, EyeIcon, FolderInputIcon, FolderOpenIcon, GitBranchIcon, GitMergeIcon, PencilIcon, ShrinkIcon, Trash2Icon } from "lucide-react"
+import { ArchiveIcon, ClipboardCopyIcon, EyeIcon, FolderInputIcon, FolderOpenIcon, GitBranchIcon, GitMergeIcon, PencilIcon, SplitIcon, ShrinkIcon, Trash2Icon } from "lucide-react"
 import type { SessionInfo, TranscriptView } from "@shared/protocol"
 import type { MenuNode } from "@/components/action-menu"
 import { rpc } from "@/lib/api"
@@ -43,6 +43,7 @@ export function sessionMenu(
       ],
     },
     ...(forkSource ? [{ kind: "item" as const, label: t("sidebar.mergeToMain"), icon: GitMergeIcon, onSelect: () => opts.merge(forkSource), disabled: running }] : []),
+    ...(s.forkOf ? [{ kind: "item" as const, label: t("sidebar.detach"), icon: SplitIcon, onSelect: actions.detach }] : []),
     { kind: "item", label: t("sidebar.mergeInto"), icon: GitMergeIcon, onSelect: () => opts.merge(null), disabled: running },
     { kind: "item", label: t("sidebar.archive"), icon: ArchiveIcon, onSelect: actions.archive },
     { kind: "separator" },

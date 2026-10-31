@@ -48,6 +48,13 @@ export const sessionHandlers: Record<string, Handler> = {
     emit({ type: "session_updated", session: s });
     return s;
   },
+  // A fork stands on its own: it leaves its source's tree and merges back like any other session.
+  "sessions.detach": ({ id }) => {
+    store.updateSession(id, { forkOf: null });
+    const s = store.getSession(id)!;
+    emit({ type: "session_updated", session: s });
+    return s;
+  },
   "sessions.merge": async ({ id, into, instructions }) => {
     const { source, target } = await mergeSession(id, into, instructions?.trim() || undefined);
     emit({ type: "session_updated", session: source });

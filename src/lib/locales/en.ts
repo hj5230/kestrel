@@ -63,6 +63,8 @@ export const en = {
   "sidebar.branch": "New branch",
   "sidebar.mergeToMain": "Merge into main",
   "sidebar.mergeInto": "Merge into…",
+  "sidebar.detach": "Detach",
+  "sidebar.detached": "Now a session of its own",
   "dialog.mergedInto": "Merged into “{title}”",
   "sidebar.archivedToast": "Session archived",
 

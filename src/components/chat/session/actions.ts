@@ -19,6 +19,11 @@ export function sessionActions(s: SessionInfo, lastSeq: number) {
     openSession(n.id)
     toast.success(t("chat.forked"))
   }
+  const detach = () =>
+    rpc("sessions.detach", { id: s.id }).then(
+      () => toast.success(t("sidebar.detached")),
+      (e) => toast.error(e.message),
+    )
   const compact = (instructions?: string) =>
     rpc("chat.compact", { sessionId: s.id, instructions }).then(
       () => toast.success(t("chat.compacted")),
@@ -59,7 +64,7 @@ export function sessionActions(s: SessionInfo, lastSeq: number) {
     return false
   }
 
-  return { update, fork, compact, archive, builtin }
+  return { update, fork, detach, compact, archive, builtin }
 }
 
 export type SessionActions = ReturnType<typeof sessionActions>

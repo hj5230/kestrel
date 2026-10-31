@@ -91,3 +91,15 @@ test("nothing new, or merging into itself, is refused and changes nothing", asyn
   expect(store.getSession(fork.id)!.archived).toBe(false);
   expect(store.loadMessages(main.id)).toHaveLength(2);
 });
+
+test("a detached fork leaves its source's tree and merges back as a whole session", async () => {
+  const main = session(user("shared question"), reply("shared answer"));
+  const fork = forkSession(main.id, 1);
+  store.appendMessage(fork.id, user("branch work"));
+  store.updateSession(fork.id, { forkOf: null });
+  expect(store.getSession(fork.id)!.forkOf).toBeNull();
+
+  prompts.length = 0;
+  await mergeSession(fork.id, main.id);
+  expect(prompts[0]).toContain("shared question");
+});

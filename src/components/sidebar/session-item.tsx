@@ -1,7 +1,7 @@
 // One row of the session list: its title (faded, not cut, when long), the status dot where the menu button
 // sits, the row menu, and for forks the branch line under their source.
 import { useEffect, useRef, useState } from "preact/hooks"
-import { ArchiveIcon, ChevronDownIcon, CircleAlertIcon, DownloadIcon, FolderOpenIcon, GitMergeIcon, MoreHorizontalIcon, PencilIcon, PinIcon, PinOffIcon, Trash2Icon } from "lucide-react"
+import { ArchiveIcon, ChevronDownIcon, CircleAlertIcon, DownloadIcon, FolderOpenIcon, GitMergeIcon, MoreHorizontalIcon, PencilIcon, PinIcon, PinOffIcon, SplitIcon, Trash2Icon } from "lucide-react"
 import type { SessionInfo } from "@shared/protocol"
 import { SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -155,6 +155,12 @@ export function SessionItem({
             <DropdownMenuItem onSelect={() => onMerge(parent)}>
               <GitMergeIcon />
               {t("sidebar.mergeToMain")}
+            </DropdownMenuItem>
+          )}
+          {s.forkOf && (
+            <DropdownMenuItem onSelect={() => rpc("sessions.detach", { id: s.id }).then(() => toast.success(t("sidebar.detached")), (e) => toast.error(e.message))}>
+              <SplitIcon />
+              {t("sidebar.detach")}
             </DropdownMenuItem>
           )}
           <DropdownMenuItem onSelect={() => onMerge(null)}>

@@ -85,6 +85,7 @@ export const SESSION_COLUMNS: Record<string, string> = {
   status: "status",
   lastError: "last_error",
   mergedInto: "merged_into",
+  forkOf: "fork_of",
 };
 
 export function updateSession(id: string, patch: Partial<SessionInfo>, touch = false) {
