@@ -131,8 +131,10 @@ export function QuestionCard({ req, readOnly }: { req: QuestionRequest; readOnly
 
 /** What was asked and answered, for the transcript once the question is closed. */
 export function QuestionSummary({ details, running }: { details?: AskDetails; running?: boolean }) {
-  if (!details) return null
-  const { questions, answers } = details
+  // Stored records come from older versions and from failed calls too: never assume their shape.
+  const questions = Array.isArray(details?.questions) ? details.questions : []
+  if (!details || !questions.length) return null
+  const answers = Array.isArray(details.answers) ? details.answers : null
   return (
     <div className="rounded-xl border bg-card px-3 py-2">
       <div className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -144,7 +146,7 @@ export function QuestionSummary({ details, running }: { details?: AskDetails; ru
         {questions.map((q) => {
           const a = answers?.find((x) => x.questionId === q.id)
           const parts = [
-            ...(a?.optionIds ?? []).map((id) => q.options.find((o) => o.id === id)?.label).filter((l): l is string => !!l),
+            ...(a?.optionIds ?? []).map((id) => q.options?.find((o) => o.id === id)?.label).filter((l): l is string => !!l),
             ...(a?.other ? [a.other] : []),
           ]
           return (

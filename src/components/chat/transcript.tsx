@@ -384,7 +384,8 @@ export function Transcript({
         const pending = d.questions.find((q) => q.toolCallId === row.block.id)
         const result = results.get(row.block.id)
         if (pending) el = <QuestionCard req={pending} readOnly={readOnly} />
-        else if (result?.details) el = <QuestionSummary details={result.details as AskDetails} />
+        // A call that failed before asking (e.g. it arrived without arguments) has a result with no questions.
+        else if (Array.isArray((result?.details as AskDetails | undefined)?.questions)) el = <QuestionSummary details={result!.details as AskDetails} />
         // Still streaming the call, or it failed before asking: the process row shows those states.
         else el = <ProcessGroup steps={[{ k: "tool", key: row.key, block: row.block, msg: d.streaming ?? ({} as AssistantMsg), streaming: !result }]} rt={rt} waiting={false} expandable={view !== "answer"} />
         break
