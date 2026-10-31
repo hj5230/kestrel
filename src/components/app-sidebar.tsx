@@ -46,6 +46,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Kbd } from "@/components/ui/kbd"
+import { useEdgeSwipe } from "@/hooks/use-edge-swipe"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
 import { RenameDialog, ConfirmDeleteDialog, ArchivedDialog } from "@/components/session-dialogs"
@@ -252,7 +253,8 @@ export function AppSidebar() {
   const [archivedOpen, setArchivedOpen] = useState(false)
   const r = route.value
   const activeId = r.name === "chat" ? r.sessionId : null
-  const { setOpenMobile } = useSidebar()
+  const { setOpenMobile, openMobile, isMobile } = useSidebar()
+  useEdgeSwipe(isMobile, openMobile, setOpenMobile)
   // On phones the sidebar is a drawer over the page: get out of the way once something is picked.
   useEffect(() => setOpenMobile(false), [JSON.stringify(r)])
   const list = sessions.value
