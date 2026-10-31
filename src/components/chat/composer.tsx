@@ -522,7 +522,7 @@ export function Composer({
             <div
               ref={mirror}
               aria-hidden="true"
-              className="md-source pointer-events-none absolute inset-0 overflow-hidden px-4 py-3 text-[0.94rem] leading-relaxed break-words whitespace-pre-wrap"
+              className="md-source pointer-events-none absolute inset-0 overflow-hidden px-4 py-3 pointer-coarse:py-4 text-[0.94rem] leading-relaxed break-words whitespace-pre-wrap"
               dangerouslySetInnerHTML={{ __html: text ? highlightMarkdownSource(text) : "" }}
             />
             <textarea
@@ -530,7 +530,7 @@ export function Composer({
               rows={1}
               value={text}
               placeholder={placeholder ?? t("composer.placeholder")}
-              className="relative block max-h-80 w-full resize-none bg-transparent px-4 py-3 text-[0.94rem] leading-relaxed break-words whitespace-pre-wrap text-transparent caret-foreground outline-none selection:bg-primary/25 selection:text-transparent placeholder:text-muted-foreground/70"
+              className="relative block max-h-80 w-full resize-none bg-transparent px-4 py-3 pointer-coarse:py-4 text-[0.94rem] leading-relaxed break-words whitespace-pre-wrap text-transparent caret-foreground outline-none selection:bg-primary/25 selection:text-transparent placeholder:text-muted-foreground/70"
               onScroll={(e) => mirror.current && (mirror.current.scrollTop = e.currentTarget.scrollTop)}
               onInput={(e) => {
                 setText(e.currentTarget.value)
@@ -552,7 +552,7 @@ export function Composer({
               }}
             />
           </div>
-          <div className="mr-2 mb-2.5 flex shrink-0 items-center gap-1.5">
+          <div className="mr-2 mb-2.5 flex shrink-0 pointer-coarse:mb-2 items-center gap-1.5">
             {running && (
               <Tooltip>
                 <TooltipTrigger asChild>
