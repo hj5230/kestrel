@@ -88,7 +88,18 @@ html, body, #root {
 
 /* Safe-area insets go through these variables so the device preview (lib/device-preview.ts) can set them
    in a desktop browser, where env() is always 0. --safe-bottom is the bottom inset for content above the
-   home indicator, dropped while the keyboard covers it. */
+   home indicator, dropped while the keyboard covers it; --kb is the keyboard's height over the page
+   (lib/viewport.ts). Both are registered so they can be transitioned. */
+@property --kb {
+    syntax: "<length>";
+    inherits: true;
+    initial-value: 0px;
+}
+@property --safe-bottom {
+    syntax: "<length>";
+    inherits: true;
+    initial-value: 0px;
+}
 :root {
     --inset-top: env(safe-area-inset-top);
     --inset-bottom: env(safe-area-inset-bottom);
@@ -104,16 +115,22 @@ html.keyboard-open {
 html.mobile-app {
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    /* What is visible above the keyboard. Follows the keyboard over its own duration with an ease close to
+       its curve, so the composer at the bottom rides up with it. */
+    --app-height: calc(100dvh - var(--kb));
+    transition:
+        --kb var(--kb-duration, 0.25s) cubic-bezier(0.25, 0.8, 0.25, 1),
+        --safe-bottom var(--kb-duration, 0.25s) cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 html.mobile-app,
 html.mobile-app body {
     overscroll-behavior: none;
 }
 html.mobile-app #root {
-    /* Fixed to the visual viewport (see lib/viewport.ts) so the composer stays above the keyboard. */
+    /* The page never scrolls (the web view's scroll is pinned natively); the app ends at the keyboard. */
     position: fixed;
     inset-inline: 0;
-    top: var(--app-top, 0px);
+    top: 0;
     height: var(--app-height, 100%);
     padding-left: var(--inset-left);
     padding-right: var(--inset-right);

@@ -1,20 +1,17 @@
-// Mobile: keep the app exactly on the visible area. When the keyboard opens iOS shrinks the *visual*
-// viewport and pans it down the page to reveal the field. Scrolling the page back afterwards made the
-// whole app jump up and then return; instead the app is fixed to the visual viewport's top and height,
-// so it follows the pan in the same frame and nothing on screen moves except the keyboard.
+// Mobile: the app fills the screen above the keyboard and the page itself never moves. iOS would scroll the
+// web view to reveal a focused field, which made the whole app jump up and back; the native side
+// (src-tauri/src/keyboard.rs) pins that scroll and reports the keyboard as it starts to move. --kb takes its
+// height and is transitioned over the same duration (index.css), so the app's bottom edge, and the composer
+// on it, rides up with the keyboard while everything above stays where it is.
 export function trackVisualViewport() {
-  const vv = window.visualViewport
-  if (!vv) return
   const root = document.documentElement
-  const sync = () => {
-    const keyboard = Math.max(0, window.innerHeight - vv.height)
-    root.style.setProperty("--app-height", `${Math.round(vv.height)}px`)
-    root.style.setProperty("--app-top", `${Math.round(vv.offsetTop)}px`)
-    // Bottom sheets sit on top of the keyboard rather than behind it.
-    root.style.setProperty("--kb", `${Math.round(keyboard)}px`)
-    root.classList.toggle("keyboard-open", keyboard > 120)
+  const set = (height: number, duration: number) => {
+    root.style.setProperty("--kb-duration", `${Math.max(0, duration)}s`)
+    root.style.setProperty("--kb", `${Math.round(height)}px`)
+    root.classList.toggle("keyboard-open", height > 120)
   }
-  vv.addEventListener("resize", sync)
-  vv.addEventListener("scroll", sync)
-  sync()
+  set(0, 0)
+  void import("@tauri-apps/api/event")
+    .then(({ listen }) => listen<{ height: number; duration: number }>("kestrel://keyboard", (e) => set(e.payload.height, e.payload.duration)))
+    .catch(() => {})
 }

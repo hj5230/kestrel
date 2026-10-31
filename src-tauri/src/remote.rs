@@ -80,6 +80,7 @@ pub fn setup<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
     builder
         .setup(|app| {
             edge_to_edge(app);
+            crate::keyboard::install(app);
             Ok(())
         })
         .plugin(tauri_plugin_barcode_scanner::init())

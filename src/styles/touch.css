@@ -117,7 +117,7 @@
 
   /* ---------- dialogs ---------- */
   /* Position against the visible area, not the layout viewport, so the keyboard never covers the
-     buttons (--app-height follows the visual viewport on the phone; elsewhere it is 100dvh). */
+     buttons (--app-height ends at the keyboard on the phone; elsewhere it is 100dvh). */
   :is([data-slot="dialog-content"], [data-slot="alert-dialog-content"]).top-1\/2 {
     top: calc(var(--app-height, 100dvh) / 2);
     max-height: calc(var(--app-height, 100dvh) - 32px);

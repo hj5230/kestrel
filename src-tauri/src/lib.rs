@@ -3,6 +3,8 @@
 #[cfg(desktop)]
 mod desktop;
 #[cfg(mobile)]
+mod keyboard;
+#[cfg(mobile)]
 mod pinned_tls;
 #[cfg(any(mobile, test))]
 mod profiles;
