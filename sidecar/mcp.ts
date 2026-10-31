@@ -1,3 +1,4 @@
+import { version as VERSION } from "../package.json";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -46,7 +47,7 @@ async function connect(cfg: McpServerConfig) {
   conns.set(cfg.id, conn);
   broadcast();
   try {
-    const client = new Client({ name: "kestrel", version: "0.1.0" }, { capabilities: {} });
+    const client = new Client({ name: "kestrel", version: VERSION }, { capabilities: {} });
     let transport;
     if (cfg.transport === "stdio") {
       transport = new StdioClientTransport({

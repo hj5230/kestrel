@@ -17,7 +17,7 @@ import type { Caller, Handler } from "./rpc/types";
 
 export type { Caller } from "./rpc/types";
 
-const VERSION = "0.1.0";
+import { version as VERSION } from "../package.json";
 
 const handlers: Record<string, Handler> = { ...appHandlers, ...modelHandlers, ...sessionHandlers, ...extensionHandlers, ...fileHandlers };
 
