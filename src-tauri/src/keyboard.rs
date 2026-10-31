@@ -1,14 +1,16 @@
-// The software keyboard on iOS. When a field is focused, WKWebView scrolls its scroll view to reveal it,
-// which moved the whole app up and, once the page reacted, back down. The app is a fixed, full-screen
-// page whose own content scrolls inside it, so that scroll view never needs to move: it is pinned at the
-// origin here. Instead the keyboard is reported to the page as it starts to move (its height and the
-// animation's duration), and the page lifts its bottom edge with a matching transition, so only the
-// input rides up with the keyboard. Public UIKit API only: a notification and key-value observing.
+// The software keyboard on iOS. WKWebView observes the keyboard notifications itself: as the keyboard
+// moves it records how much of the view is covered, insets and scrolls its scroll view, and scrolls the
+// focused field into view, all inside the keyboard's animation. That is what moved the whole app up.
+// (Resetting the scroll from an observer only stacked a second animation on the first: up, then back.)
+// So WKWebView is taken off those notifications, as Capacitor's keyboard plugin does, and never learns of
+// the keyboard; the page is told instead, as the keyboard starts to move, its height and the animation's
+// duration, and lifts its bottom edge with a matching transition, so only the composer rides up.
+// `interactive-widget=overlays-content` would ask WebKit for this directly, but iOS does not support it.
 use objc2::encode::{Encode, Encoding};
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, NSObject, NSObjectProtocol};
 use objc2::{class, define_class, msg_send, sel, ClassType};
-use std::ffi::{c_void, CString};
+use std::ffi::CString;
 use std::sync::OnceLock;
 use tauri::{Emitter, Manager, Runtime};
 
@@ -43,6 +45,14 @@ unsafe impl Encode for CGRect {
     const ENCODING: Encoding = Encoding::Struct("CGRect", &[CGPoint::ENCODING, CGSize::ENCODING]);
 }
 
+/// The notifications WKWebView registers for in `_registerForNotifications`.
+const WEBKIT_KEYBOARD_NOTIFICATIONS: [&str; 4] = [
+    "UIKeyboardWillChangeFrameNotification",
+    "UIKeyboardDidChangeFrameNotification",
+    "UIKeyboardWillShowNotification",
+    "UIKeyboardWillHideNotification",
+];
+
 /// Sends the keyboard's height over the page and its animation duration to the front end.
 static REPORT: OnceLock<Box<dyn Fn(f64, f64) + Send + Sync>> = OnceLock::new();
 
@@ -74,16 +84,6 @@ unsafe fn keyboard_changed(note: &AnyObject) {
     }
 }
 
-unsafe fn pin(scroll: *mut AnyObject) {
-    if scroll.is_null() {
-        return;
-    }
-    let offset: CGPoint = msg_send![scroll, contentOffset];
-    if offset.x != 0.0 || offset.y != 0.0 {
-        let _: () = msg_send![scroll, setContentOffset: CGPoint { x: 0.0, y: 0.0 }];
-    }
-}
-
 define_class!(
     // SAFETY: NSObject has no subclassing requirements, and the class implements no Drop.
     #[unsafe(super(NSObject))]
@@ -94,11 +94,6 @@ define_class!(
         #[unsafe(method(keyboardWillChangeFrame:))]
         fn keyboard_will_change_frame(&self, note: &AnyObject) {
             unsafe { keyboard_changed(note) }
-        }
-
-        #[unsafe(method(observeValueForKeyPath:ofObject:change:context:))]
-        fn observe_value(&self, _path: *mut AnyObject, object: *mut AnyObject, _change: *mut AnyObject, _context: *mut c_void) {
-            unsafe { pin(object) }
         }
     }
 
@@ -112,24 +107,19 @@ pub fn install<R: Runtime>(app: &tauri::App<R>) {
     }));
     let Some(window) = app.get_webview_window("main") else { return };
     let _ = window.with_webview(|webview| unsafe {
-        const NS_KEY_VALUE_OBSERVING_OPTION_NEW: usize = 1;
-        let observer: Retained<AnyObject> = msg_send![Observer::class(), new];
         let center: *mut AnyObject = msg_send![class!(NSNotificationCenter), defaultCenter];
+        let wk = webview.inner() as *mut AnyObject;
+        let none = std::ptr::null_mut::<AnyObject>();
+        for name in WEBKIT_KEYBOARD_NOTIFICATIONS {
+            let _: () = msg_send![center, removeObserver: wk, name: ns(name), object: none];
+        }
+        let observer: Retained<AnyObject> = msg_send![Observer::class(), new];
         let _: () = msg_send![
             center,
             addObserver: &*observer,
             selector: sel!(keyboardWillChangeFrame:),
             name: ns("UIKeyboardWillChangeFrameNotification"),
-            object: std::ptr::null_mut::<AnyObject>()
-        ];
-        let wk = webview.inner() as *mut AnyObject;
-        let scroll: *mut AnyObject = msg_send![wk, scrollView];
-        let _: () = msg_send![
-            scroll,
-            addObserver: &*observer,
-            forKeyPath: ns("contentOffset"),
-            options: NS_KEY_VALUE_OBSERVING_OPTION_NEW,
-            context: std::ptr::null_mut::<c_void>()
+            object: none
         ];
         // Observes for as long as the app runs.
         std::mem::forget(observer);
