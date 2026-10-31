@@ -153,6 +153,8 @@ sudo brew services start tailscale
 sudo tailscale up
 ```
 
+Install one or the other, not both: the app and the Homebrew daemon each run their own `tailscaled` and fight over the tunnel.
+
 The phone needs Tailscale too, signed in to the same account. iOS runs one VPN at a time: keep Tailscale on, and switch to LocalDevVPN only while refreshing apps in SideStore.
 
 ### Platform seams
