@@ -70,8 +70,7 @@ export function HomeView() {
   return (
     <div className="flex h-full flex-col">
       <PageHeader bordered={false} />
-      {/* Reaches under the keyboard, so the greeting stays centred where it was while the keyboard is up. */}
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-y-auto px-6 text-center [html.mobile-app_&]:-mb-(--kb)">
+      <div data-keyboard-follow className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-y-auto px-6 text-center">
         <Greeting />
         {noModels && (
           <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-dashed p-8 text-center">

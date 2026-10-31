@@ -4,9 +4,11 @@
 //
 // The layout changes once per keyboard move (--kb, which ends the app at the keyboard), never per frame:
 // relaying out a long conversation every frame is what made the keyboard stutter. What rides with the
-// keyboard is the dock ([data-keyboard-dock], the composer), moved by a transform the compositor animates
-// over the keyboard's own duration. Opening, it slides up first and the layout follows once the keyboard is
-// in place; closing, the layout goes first (the keyboard still covers the dock) and it slides down into it.
+// keyboard is the dock ([data-keyboard-dock], the composer) and whatever is laid out around it and should
+// follow it ([data-keyboard-follow], the centred home greeting), moved by transforms the compositor animates
+// over the keyboard's own duration from where they are to where the new layout puts them. Opening, they
+// slide first and the layout follows once the keyboard is in place (so the conversation is never cut short
+// above a composer still on its way up); closing, the layout goes first, under the keyboard, and they slide.
 // A field the keyboard would cover elsewhere (low in Settings) is scrolled into view in its own container.
 const editable = (el: Element | null): el is HTMLElement =>
   el instanceof HTMLElement && (el.matches("input, textarea, select") || el.isContentEditable)
@@ -21,7 +23,7 @@ export function trackVisualViewport() {
   let commit: ReturnType<typeof setTimeout> | undefined
   let reveal: ReturnType<typeof setTimeout> | undefined
   let slides: Animation[] = []
-  const docks = () => [...document.querySelectorAll<HTMLElement>("[data-keyboard-dock]")]
+  const movers = () => [...document.querySelectorAll<HTMLElement>("[data-keyboard-dock], [data-keyboard-follow]")]
 
   const revealFocused = () => {
     const el = document.activeElement
@@ -46,20 +48,28 @@ export function trackVisualViewport() {
     stop()
     clearTimeout(reveal)
     if (height === applied) return
-    if (height > applied && ms > 0) {
-      // The dock's bottom moves by the change in height and, the first time, sheds the home-indicator inset.
-      const shed = applied > OPEN ? 0 : 1
-      slides = docks().map((el) => slide(el, 0, applied - height + shed * parseFloat(getComputedStyle(el).paddingBottom), ms))
+    const els = movers()
+    // The dock moves with its top edge; a follower is a box that changes size around centred content.
+    const tops = () =>
+      els.map((el) => {
+        const r = el.getBoundingClientRect()
+        return el.hasAttribute("data-keyboard-follow") ? r.top + r.height / 2 : r.top
+      })
+    const before = tops()
+    const from = applied
+    apply(height)
+    const after = tops()
+    if (height > from && ms > 0) {
+      // Measured in the new layout, which is put back until the keyboard has arrived; nothing paints between.
+      apply(from)
+      slides = els.map((el, i) => slide(el, 0, after[i] - before[i], ms))
       commit = setTimeout(() => {
         stop()
         apply(height)
         revealFocused()
       }, ms)
     } else {
-      const els = docks()
-      const before = els.map((el) => el.getBoundingClientRect().top)
-      apply(height)
-      if (ms > 0) slides = els.map((el, i) => slide(el, before[i] - el.getBoundingClientRect().top, 0, ms))
+      if (ms > 0) slides = els.map((el, i) => slide(el, before[i] - after[i], 0, ms))
       if (height > OPEN) reveal = setTimeout(revealFocused, ms + 30)
     }
   }
