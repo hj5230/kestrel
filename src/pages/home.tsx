@@ -85,7 +85,7 @@ export function HomeView() {
         )}
       </div>
       {!noModels && (
-        <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-[max(0.25rem,calc(var(--safe-bottom)-1rem))] md:px-6 md:pb-3">
+        <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-[max(0px,calc(var(--safe-bottom)-1.25rem))] md:px-6">
           <Composer
             cwd={cwd}
             autoFocus

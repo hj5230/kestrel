@@ -44,6 +44,10 @@ function formatSize(n: number): string {
 
 const isImageFile = (f: File) => f.type.startsWith("image/") || isImageName(f.name)
 
+/** The send and stop buttons draw a small disc inside a full-size hit area, which stays 40pt on touch. */
+const ROUND_HIT = "group/send rounded-full border-0 p-0 hover:bg-transparent disabled:opacity-100 dark:hover:bg-transparent"
+const ROUND = "flex size-7 shrink-0 items-center justify-center rounded-full transition-[background-color,color,box-shadow,transform] group-active/send:scale-95 pointer-coarse:size-8"
+
 export function Composer({
   cwd,
   running,
@@ -556,8 +560,10 @@ export function Composer({
             {running && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="icon-sm" variant="secondary" aria-label={t("composer.stop")} onClick={onAbort} className="rounded-full">
-                    <SquareIcon className="fill-current" />
+                  <Button size="icon-sm" variant="ghost" aria-label={t("composer.stop")} onClick={onAbort} className={ROUND_HIT}>
+                    <span className={cn(ROUND, "border bg-background text-foreground group-hover/send:bg-muted")}>
+                      <SquareIcon className="size-2.5! fill-current" />
+                    </span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -568,8 +574,16 @@ export function Composer({
             {(!running || canSend) && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="icon-sm" disabled={!canSend} aria-label={running ? t("composer.steer") : t("composer.send")} onClick={submit} className="rounded-full">
-                    {converting > 0 ? <Spinner /> : <ArrowUpIcon />}
+                  <Button size="icon-sm" variant="ghost" disabled={!canSend} aria-label={running ? t("composer.steer") : t("composer.send")} onClick={submit} className={ROUND_HIT}>
+                    <span
+                      className={cn(
+                        ROUND,
+                        "bg-foreground text-background shadow-sm group-hover/send:bg-foreground/85",
+                        "group-disabled/send:bg-muted-foreground/15 group-disabled/send:text-muted-foreground/60 group-disabled/send:shadow-none",
+                      )}
+                    >
+                      {converting > 0 ? <Spinner className="size-3.5!" /> : <ArrowUpIcon className="size-3.5!" strokeWidth={2.5} />}
+                    </span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>

@@ -2,6 +2,7 @@ import type { MessageKey } from "./en"
 
 export const zhCN: Record<MessageKey, string> = {
   "common.cancel": "取消",
+  "common.close": "关闭",
   "common.save": "保存",
   "common.delete": "删除",
   "common.edit": "编辑",

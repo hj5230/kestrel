@@ -1,5 +1,6 @@
 export const en = {
   "common.cancel": "Cancel",
+  "common.close": "Close",
   "common.save": "Save",
   "common.delete": "Delete",
   "common.edit": "Edit",

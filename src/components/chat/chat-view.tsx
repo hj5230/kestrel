@@ -68,7 +68,8 @@ function SubagentSheet({ id, onClose }: { id: string | null; onClose: () => void
   )
 }
 
-function PlanPanel({ todos }: { todos: SessionInfo["todos"] }) {
+/** On a phone the panel is a sheet: its close button sits in the header row, after the count, instead of on top of it. */
+function PlanPanel({ todos, onClose }: { todos: SessionInfo["todos"]; onClose?: () => void }) {
   const open = todos.some((t) => t.status !== "completed")
   return (
     <>
@@ -78,6 +79,11 @@ function PlanPanel({ todos }: { todos: SessionInfo["todos"] }) {
         <span className="ml-auto text-xs font-normal text-muted-foreground tabular-nums">
           {todos.filter((t) => t.status === "completed").length}/{todos.length}
         </span>
+        {onClose && (
+          <Button variant="ghost" size="icon-sm" className="-my-1 -mr-2" aria-label={t("common.close")} onClick={onClose}>
+            <XIcon />
+          </Button>
+        )}
       </div>
       <div className={cn("px-4 py-3", !open && "opacity-70")}>
         <TodoList todos={todos} />
@@ -318,7 +324,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
               <ArrowDownIcon />
             </Button>
           )}
-          <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-[max(0.25rem,calc(var(--safe-bottom)-1rem))] md:px-6 md:pb-3">
+          <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-[max(0px,calc(var(--safe-bottom)-1.25rem))] md:px-6">
             <div className="flex flex-col gap-2">
               {d.approvals.map((a) => (
                 <ApprovalCard key={a.id} req={a} />
@@ -378,12 +384,12 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         )}
       </div>
       <Sheet open={!wide && planSheet && s.todos.length > 0} onOpenChange={setPlanSheet}>
-        <SheetContent className="w-[min(22rem,88vw)] gap-0 p-0">
+        <SheetContent showCloseButton={false} onOpenAutoFocus={(e) => e.preventDefault()} className="w-[min(22rem,88vw)] gap-0 p-0">
           <SheetHeader className="sr-only">
             <SheetTitle>{t("chat.plan")}</SheetTitle>
             <SheetDescription>{t("chat.plan")}</SheetDescription>
           </SheetHeader>
-          <PlanPanel todos={s.todos} />
+          <PlanPanel todos={s.todos} onClose={() => setPlanSheet(false)} />
         </SheetContent>
       </Sheet>
       <SubagentSheet id={subagent} onClose={() => setSubagent(null)} />
