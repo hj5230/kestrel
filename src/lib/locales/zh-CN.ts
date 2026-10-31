@@ -67,6 +67,8 @@ export const zhCN: Record<MessageKey, string> = {
   "sidebar.mergeInto": "合并到…",
   "sidebar.detach": "分离为独立会话",
   "sidebar.detached": "已分离为独立会话",
+  "chat.branches": "分支",
+  "chat.openBranch": "打开分支",
   "dialog.mergedInto": "已合并到「{title}」",
   "sidebar.archivedToast": "会话已归档",
 

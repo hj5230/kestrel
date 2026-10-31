@@ -155,7 +155,7 @@ export function MergeDialog({ source, target, onClose }: { source: SessionInfo |
     setFocus("")
     setBusy(false)
   }, [source, target])
-  const title = (s: SessionInfo) => s.title || t("common.untitled")
+  const title = (s: SessionInfo) => s.title || (s.forkOf ? t("sidebar.branch") : t("common.untitled"))
   const q = query.trim().toLowerCase()
   const candidates = sessions.value.filter((s) => s.id !== source?.id && (!q || title(s).toLowerCase().includes(q)))
   const branch = !!source && !!into && source.forkOf === into.id

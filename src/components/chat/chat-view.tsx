@@ -17,6 +17,7 @@ import { userText } from "./messages"
 import { Transcript } from "./transcript"
 import { sessionActions } from "./session/actions"
 import { ChatDock, type Editing } from "./session/dock"
+import { ForkList } from "./session/forks"
 import { ChatHeader } from "./session/header"
 import { folderMenu, sessionMenu } from "./session/menus"
 import { PlanPanel, PlanSheet, SubagentSheet } from "./session/panels"
@@ -27,7 +28,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const [editing, setEditing] = useState<Editing | null>(null)
   const [renaming, setRenaming] = useState<SessionInfo | null>(null)
   const [deleting, setDeleting] = useState<SessionInfo | null>(null)
-  const [merging, setMerging] = useState<{ target: SessionInfo | null } | null>(null)
+  const [merging, setMerging] = useState<{ source: SessionInfo; target: SessionInfo | null } | null>(null)
   const [showPlan, setShowPlan] = useState(true)
   // Wide windows dock the plan beside the transcript; narrower screens open it as a drawer on demand.
   const wide = useMediaQuery("(min-width: 1024px)")
@@ -83,7 +84,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         onCompact={() => actions.compact()}
         onRename={() => setRenaming(s)}
         folderMenu={folderMenu(s, actions)}
-        sessionMenu={sessionMenu(s, { running, lastSeq, actions, rename: () => setRenaming(s), remove: () => setDeleting(s), merge: (target) => setMerging({ target }) })}
+        sessionMenu={sessionMenu(s, { running, lastSeq, actions, rename: () => setRenaming(s), remove: () => setDeleting(s), merge: (target) => setMerging({ source: s, target }) })}
         planActive={wide ? showPlan : planSheet}
         onPlan={() => (wide ? setShowPlan(!showPlan) : setPlanSheet(true))}
       />
@@ -104,6 +105,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
                   onRetry={() => rpc("chat.retry", { sessionId: s.id }).catch((e) => toast.error(e.message))}
                 />
               )}
+              <ForkList s={s} onMerge={(fork) => setMerging({ source: fork, target: s })} />
             </div>
           </div>
           {detached && (
@@ -123,7 +125,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
       <SubagentSheet id={subagent} onClose={() => setSubagent(null)} />
       <RenameDialog session={renaming} onClose={() => setRenaming(null)} />
       <ConfirmDeleteDialog session={deleting} onClose={() => setDeleting(null)} />
-      <MergeDialog source={merging ? s : null} target={merging?.target} onClose={() => setMerging(null)} />
+      <MergeDialog source={merging?.source ?? null} target={merging?.target} onClose={() => setMerging(null)} />
     </div>
   )
 }
