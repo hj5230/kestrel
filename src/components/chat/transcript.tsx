@@ -53,6 +53,11 @@ export function Transcript({
   const pending = running && !!d.phase && d.approvals.length === 0 && d.questions.length === 0
   const busy = pending || (running && (!lastRow || lastRow.k === "user" || lastRow.k === "compaction") && d.approvals.length === 0 && d.questions.length === 0)
   const waiting = d.approvals.length > 0 || d.questions.length > 0
+  const phase = d.compacting ? t("chat.compacting") : busy ? t(`phase.${d.phase ?? "preparing"}` as MessageKey) : undefined
+  // A trailing process group owns the status while the next request starts. Streaming text already
+  // shows progress itself; neither needs a second line appearing and disappearing underneath it.
+  const inlinePhase = lastRow?.k === "group" ? phase : undefined
+  const standalonePhase = lastRow?.k !== "group" && !(lastRow?.k === "text" && lastRow.streaming) ? phase : undefined
 
   const win = useRowWindow(rows.length)
   const rendered: preact.JSX.Element[] = []
@@ -102,12 +107,13 @@ export function Transcript({
         el = <div className="text-xs text-muted-foreground">{t("msg.stopped")}</div>
         break
       case "group": {
-        const groupActive = row.last && running
+        const groupActive = row === lastRow && running
+        const rowPhase = row === lastRow ? inlinePhase : undefined
         if (view === "answer") {
-          if (!groupActive) return
-          el = <ProcessGroup steps={row.steps} rt={rt} waiting={waiting} expandable={false} />
-        } else if (view === "compact") {
-          el = <ProcessGroup steps={row.steps} rt={rt} waiting={groupActive && waiting} expandable onOpenSubagent={onOpenSubagent} />
+          if (!groupActive && !rowPhase) return
+          el = <ProcessGroup steps={row.steps} rt={rt} waiting={waiting} phase={rowPhase} expandable={false} />
+        } else if (view === "compact" || rowPhase) {
+          el = <ProcessGroup steps={row.steps} rt={rt} waiting={groupActive && waiting} phase={rowPhase} expandable onOpenSubagent={onOpenSubagent} />
         } else {
           el = <StepView step={row.steps[0]} rt={rt} expand={view === "verbose"} onOpenSubagent={onOpenSubagent} />
         }
@@ -127,10 +133,10 @@ export function Transcript({
     <div className="flex flex-col">
       {win.sentinel}
       {rendered}
-      {(busy || d.compacting) && (
-        <div className={cn("flex items-center gap-2 text-[13px] text-muted-foreground", rendered.length && "mt-6")}>
+      {standalonePhase && (
+        <div className={cn("flex min-w-0 items-center gap-2 px-2 py-1 text-[13px] text-muted-foreground pointer-coarse:min-h-10", rendered.length && "mt-6")}>
           <KestrelMark />
-          <span className="text-shimmer">{d.compacting ? t("chat.compacting") : t(`phase.${d.phase ?? "preparing"}` as MessageKey)}</span>
+          <span className="min-w-0 truncate text-shimmer">{standalonePhase}</span>
         </div>
       )}
       {lastAssistantError && (

@@ -28,12 +28,15 @@ export function ProcessGroup({
   rt,
   waiting,
   expandable,
+  phase,
   onOpenSubagent,
 }: {
   steps: Step[]
   rt: Runtime
   waiting: boolean
   expandable: boolean
+  /** Reuse the process row during gaps between model/tool steps instead of adding a status row. */
+  phase?: string
   onOpenSubagent?: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -47,7 +50,7 @@ export function ProcessGroup({
     const step = steps[idx]
     activity = step.k === "thinking" ? t("group.thinking") : `${toolLabel(step.block.name)} ${summary(step.block)}`.trim()
   }
-  const label = waiting ? t("group.waiting") : active ? activity || t("group.working") : describeGroup(steps)
+  const label = waiting ? t("group.waiting") : active ? activity || t("group.working") : phase || describeGroup(steps)
   return (
     <div>
       <button
@@ -62,12 +65,12 @@ export function ProcessGroup({
       >
         {waiting ? (
           <CircleDashedIcon className="size-3.5 shrink-0 text-warning" />
-        ) : active ? (
+        ) : active || phase ? (
           <KestrelMark />
         ) : (
           <ListTreeIcon className="size-3.5 shrink-0" />
         )}
-        <span className={cn("min-w-0 truncate", active && !waiting && "text-shimmer")}>{label}</span>
+        <span className={cn("min-w-0 truncate", (active || phase) && !waiting && "text-shimmer")}>{label}</span>
         {failed > 0 && <span className="shrink-0 text-xs text-destructive">· {t("group.failed", { n: failed })}</span>}
         {expandable && <ChevronRightIcon className={cn("ml-auto size-3.5 shrink-0 opacity-60 transition-transform", open && "rotate-90")} />}
       </button>
