@@ -1,6 +1,5 @@
-// A small surprise on iPhones with a Dynamic Island: while an agent is working, a kestrel drops out from under
-// the island and hovers there, then slips back under it when the work is done. Only where the top inset is deep
-// enough to mean an island (a notch is shallower), and never in the way: it takes no touches.
+// A tiny kestrel tucked behind the Dynamic Island while an agent works. Its whole flight stays within the
+// island's footprint rather than leaking into the header. It never takes touches.
 import { useEffect, useState } from "preact/hooks"
 import { sessions } from "@/lib/store"
 import { KestrelMark } from "./kestrel-mark"

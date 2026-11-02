@@ -23,11 +23,11 @@
 @keyframes kestrel-beat { from { transform: rotate(16deg) scaleY(0.7); } to { transform: rotate(-14deg); } }
 @keyframes kestrel-beat-r { from { transform: rotate(-16deg) scaleY(0.7); } to { transform: rotate(14deg); } }
 @media (prefers-reduced-motion: reduce) { .kestrel-mark .kestrel-wing { animation: none; } }
-/* IslandKestrel: drops out from under the Dynamic Island, hovers with a slow bob, and slips back under. */
+/* Keep the entire bird and its motion inside the island's footprint, not below its lower edge. */
 .island-kestrel {
     position: fixed;
     z-index: 60;
-    top: calc(var(--inset-top) - 15px);
+    top: calc(var(--inset-top) - 38px);
     left: 50%;
     pointer-events: none;
     color: #c8743f;
