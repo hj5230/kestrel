@@ -1,19 +1,4 @@
-/* Animations: the streaming caret, shimmer on running steps, the kestrel's wings, status dots and the home greeting.
-   Each one stops under prefers-reduced-motion. */
-
-@keyframes caret-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-.streaming-caret::after, .markdown.is-streaming > :last-child:not(pre):not(ul):not(ol)::after {
-    content: "";
-    display: inline-block;
-    width: 0.5em;
-    height: 1em;
-    margin-left: 2px;
-    vertical-align: -0.15em;
-    border-radius: 2px;
-    background: currentColor;
-    opacity: 0.6;
-    animation: caret-blink 1s steps(2) infinite;
-}
+/* Shared text reveal, running steps, the kestrel's wings, status dots and the home greeting. */
 
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 /* KestrelMark: wings beat about the shoulders while the body hangs still. */
@@ -57,11 +42,13 @@
 }
 
 /* Home greeting: each letter fades up out of a slight blur. */
-.greet-char { display: inline-block; white-space: pre; animation: greet-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.greet-char, .reveal-tail { animation: greet-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.greet-char { display: inline-block; white-space: pre; }
+.reveal-tail { display: inline-block; }
 @keyframes greet-in {
   from { opacity: 0; transform: translateY(0.18em); filter: blur(4px); }
   to { opacity: 1; transform: none; filter: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .greet-char { animation: none; }
+  .greet-char, .reveal-tail { animation: none; }
 }

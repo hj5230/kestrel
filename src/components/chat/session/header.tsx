@@ -1,10 +1,9 @@
-// The conversation's header: title (click to rename), working folder menu, context meter, plan toggle and "…".
-import { FolderIcon, ListChecksIcon, MoreHorizontalIcon, PencilIcon } from "lucide-react"
+// The conversation's header: title (click to rename), working folder menu, context meter and "…".
+import { FolderIcon, MoreHorizontalIcon, PencilIcon } from "lucide-react"
 import type { ModelConfig, SessionInfo } from "@shared/protocol"
 import { ActionMenu, type MenuNode } from "@/components/action-menu"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { shortPath } from "@/lib/format"
 import { appInfo } from "@/lib/store"
 import { cn } from "@/lib/utils"
@@ -19,8 +18,6 @@ export function ChatHeader({
   onRename,
   folderMenu,
   sessionMenu,
-  planActive,
-  onPlan,
 }: {
   s: SessionInfo
   model?: ModelConfig
@@ -29,8 +26,6 @@ export function ChatHeader({
   onRename: () => void
   folderMenu: MenuNode[]
   sessionMenu: MenuNode[]
-  planActive: boolean
-  onPlan: () => void
 }) {
   return (
     <PageHeader>
@@ -56,16 +51,6 @@ export function ChatHeader({
       />
       <div className="ml-auto flex items-center gap-1">
         <ContextMeter session={s} model={model} onCompact={onCompact} compacting={compacting} />
-        {s.todos.length > 0 && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant={planActive ? "secondary" : "ghost"} size="icon-sm" aria-label={t("chat.plan")} onClick={onPlan}>
-                <ListChecksIcon />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{t("chat.plan")}</TooltipContent>
-          </Tooltip>
-        )}
         <ActionMenu
           title={t("common.moreActions")}
           nodes={sessionMenu}

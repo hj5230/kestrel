@@ -1,5 +1,4 @@
-// One conversation: header, transcript (kept at the bottom while the agent writes), the dock under it, and the
-// plan beside it. The parts are in session/; this holds what is open and sends messages.
+// One conversation: header, transcript (kept at the bottom while the agent writes) and the dock under it. The parts are in session/; this holds what is open and sends messages.
 import { useEffect, useMemo, useState } from "preact/hooks"
 import { ArrowDownIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -10,7 +9,6 @@ import { ConfirmDeleteDialog, MergeDialog, RenameDialog } from "@/components/ses
 import { rpc, stageAttachments, type StagedFile } from "@/lib/api"
 import { detailSignal, enabledModels, findModel, loadDetail, settings } from "@/lib/store"
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom"
-import { useMediaQuery } from "@/hooks/use-media-query"
 import { t } from "@/lib/i18n"
 import type { Attachment } from "./composer"
 import { userText } from "./messages"
@@ -20,7 +18,7 @@ import { ChatDock, type Editing } from "./session/dock"
 import { ForkList } from "./session/forks"
 import { ChatHeader } from "./session/header"
 import { folderMenu, sessionMenu } from "./session/menus"
-import { PlanPanel, PlanSheet, SubagentSheet } from "./session/panels"
+import { SubagentSheet } from "./session/panels"
 
 export function ChatView({ sessionId }: { sessionId: string }) {
   const d = detailSignal(sessionId).value
@@ -29,16 +27,12 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const [renaming, setRenaming] = useState<SessionInfo | null>(null)
   const [deleting, setDeleting] = useState<SessionInfo | null>(null)
   const [merging, setMerging] = useState<{ source: SessionInfo; target: SessionInfo | null } | null>(null)
-  const [showPlan, setShowPlan] = useState(true)
-  // Wide windows dock the plan beside the transcript; narrower screens open it as a drawer on demand.
-  const wide = useMediaQuery("(min-width: 1024px)")
-  const [planSheet, setPlanSheet] = useState(false)
 
   useEffect(() => {
     loadDetail(sessionId).catch((e) => toast.error(e.message))
   }, [sessionId])
 
-  const { ref, detached, jump, follow } = useStickToBottom([d?.messages.length, d?.streaming, d?.runningTools, d?.approvals.length, d?.questions.length, d?.compacting])
+  const { ref, detached, jump, follow } = useStickToBottom([d?.messages.length, d?.streaming, d?.runningTools, d?.approvals.length, d?.questions.length, d?.compacting, d?.session.todos])
 
   const history = useMemo(
     () => (d?.messages ?? []).filter((m) => m.message.role === "user").map((m) => userText(m.message as any)).filter(Boolean),
@@ -85,8 +79,6 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         onRename={() => setRenaming(s)}
         folderMenu={folderMenu(s, actions)}
         sessionMenu={sessionMenu(s, { running, lastSeq, actions, rename: () => setRenaming(s), remove: () => setDeleting(s), merge: (target) => setMerging({ source: s, target }) })}
-        planActive={wide ? showPlan : planSheet}
-        onPlan={() => (wide ? setShowPlan(!showPlan) : setPlanSheet(true))}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -115,13 +107,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
           )}
           <ChatDock d={d} vision={model ? model.vision : true} history={history} editing={editing} onCancelEdit={() => setEditing(null)} onSend={send} actions={actions} />
         </div>
-        {wide && showPlan && s.todos.length > 0 && (
-          <aside className="w-72 shrink-0 border-l bg-sidebar/40">
-            <PlanPanel todos={s.todos} />
-          </aside>
-        )}
       </div>
-      <PlanSheet open={!wide && planSheet && s.todos.length > 0} onOpenChange={setPlanSheet} todos={s.todos} />
       <SubagentSheet id={subagent} onClose={() => setSubagent(null)} />
       <RenameDialog session={renaming} onClose={() => setRenaming(null)} />
       <ConfirmDeleteDialog session={deleting} onClose={() => setDeleting(null)} />

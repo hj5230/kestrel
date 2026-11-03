@@ -1,4 +1,6 @@
+// Sanitized Markdown with a lightweight reveal on newly streamed text only.
 import { memo } from "preact/compat"
+import { useTextReveal } from "@/hooks/use-text-reveal"
 import { renderMarkdown } from "@/lib/markdown"
 import { t } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
@@ -13,9 +15,11 @@ function onClick(e: MouseEvent) {
 }
 
 export const Markdown = memo(function Markdown({ text, className, streaming }: { text: string; className?: string; streaming?: boolean }) {
+  const ref = useTextReveal(!!streaming)
   return (
     <div
-      className={cn("markdown text-[0.875rem]", streaming && "is-streaming", className)}
+      ref={ref}
+      className={cn("markdown text-[0.875rem]", className)}
       onClick={onClick as any}
       dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }}
     />

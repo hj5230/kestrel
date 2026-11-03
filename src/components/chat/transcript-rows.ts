@@ -26,6 +26,7 @@ export type Item =
   | { k: "meta"; key: string; meta: ReplyMeta }
   | { k: "aborted"; key: string }
   | Ask
+  | { k: "plan"; key: string; block: ToolCallBlock }
   | Step
 
 export type Row =
@@ -61,6 +62,7 @@ export function assistantItems(msg: AssistantMsg, keyBase: string, streaming: bo
       if (c.text.trim()) out.push({ k: "text", key, text: c.text, streaming: live })
     } else if (c.type === "toolCall") {
       if (c.name === "ask_user") out.push({ k: "ask", key: c.id || key, block: c })
+      else if (c.name === "todo_write") out.push({ k: "plan", key: c.id || key, block: c })
       else out.push({ k: "tool", key: c.id || key, block: c, msg, streaming })
     }
   })
@@ -126,7 +128,7 @@ export function toRows(items: Item[], view: TranscriptView): Row[] {
   }
   for (const it of items) {
     if (it.k === "thinking" || it.k === "tool") current.push(it)
-    else if (it.k === "meta" || it.k === "aborted") rows.push(it)
+    else if (it.k === "meta") rows.push(it)
     else {
       flush()
       rows.push(it)

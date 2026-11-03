@@ -1,3 +1,5 @@
+// Transcript messages, their actions and expandable reasoning.
+import { RevealedText } from "./revealed-text"
 import type { ComponentChildren } from "preact"
 import { useLayoutEffect, useRef, useState } from "preact/hooks"
 import { BrainIcon, ChevronDownIcon, ChevronRightIcon, CopyIcon, FileIcon, GitBranchIcon, PencilIcon, RotateCcwIcon, TriangleAlertIcon, CheckIcon } from "lucide-react"
@@ -202,7 +204,7 @@ export function Thinking({ text, streaming, defaultOpen = false }: { text: strin
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="mt-1 ml-1.5 border-l-2 pl-4 text-[13px] leading-relaxed whitespace-pre-wrap text-muted-foreground select-text">{text}</div>
+        <RevealedText text={text} streaming={streaming} className="mt-1 ml-1.5 border-l-2 pl-4 text-[13px] leading-relaxed whitespace-pre-wrap text-muted-foreground select-text" />
       </CollapsibleContent>
     </Collapsible>
   )
