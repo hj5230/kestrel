@@ -133,7 +133,9 @@ describe("ask_user, end to end", () => {
     off();
     expect(opened).not.toBe("");
     expect(sessionDetail(info.id).questions).toEqual([]);
-    expect(() => respondQuestion(opened, [])).toThrow();
+    const count = store.loadMessages(info.id).length;
+    await respondQuestion(opened, []); // A stale client retry is an idempotent no-op.
+    expect(store.loadMessages(info.id)).toHaveLength(count);
   }, 60000);
 
   test("the main agent is offered the tool", () => {

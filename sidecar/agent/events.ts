@@ -11,6 +11,7 @@ import { memoryConfigured } from "../memory-config";
 import { memoryEpoch } from "../memory";
 import type { SessionRunner } from "./session-runner";
 import { visibleBlock, usageCost } from "./text";
+import { finishQuestionTool } from "../db/questions";
 
 export function flushStream(runner: SessionRunner) {
   runner.streamTimer = null;
@@ -46,6 +47,7 @@ export function onEvent(runner: SessionRunner, e: any) {
       const settings = store.getSettings();
       const epoch = msg.role === "user" && runner.info().kind === "main" && settings.memoryEnabled && settings.memoryAutoSave && memoryConfigured(settings) ? memoryEpoch() : undefined;
       const stored = store.appendMessage(runner.id, msg, epoch);
+      if (msg.role === "toolResult" && msg.toolName === "ask_user") finishQuestionTool(runner.id, msg.toolCallId);
       emit({ type: "message_appended", sessionId: runner.id, stored });
       if (msg.role === "assistant") {
         emit({ type: "stream", sessionId: runner.id, message: null });

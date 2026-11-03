@@ -1,4 +1,6 @@
+// Live questions retain local selections across reloads, scoped to the paired host and request.
 import { useState } from "preact/hooks"
+import { draftKeyForHost } from "@/lib/store"
 import { CheckIcon, CircleHelpIcon } from "lucide-react"
 import { toast } from "sonner"
 import type { AskDetails, Question, QuestionAnswer, QuestionRequest } from "@shared/protocol"
@@ -55,9 +57,19 @@ function OptionRow({ q, option, on, onToggle }: { q: Question; option: Question[
 /** The live question, in place in the transcript. readOnly: a subagent's transcript, where nobody can answer. */
 export function QuestionCard({ req, readOnly }: { req: QuestionRequest; readOnly?: boolean }) {
   const [busy, setBusy] = useState(false)
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({})
+  const key = draftKeyForHost(`question:${req.sessionId}:${req.id}`)
+  const [drafts, setDrafts] = useState<Record<string, Draft>>(() => {
+    try {
+      const value = JSON.parse(localStorage.getItem(key) ?? "{}")
+      return Object.fromEntries(Object.entries(value).filter(([, v]: [string, any]) => Array.isArray(v?.picked) && v.picked.every((x: unknown) => typeof x === "string") && typeof v.other === "string")) as Record<string, Draft>
+    } catch { return {} }
+  })
   const draft = (q: Question): Draft => drafts[q.id] ?? { picked: [], other: "" }
-  const set = (q: Question, next: Draft) => setDrafts((d) => ({ ...d, [q.id]: next }))
+  const set = (q: Question, next: Draft) => setDrafts((d) => {
+    const value = { ...d, [q.id]: next }
+    try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
+    return value
+  })
   const ready = req.questions.every((q) => answered(drafts[q.id]))
 
   const toggle = (q: Question, id: string) => {
@@ -71,6 +83,7 @@ export function QuestionCard({ req, readOnly }: { req: QuestionRequest; readOnly
     setBusy(true)
     try {
       await rpc("questions.respond", { id: req.id, answers })
+      try { localStorage.removeItem(key) } catch {}
     } catch (e: any) {
       toast.error(e.message)
       setBusy(false)

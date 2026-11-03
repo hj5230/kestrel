@@ -1,6 +1,7 @@
 // The store: one SQLite database for settings, providers, sessions and their messages, usage and paired
 // devices. Callers use it as one namespace (`import * as store from "./db"`); each domain lives in db/.
 import { connect } from "./db/connection";
+import { recoverQuestions } from "./db/questions";
 import { mergeBashDefaults } from "./db/settings";
 
 export { db, dbPath } from "./db/connection";
@@ -14,4 +15,5 @@ export { listDevices, addDevice, deviceByTokenHash, touchDevice, deleteDevice, d
 export function openDb(dataDir: string, dev: boolean) {
   connect(dataDir, dev);
   mergeBashDefaults();
+  recoverQuestions();
 }

@@ -18,7 +18,6 @@ export function ForkList({ s, onMerge }: { s: SessionInfo; onMerge: (fork: Sessi
       </div>
       <div className="divide-y">
         {forks.map((f) => {
-          const busy = f.status === "running" || f.status === "waiting"
           return (
             <div key={f.id} className="flex items-center gap-2 px-1.5 py-1">
               <button
@@ -30,7 +29,7 @@ export function ForkList({ s, onMerge }: { s: SessionInfo; onMerge: (fork: Sessi
                 <span className="truncate text-sm">{f.title || t("sidebar.branch")}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">{relativeTime(f.updatedAt)}</span>
               </button>
-              <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground" disabled={busy} onClick={() => onMerge(f)}>
+              <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground" onClick={() => onMerge(f)}>
                 <GitMergeIcon />
                 {t("merge.action")}
               </Button>

@@ -41,6 +41,7 @@ export class SessionRunner {
   toolEmitAt = new Map<string, number>();
   runPromise: Promise<void> | null = null;
   overflowRetried = false;
+  stopRequested = false;
 
   constructor(info: SessionInfo, parent: SessionRunner | null) {
     this.id = info.id;
@@ -160,6 +161,7 @@ export class SessionRunner {
   }
 
   abort() {
+    this.stopRequested = true;
     for (const a of approvals.values()) if (a.owner === this) a.resolve({ decision: "deny", reason: "aborted" });
     for (const q of pendingQuestions.values()) if (q.owner === this) q.resolve(null);
     this.agent.clearAllQueues();

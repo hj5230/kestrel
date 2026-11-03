@@ -9,6 +9,7 @@ import { ApprovalCard } from "../approval-card"
 import { Composer, type Attachment } from "../composer"
 import { ModelControl, PermissionPicker } from "../pickers"
 import type { SessionActions } from "./actions"
+import { MergeStatus } from "./merge-status"
 
 export interface Editing {
   seq: number
@@ -38,6 +39,7 @@ export function ChatDock({
   return (
     <div data-keyboard-dock className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-[max(0px,calc(var(--safe-bottom)-1.25rem))] md:px-6">
       <div className="flex flex-col gap-2">
+        <MergeStatus sessionId={s.id} />
         {d.approvals.map((a) => (
           <ApprovalCard key={a.id} req={a} />
         ))}

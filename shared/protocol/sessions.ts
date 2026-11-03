@@ -87,3 +87,13 @@ export interface QueuedMessage {
   mode: "steer" | "followUp";
   files?: FileAttachment[];
 }
+
+/** Durable background summarization and delivery into another session. */
+export interface MergeJob {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  state: "queued" | "running" | "ready" | "succeeded" | "failed";
+  error: string | null;
+  createdAt: number;
+}

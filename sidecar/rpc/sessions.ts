@@ -9,11 +9,12 @@ import { emit } from "../hub";
 import { st } from "../i18n";
 import { mcpStatuses } from "../mcp";
 import { createSession, exportMarkdown, forkSession } from "../sessions";
-import { mergeSession } from "../merge";
+import { assertNotMerging, listMergeJobs, queueMerge } from "../merge-jobs";
 import { discoverSkills } from "../skills";
 import { removeSessionUploads } from "../uploads";
 import type { Handler } from "./types";
 import { appInfo } from "../app-info";
+import { assertNoRecoveredQuestions, cancelRecoveredQuestions } from "../agent/pending";
 
 export const sessionHandlers: Record<string, Handler> = {
   "sessions.list": ({ archived } = {}) => store.listSessions({ archived }),
@@ -24,6 +25,7 @@ export const sessionHandlers: Record<string, Handler> = {
     return s;
   },
   "sessions.update": ({ id, patch }: { id: string; patch: Partial<SessionInfo> }) => {
+    assertNotMerging(id);
     if (patch.cwd) {
       patch.cwd = expandHome(patch.cwd);
       if (!fs.existsSync(patch.cwd)) throw new Error(st("dirNotFound", { path: patch.cwd }));
@@ -37,6 +39,7 @@ export const sessionHandlers: Record<string, Handler> = {
     return s;
   },
   "sessions.delete": ({ id }) => {
+    assertNotMerging(id);
     dropRunner(id);
     const deleted = store.deleteSession(id);
     for (const sessionId of deleted) removeSessionUploads(appInfo().dataDir, sessionId);
@@ -50,17 +53,14 @@ export const sessionHandlers: Record<string, Handler> = {
   },
   // A fork stands on its own: it leaves its source's tree and merges back like any other session.
   "sessions.detach": ({ id }) => {
+    assertNotMerging(id);
     store.updateSession(id, { forkOf: null });
     const s = store.getSession(id)!;
     emit({ type: "session_updated", session: s });
     return s;
   },
-  "sessions.merge": async ({ id, into, instructions }) => {
-    const { source, target } = await mergeSession(id, into, instructions?.trim() || undefined);
-    emit({ type: "session_updated", session: source });
-    emit({ type: "session_updated", session: target });
-    return target;
-  },
+  "sessions.merge": ({ id, into, instructions }) => queueMerge(id, into, instructions?.trim() || undefined),
+  "sessions.mergeJobs": () => listMergeJobs(),
   "sessions.export": ({ id }) => exportMarkdown(id),
   // One stored message per line, as the session's own record (no rendering), for pasting into other tools.
   "sessions.jsonl": ({ id }) => {
@@ -79,22 +79,32 @@ export const sessionHandlers: Record<string, Handler> = {
     };
   },
   "chat.send": async ({ sessionId, text, images, files, mode }: { sessionId: string; text: string; images?: any[]; files?: FileAttachment[]; mode?: "auto" | "steer" | "followUp" }) => {
+    assertNotMerging(sessionId);
+    assertNoRecoveredQuestions(sessionId);
     await getRunner(sessionId).send(text, images ?? [], files ?? [], mode ?? "auto");
     return true;
   },
   "chat.abort": ({ sessionId }) => {
-    peekRunner(sessionId)?.abort();
+    const runner = peekRunner(sessionId);
+    if (runner?.busy || runner?.runPromise) runner.abort();
+    else cancelRecoveredQuestions(sessionId);
     return true;
   },
   "chat.retry": async ({ sessionId }) => {
+    assertNotMerging(sessionId);
+    assertNoRecoveredQuestions(sessionId);
     await getRunner(sessionId).retry();
     return true;
   },
   "chat.edit": async ({ sessionId, seq, text, images, files }: { sessionId: string; seq: number; text: string; images?: any[]; files?: FileAttachment[] }) => {
+    assertNotMerging(sessionId);
+    assertNoRecoveredQuestions(sessionId);
     await getRunner(sessionId).editAndResend(seq, text, images ?? [], files ?? []);
     return true;
   },
   "chat.compact": async ({ sessionId, instructions }) => {
+    assertNotMerging(sessionId);
+    assertNoRecoveredQuestions(sessionId);
     await getRunner(sessionId).manualCompact(instructions);
     return true;
   },
@@ -107,8 +117,8 @@ export const sessionHandlers: Record<string, Handler> = {
     return true;
   },
   /** `answers: null` dismisses the question. */
-  "questions.respond": ({ id, answers }) => {
-    respondQuestion(id, answers ?? null);
+  "questions.respond": async ({ id, answers }) => {
+    await respondQuestion(id, answers ?? null);
     return true;
   },
 };

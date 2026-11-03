@@ -3,7 +3,8 @@ import type { SessionDetail } from "../../shared/protocol";
 import * as store from "../db";
 import { st } from "../i18n";
 import { SessionRunner } from "./session-runner";
-import { approvals, pendingQuestions } from "./pending";
+import { approvals } from "./pending";
+import { listQuestions } from "../db/questions";
 
 export const runners = new Map<string, SessionRunner>();
 
@@ -39,7 +40,7 @@ export function sessionDetail(id: string): SessionDetail {
     messages: store.loadMessages(id),
     compactions: store.listCompactions(id),
     approvals: [...approvals.values()].filter((a) => a.request.sessionId === id).map((a) => a.request),
-    questions: [...pendingQuestions.values()].filter((q) => q.request.sessionId === id).map((q) => q.request),
+    questions: listQuestions(id).map((q) => q.request),
     streaming: r?.streaming ?? null,
     phase: r?.phase ?? null,
     runningTools: r?.runningTools ?? {},

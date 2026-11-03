@@ -11,6 +11,7 @@ import { sanitizeAnswers } from "../tools/ask";
 import type { KestrelTool } from "../tools/types";
 import type { SessionRunner } from "./session-runner";
 import { approvals, pendingQuestions } from "./pending";
+import { saveQuestion } from "../db/questions";
 
 /** What the reviewer reads: the user's words and the agent's tool calls, nothing else. */
 export function reviewTranscript(runner: SessionRunner): string {
@@ -76,6 +77,7 @@ export async function ask(runner: SessionRunner, req: { toolCallId: string; titl
   const request: QuestionRequest = { id: newId("qn_"), sessionId: runner.rootId, createdAt: Date.now(), ...req };
   const answers = await new Promise<QuestionAnswer[] | null>((resolve) => {
     if (signal?.aborted) return resolve(null);
+    saveQuestion(request, runner.id);
     const onAbort = () => resolve(null);
     signal?.addEventListener("abort", onAbort, { once: true });
     pendingQuestions.set(request.id, {

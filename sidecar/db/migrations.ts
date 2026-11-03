@@ -153,4 +153,18 @@ export const MIGRATIONS: string[] = [
   `ALTER TABLE sessions ADD COLUMN fork_of TEXT;
    ALTER TABLE sessions ADD COLUMN fork_seq INTEGER;
    ALTER TABLE sessions ADD COLUMN merged_into TEXT;`,
+  `CREATE TABLE pending_questions (
+    id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    owner_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    request TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending', answers TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX pending_questions_session ON pending_questions(session_id, state);
+  CREATE TABLE merge_jobs (
+    id TEXT PRIMARY KEY, source_id TEXT NOT NULL, target_id TEXT NOT NULL,
+    state TEXT NOT NULL, instructions TEXT, snapshot TEXT, summary TEXT, error TEXT,
+    created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+  );
+  CREATE UNIQUE INDEX merge_source_active ON merge_jobs(source_id)
+    WHERE state IN ('queued', 'running', 'ready');`,
 ];

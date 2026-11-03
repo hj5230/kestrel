@@ -7,6 +7,7 @@ import type { ProviderConfig } from "../shared/protocol";
 import * as store from "./db";
 import { modelDefaults, PROVIDER_PRESETS } from "./providers";
 import { createSession } from "./sessions";
+import { MIGRATIONS } from "./db/migrations";
 
 test("legacy provider migration preserves IDs, credentials, model settings and session references", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kestrel-amazon-q-migration-"));
@@ -23,7 +24,10 @@ test("legacy provider migration preserves IDs, credentials, model settings and s
   store.db.run("ALTER TABLE models DROP COLUMN metadata_source");
   store.db.run("ALTER TABLE models DROP COLUMN metadata");
   for (const column of ["fork_of", "fork_seq", "merged_into"]) store.db.run(`ALTER TABLE sessions DROP COLUMN ${column}`);
-  store.db.run("DELETE FROM _migrations WHERE version >= (SELECT max(version) - 2 FROM _migrations)");
+  store.db.run("DROP TABLE pending_questions");
+  store.db.run("DROP TABLE merge_jobs");
+  const rename = MIGRATIONS.findIndex((sql) => sql.includes("UPDATE providers SET kind")) + 1;
+  store.db.run("DELETE FROM _migrations WHERE version >= ?", [rename]);
   store.db.close();
   store.openDb(dir, true);
   expect(store.getProvider(provider.id)).toEqual({ ...provider, kind: "amazon-q", name: "Amazon Q" });

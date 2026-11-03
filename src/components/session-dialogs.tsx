@@ -19,7 +19,7 @@ import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { rpc } from "@/lib/api"
 import { relativeTime, shortPath } from "@/lib/format"
 import { Spinner } from "@/components/ui/spinner"
-import { appInfo, openSession, refreshSessions, sessions } from "@/lib/store"
+import { appInfo, refreshSessions, sessions } from "@/lib/store"
 import { cn } from "@/lib/utils"
 import { t } from "@/lib/i18n"
 
@@ -164,10 +164,9 @@ export function MergeDialog({ source, target, onClose }: { source: SessionInfo |
     if (!source || !into || busy) return
     setBusy(true)
     try {
-      const merged = await rpc<SessionInfo>("sessions.merge", { id: source.id, into: into.id, instructions: focus })
+      await rpc("sessions.merge", { id: source.id, into: into.id, instructions: focus })
       onClose()
-      openSession(merged.id)
-      toast.success(t("merge.done", { title: title(merged) }))
+      toast.success(t("merge.queued"))
     } catch (err: any) {
       toast.error(err.message)
       setBusy(false)

@@ -8,9 +8,16 @@ import { drainMemoryJobs } from "../memory-jobs";
 import type { SessionRunner } from "./session-runner";
 import * as setup from "./setup";
 import * as context from "./context";
+import { appendStopMarker } from "./stop-marker";
 
 export async function run(runner: SessionRunner, fn: () => Promise<void>): Promise<void> {
+  runner.stopRequested = false;
+  const startSeq = store.loadMessages(runner.id).length;
   await shellEnvReady();
+  if (runner.stopRequested) {
+    appendStopMarker(runner.id, startSeq);
+    return;
+  }
   try {
     setup.prepare(runner);
   } catch (e: any) {
@@ -49,6 +56,12 @@ export async function run(runner: SessionRunner, fn: () => Promise<void>): Promi
     ok = false;
     store.updateSession(runner.id, { status: "error", lastError: e?.message ?? String(e) });
   } finally {
+    if (runner.stopRequested) {
+      appendStopMarker(runner.id, startSeq);
+      runner.agent.state.messages = store.loadMessages(runner.id).map((s) => s.message as any);
+      store.updateSession(runner.id, { status: "idle", lastError: null });
+      ok = true;
+    }
     runner.overflowRetried = false;
     runner.streaming = null;
     runner.setPhase(null);

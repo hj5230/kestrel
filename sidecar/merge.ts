@@ -11,12 +11,12 @@ import * as store from "./db";
 import { st } from "./i18n";
 import { costOf, sideModel } from "./side-model";
 
-export async function mergeSession(sourceId: string, targetId: string, instructions?: string): Promise<{ source: SessionInfo; target: SessionInfo }> {
+export async function prepareMerge(sourceId: string, targetId: string, instructions?: string): Promise<ChatMessage> {
   if (sourceId === targetId) throw new Error(st("mergeSelf"));
   const src = store.getSession(sourceId);
   const dst = store.getSession(targetId);
   if (!src || !dst || src.kind !== "main" || dst.kind !== "main") throw new Error(st("sessionNotFound"));
-  if (peekRunner(sourceId)?.busy || peekRunner(targetId)?.busy) throw new Error(st("sessionBusy"));
+  if (peekRunner(sourceId)?.busy) throw new Error(st("sessionBusy"));
 
   const stored = store.loadMessages(sourceId);
   const branch = src.forkOf === targetId && src.forkSeq !== null;
@@ -51,6 +51,13 @@ export async function mergeSession(sourceId: string, targetId: string, instructi
     merge: { sessionId: sourceId, title, messages: count, summary },
     timestamp: Date.now(),
   };
+  return note;
+}
+
+/** Synchronous adapter for internal callers; the UI queues a durable job instead. */
+export async function mergeSession(sourceId: string, targetId: string, instructions?: string): Promise<{ source: SessionInfo; target: SessionInfo }> {
+  if (peekRunner(targetId)?.busy) throw new Error(st("sessionBusy"));
+  const note = await prepareMerge(sourceId, targetId, instructions);
   getRunner(targetId).appendNote(note);
   store.updateSession(sourceId, { archived: true, mergedInto: targetId }, true);
   return { source: store.getSession(sourceId)!, target: store.getSession(targetId)! };
