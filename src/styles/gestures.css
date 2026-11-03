@@ -1,0 +1,43 @@
+/* Direct manipulation has no easing; transitions are only for settling after the finger is lifted. */
+[data-sheet-grabber] { display: none; }
+@media (pointer: coarse) {
+  [data-side="bottom"] > [data-sheet-grabber] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 40px;
+    flex-shrink: 0;
+    touch-action: none;
+    cursor: grab;
+  }
+  [data-sheet-grabber] > span { width: 36px; height: 5px; border-radius: 3px; background: var(--muted-foreground); opacity: .35; }
+  [data-dragging] { animation: none !important; }
+  html[data-sidebar-drag] [data-sidebar="sidebar"][data-mobile="true"] {
+    animation: none !important;
+    transform: translateX(var(--sidebar-drag-x)) !important;
+    transition: none !important;
+  }
+  html[data-sidebar-drag] [data-slot="sheet-overlay"] {
+    animation: none !important;
+    opacity: var(--sidebar-drag-opacity);
+    transition: none !important;
+  }
+  html[data-sidebar-drag="settling"] [data-sidebar="sidebar"][data-mobile="true"] { transition: transform 180ms ease-out !important; }
+  html[data-sidebar-drag="settling"] [data-slot="sheet-overlay"] { transition: opacity 180ms ease-out !important; }
+}
+@media (pointer: coarse) and (max-width: 767px) {
+  :is([data-slot="dropdown-menu-content"], [data-slot="select-content"], [data-slot="popover-content"]) > [data-sheet-grabber] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 40px;
+    margin-top: -16px;
+    touch-action: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-sidebar-drag="settling"] [data-sidebar="sidebar"][data-mobile="true"],
+  html[data-sidebar-drag="settling"] [data-slot="sheet-overlay"] { transition: none !important; }
+}

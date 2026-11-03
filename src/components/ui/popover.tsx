@@ -1,3 +1,4 @@
+import { DragHandle } from "@/components/drag-handle"
 import * as React from "react"
 import { cn } from "cn"
 import { Popover as PopoverPrimitive } from "radix-ui"
@@ -17,6 +18,7 @@ function PopoverTrigger({
 
 function PopoverContent({
   className,
+  children,
   align = "center",
   sideOffset = 4,
   onOpenAutoFocus,
@@ -39,7 +41,10 @@ function PopoverContent({
           className
         )}
         {...props}
-      />
+      >
+        <DragHandle />
+        {children}
+      </PopoverPrimitive.Content>
     </PopoverPrimitive.Portal>
   )
 }

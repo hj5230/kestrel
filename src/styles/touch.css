@@ -186,19 +186,6 @@
     box-shadow: 0 0 0 100vmax oklch(0 0 0 / 0.35);
     translate: none;
   }
-  /* Grabber, as on native sheets. */
-  :is([data-slot="dropdown-menu-content"], [data-slot="select-content"], [data-slot="popover-content"])::before {
-    content: "";
-    position: absolute;
-    top: 7px;
-    left: 50%;
-    width: 36px;
-    height: 5px;
-    margin-left: -18px;
-    border-radius: 3px;
-    background: var(--muted-foreground);
-    opacity: 0.35;
-  }
   :is([data-slot="dropdown-menu-content"], [data-slot="select-content"], [data-slot="popover-content"])[data-state="open"] {
     animation: kestrel-sheet-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
   }

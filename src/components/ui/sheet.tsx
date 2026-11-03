@@ -1,5 +1,6 @@
 "use client"
 
+import { DragHandle } from "@/components/drag-handle"
 import * as React from "react"
 import { cn } from "cn"
 import { Dialog as SheetPrimitive } from "radix-ui"
@@ -67,6 +68,7 @@ function SheetContent({
         )}
         {...props}
       >
+        {side === "bottom" && <DragHandle />}
         {children}
         {showCloseButton && (
           <SheetPrimitive.Close data-slot="sheet-close" asChild>

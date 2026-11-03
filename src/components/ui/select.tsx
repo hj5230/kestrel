@@ -1,5 +1,6 @@
 "use client"
 
+import { DragHandle } from "@/components/drag-handle"
 import * as React from "react"
 import { cn } from "cn"
 import { Select as SelectPrimitive } from "radix-ui"
@@ -75,6 +76,7 @@ function SelectContent({
         align={align}
         {...props}
       >
+        <DragHandle />
         <SelectScrollUpButton />
         <SelectPrimitive.Viewport
           data-position={position}
