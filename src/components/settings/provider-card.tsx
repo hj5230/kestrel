@@ -57,7 +57,7 @@ function ModelRow({ m, testing, onTest, onEdit }: { m: ModelConfig; testing: str
               <MoreHorizontalIcon />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="min-w-48 max-w-[calc(100vw-1.5rem)] [&_[role=menuitem]]:whitespace-nowrap">
             <DropdownMenuItem onSelect={() => onTest(m)}>
               <PlayIcon />
               {t("models.test")}
@@ -140,7 +140,7 @@ export function ProviderCard({
               <MoreHorizontalIcon />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="min-w-48 max-w-[calc(100vw-1.5rem)] [&_[role=menuitem]]:whitespace-nowrap">
             <DropdownMenuItem className="sm:hidden" onSelect={onFetch}>
               <CloudDownloadIcon />
               {t("models.addModels")}
