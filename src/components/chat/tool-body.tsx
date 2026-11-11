@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils"
 import { t } from "@/lib/i18n"
 import { ICONS, resultText, type ToolState } from "./tool-meta"
 
-export function TodoList({ todos }: { todos: Todo[] }) {
+/** `live` is false once the turn that wrote the list is over: nothing is in progress any more. */
+export function TodoList({ todos, live = true }: { todos: Todo[]; live?: boolean }) {
   return (
     <ul className="grid gap-1 py-1">
       {todos.map((t, i) => (
@@ -19,12 +20,12 @@ export function TodoList({ todos }: { todos: Todo[] }) {
           {t.status === "completed" ? (
             <CircleCheckIcon className="mt-0.5 size-3.5 shrink-0 text-success" />
           ) : t.status === "in_progress" ? (
-            <CircleDashedIcon className="mt-0.5 size-3.5 shrink-0 animate-spin text-primary [animation-duration:3s]" />
+            <CircleDashedIcon className={cn("mt-0.5 size-3.5 shrink-0", live ? "animate-spin text-primary [animation-duration:3s]" : "text-muted-foreground")} />
           ) : (
             <CircleIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/60" />
           )}
-          <span className={cn(t.status === "completed" && "text-muted-foreground line-through decoration-muted-foreground/40", t.status === "in_progress" && "font-medium")}>
-            {t.status === "in_progress" && t.activeForm ? t.activeForm : t.content}
+          <span className={cn(t.status === "completed" && "text-muted-foreground line-through decoration-muted-foreground/40", live && t.status === "in_progress" && "font-medium")}>
+            {live && t.status === "in_progress" && t.activeForm ? t.activeForm : t.content}
           </span>
         </li>
       ))}

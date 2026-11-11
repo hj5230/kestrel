@@ -2,7 +2,7 @@ import { useMemo } from "preact/hooks"
 import type { AskDetails, AssistantMsg, ToolResultMsg, TranscriptView } from "@shared/protocol"
 import { KestrelMark } from "@/components/kestrel-mark"
 import { Markdown } from "./markdown"
-import { InlinePlan } from "./inline-plan"
+import { InlinePlan, placePlans } from "./inline-plan"
 import { SquareIcon } from "lucide-react"
 import { AssistantMeta, CompactionDivider, ErrorCard, MergeNote, UserMessage } from "./messages"
 import { QuestionCard, QuestionSummary } from "./question-card"
@@ -61,7 +61,7 @@ export function Transcript({
   const inlinePhase = lastRow?.k === "group" ? phase : undefined
   const standalonePhase = lastRow?.k !== "group" && !(lastRow?.k === "text" && lastRow.streaming) ? phase : undefined
 
-  const plan = [...rows].reverse().find((r) => r.k === "plan")
+  const plans = useMemo(() => placePlans(rows), [rows])
   const win = useRowWindow(rows.length)
   const rendered: preact.JSX.Element[] = []
   rows.forEach((row, i) => {
@@ -106,9 +106,12 @@ export function Transcript({
         else el = <ProcessGroup steps={[{ k: "tool", key: row.key, block: row.block, msg: d.streaming ?? ({} as AssistantMsg), streaming: !result }]} rt={rt} waiting={false} expandable={view !== "answer"} />
         break
       }
-      // Plans are not repeated per update: only the newest one is shown, at the end (below).
-      case "plan":
+      // One plan per turn: a finished turn's last update stays here, folded; the current one is at the end.
+      case "plan": {
+        const past = plans.history.get(row.key)
+        if (past) el = <InlinePlan todos={row.block.arguments?.todos} live={false} stopped={past.stopped} />
         break
+      }
       case "aborted":
         el = <div className="flex items-center gap-1.5 py-1 text-xs text-muted-foreground"><SquareIcon className="size-2.5 fill-current opacity-60" />{t("msg.stopped")}</div>
         break
@@ -142,9 +145,9 @@ export function Transcript({
       {d.questions.filter((q) => !rows.some((r) => r.k === "ask" && r.block.id === q.toolCallId)).map((q) => (
         <div key={q.id} className="mt-3"><QuestionCard req={q} readOnly={readOnly} /></div>
       ))}
-      {plan?.k === "plan" && (
+      {plans.current && (
         <div className={cn(rendered.length && "mt-3")}>
-          <InlinePlan todos={plan.block.arguments?.todos} latest={running} />
+          <InlinePlan todos={plans.current.row.block.arguments?.todos} live={running} stopped={plans.current.stopped} />
         </div>
       )}
       {standalonePhase && (
