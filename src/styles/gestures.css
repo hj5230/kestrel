@@ -5,14 +5,19 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    align-items: flex-start;
+    position: relative;
     width: 100%;
-    min-height: 40px;
+    height: 22px;
+    padding-top: 6px;
     flex-shrink: 0;
     touch-action: none;
     cursor: grab;
   }
+  /* The bar sits at the edge as on iOS; the grab area reaches above it so it stays finger-sized. */
+  [data-side="bottom"] > [data-sheet-grabber]::before { content: ""; position: absolute; inset: -18px 0 0; }
   [data-sheet-grabber] > span { width: 36px; height: 5px; border-radius: 3px; background: var(--muted-foreground); opacity: .35; }
-  [data-dragging] { animation: none !important; }
+  [data-dragging], [data-gesture-settled][data-state="open"] { animation: none !important; }
   html[data-sidebar-drag] [data-sidebar="sidebar"][data-mobile="true"] {
     animation: none !important;
     transform: translateX(var(--sidebar-drag-x)) !important;
@@ -29,11 +34,13 @@
 @media (pointer: coarse) and (max-width: 767px) {
   :is([data-slot="dropdown-menu-content"], [data-slot="select-content"], [data-slot="popover-content"]) > [data-sheet-grabber] {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     width: 100%;
-    min-height: 40px;
-    margin-top: -16px;
+    height: 24px;
+    padding-top: 6px;
+    margin-top: -20px;
+    margin-bottom: 4px;
     touch-action: none;
   }
 }

@@ -23,6 +23,11 @@ export function DragHandle() {
       panel.style.removeProperty("transition")
       delete panel.dataset.dragging
     }
+    // Re-enabling animations on a panel that is already open would replay its entrance.
+    const settle = () => {
+      panel.dataset.gestureSettled = ""
+      reset()
+    }
     const down = (e: PointerEvent) => {
       if (e.pointerType === "mouse" || !e.isPrimary) return
       if (timer) clearTimeout(timer)
@@ -49,8 +54,12 @@ export function DragHandle() {
       panel.style.transition = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "none" : "translate 180ms ease-out"
       panel.style.translate = close ? `0 ${panel.offsetHeight + 40}px` : "0 0"
       timer = setTimeout(() => {
-        if (close) panel.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }))
-        reset()
+        if (close) {
+          // Stay where the gesture left the panel: with its animation still suppressed, Radix unmounts it at
+          // once instead of snapping back and replaying the exit. Reset only if the dismissal was refused.
+          panel.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }))
+          timer = setTimeout(settle, 400)
+        } else settle()
       }, 180)
     }
     handle.addEventListener("click", click, true)

@@ -69,7 +69,23 @@ export function useEdgeSwipe(enabled: boolean, open: boolean, setOpen: (open: bo
       root.dataset.sidebarDrag = "settling"
       root.style.setProperty("--sidebar-drag-x", next ? "0px" : `${-width}px`)
       root.style.setProperty("--sidebar-drag-opacity", next ? "1" : "0")
-      timer = setTimeout(() => { state.current.setOpen(next); clear() }, 180)
+      timer = setTimeout(() => {
+        const el = panel()
+        if (next) {
+          // Lifting the animation override on an open drawer would replay its entrance, so mark it settled.
+          for (const node of [el, el?.parentElement?.querySelector<HTMLElement>(':scope > [data-slot="sheet-overlay"]')]) {
+            if (node) node.dataset.gestureSettled = ""
+          }
+          clear()
+          return
+        }
+        // Closing keeps the override until Radix unmounts the drawer: it sees no exit animation and removes
+        // it in place instead of jumping back to fully open and sliding out again.
+        state.current.setOpen(false)
+        let frames = 0
+        const wait = () => (panel() && ++frames < 30 ? (frame = requestAnimationFrame(wait)) : clear())
+        frame = requestAnimationFrame(wait)
+      }, 180)
     }
     const finish = () => end(false)
     const cancel = () => end(true)
