@@ -1,15 +1,17 @@
 import DOMPurify from "dompurify"
 import hljs from "highlight.js/lib/common"
-import { Marked } from "marked"
+import { Marked, type MarkedExtension } from "marked"
 import { lang, t } from "./i18n"
 
+// Replies follow Markdown's own line rules; what the user typed keeps every line break they made.
 const marked = new Marked({ gfm: true, breaks: false })
+const typed = new Marked({ gfm: true, breaks: true })
 
 function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!)
 }
 
-marked.use({
+const extension: MarkedExtension = {
   renderer: {
     code({ text, lang }) {
       const language = (lang ?? "").trim().split(/\s+/)[0]
@@ -28,15 +30,19 @@ marked.use({
       return `<a href="${escapeHtml(href)}"${t} target="_blank" rel="noreferrer">${text}</a>`
     },
   },
-})
+}
+marked.use(extension)
+typed.use(extension)
+// A pasted snippet of HTML is something the user is showing, not markup to render.
+typed.use({ renderer: { html: ({ text }) => escapeHtml(text) } })
 
 const cache = new Map<string, string>()
 
-export function renderMarkdown(src: string): string {
-  const key = lang.value + "\u0000" + src
+export function renderMarkdown(src: string, opts: { breaks?: boolean } = {}): string {
+  const key = lang.value + (opts.breaks ? "\u0001" : "\u0000") + src
   const hit = cache.get(key)
   if (hit) return hit
-  const raw = marked.parse(src, { async: false }) as string
+  const raw = (opts.breaks ? typed : marked).parse(src, { async: false }) as string
   const html = DOMPurify.sanitize(raw, { ADD_ATTR: ["target", "data-copy"] })
   if (cache.size > 400) cache.clear()
   cache.set(key, html)

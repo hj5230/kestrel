@@ -1,5 +1,6 @@
 // Transcript messages, their actions and expandable reasoning.
 import { RevealedText } from "./revealed-text"
+import { Markdown } from "./markdown"
 import type { ComponentChildren } from "preact"
 import { useLayoutEffect, useRef, useState } from "preact/hooks"
 import { BrainIcon, ChevronDownIcon, ChevronRightIcon, CopyIcon, FileIcon, GitBranchIcon, PencilIcon, RotateCcwIcon, TriangleAlertIcon, CheckIcon } from "lucide-react"
@@ -146,11 +147,12 @@ export function UserMessage({
         <div
           onClick={isTouch ? () => setShown(!shown) : undefined}
           className={cn(
-            "max-w-[85%] rounded-2xl bg-muted px-4 py-2.5 text-[0.875rem] leading-relaxed whitespace-pre-wrap break-words select-text",
-            isCommand && "font-mono text-[13px]",
+            "max-w-[85%] min-w-0 rounded-2xl bg-muted px-4 py-2.5 text-[0.875rem] leading-relaxed break-words select-text",
+            isCommand && "font-mono text-[13px] whitespace-pre-wrap",
           )}
         >
-          <Foldable>{text}</Foldable>
+          {/* The same Markdown as replies, keeping the line breaks the user typed. Commands stay literal. */}
+          <Foldable>{isCommand ? text : <Markdown text={text} breaks className="markdown-bubble" />}</Foldable>
         </div>
       )}
       <div

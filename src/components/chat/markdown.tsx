@@ -14,14 +14,14 @@ function onClick(e: MouseEvent) {
   setTimeout(() => (btn.textContent = t("common.copy")), 1200)
 }
 
-export const Markdown = memo(function Markdown({ text, className, streaming }: { text: string; className?: string; streaming?: boolean }) {
+export const Markdown = memo(function Markdown({ text, className, streaming, breaks }: { text: string; className?: string; streaming?: boolean; breaks?: boolean }) {
   const ref = useTextReveal(!!streaming)
   return (
     <div
       ref={ref}
       className={cn("markdown text-[0.875rem]", className)}
       onClick={onClick as any}
-      dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }}
+      dangerouslySetInnerHTML={{ __html: renderMarkdown(text, { breaks }) }}
     />
   )
 })
