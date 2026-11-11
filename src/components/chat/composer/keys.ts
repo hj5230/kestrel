@@ -1,8 +1,16 @@
-// Keyboard handling for the input, in the order it applies: the completion menu, Esc to stop, ↑/↓ through
-// earlier messages, and the send key. Composition (IME) keystrokes are never taken.
+// What each key does in the input, decided in one place and in this order:
+// 1. composition (IME) keystrokes are never taken;
+// 2. the completion menu, while open, takes ↑ ↓ Return Tab Esc;
+// 3. Esc stops a running turn;
+// 4. ↑ at the very start of an empty (or recalled) input walks back through earlier messages, ↓ forward;
+// 5. Tab and Shift+Tab indent list items and code lines; elsewhere Tab moves focus as usual;
+// 6. Return either sends or makes a newline. ⌘/Ctrl+Return always sends. A newline is what Return means
+//    on a touch keyboard, with Shift (or without, when the send key is ⌘Return), and inside a code block.
+//    A newline continues a list or quote, keeps a code line's indent and opens a block after a fence.
+// The edits themselves are in edits.ts; `apply` makes them through the textarea so undo keeps working.
 import { isTouch } from "@/lib/platform"
 import type { MenuItem } from "./completions"
-import { fenceEnter, type Edit } from "./fence-enter"
+import { inCode, indent, newline, type Edit } from "./edits"
 
 export interface KeyContext {
   menu: { open: boolean; items: MenuItem[]; index: number; setIndex: (f: (i: number) => number) => void; pick: (item: MenuItem) => void; dismiss: () => void }
@@ -13,13 +21,11 @@ export interface KeyContext {
   setHistoryIndex: (i: number) => void
   text: string
   setText: (text: string) => void
-  /** The caret is at the very start, where ↑ means "previous message" rather than "line up". */
-  atStart: boolean
   sendKey: "enter" | "mod-enter"
   submit: () => void
-  /** The textarea's selection, for edits Return makes itself. */
+  /** The textarea's selection. */
   selection: [number, number]
-  edit: (e: Edit) => void
+  apply: (e: Edit) => void
 }
 
 export function handleComposerKey(e: KeyboardEvent, c: KeyContext) {
@@ -28,6 +34,7 @@ export function handleComposerKey(e: KeyboardEvent, c: KeyContext) {
     e.preventDefault()
     fn()
   }
+  const [start, end] = c.selection
   const { menu } = c
   if (menu.open) {
     const n = menu.items.length
@@ -37,7 +44,7 @@ export function handleComposerKey(e: KeyboardEvent, c: KeyContext) {
     if (e.key === "Escape") return take(menu.dismiss)
   }
   if (e.key === "Escape" && c.running && c.onAbort) return take(c.onAbort)
-  if (e.key === "ArrowUp" && c.history.length && (c.text === "" || c.historyIndex >= 0) && c.atStart) {
+  if (e.key === "ArrowUp" && c.history.length && (c.text === "" || c.historyIndex >= 0) && start === 0 && end === 0) {
     return take(() => {
       const next = Math.min(c.historyIndex + 1, c.history.length - 1)
       c.setHistoryIndex(next)
@@ -51,14 +58,16 @@ export function handleComposerKey(e: KeyboardEvent, c: KeyContext) {
       c.setText(next >= 0 ? c.history[c.history.length - 1 - next] : "")
     })
   }
+  if (e.key === "Tab" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    const edit = indent(c.text, start, end, e.shiftKey)
+    if (edit) return take(() => c.apply(edit))
+    return
+  }
+  if (e.key !== "Enter" || e.altKey) return
   const mod = e.metaKey || e.ctrlKey
-  // Code fences: Return opens a block or adds a line inside one. ⌘/Ctrl+Return still sends.
-  if (e.key === "Enter" && !mod && !e.altKey) {
-    const edit = fenceEnter(c.text, ...c.selection)
-    if (edit) return take(() => c.edit(edit))
-  }
-  // A software keyboard's return key inserts a newline; sending is the button's job.
-  if (e.key === "Enter" && !isTouch) {
-    if (c.sendKey === "enter" ? !e.shiftKey || mod : mod) take(c.submit)
-  }
+  if (mod && !isTouch) return take(c.submit)
+  const wantsNewline = isTouch || e.shiftKey || c.sendKey === "mod-enter" || inCode(c.text, start)
+  if (!wantsNewline) return take(c.submit)
+  const edit = newline(c.text, start, end)
+  if (edit) take(() => c.apply(edit))
 }

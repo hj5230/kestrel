@@ -113,24 +113,24 @@ export function Composer(props: ComposerProps) {
       setHistoryIndex,
       text,
       setText,
-      atStart: (ta.current?.selectionStart ?? 0) === 0,
       sendKey,
       submit,
       selection: [ta.current?.selectionStart ?? 0, ta.current?.selectionEnd ?? 0],
-      edit: (next) => {
+      apply: (edit) => {
         const el = ta.current
         if (!el) return
-        const start = el.selectionStart
-        // insertText goes through the textarea's own editing, so ⌘Z undoes it and onInput syncs the state.
-        if (document.execCommand("insertText", false, next.insert)) {
-          // Same tick, so the next keystroke already lands inside the block.
-          el.setSelectionRange(start + next.caret, start + next.caret)
-          setCaret(start + next.caret)
-        } else {
-          setText(next.text)
-          persist(next.text)
-          placeCaret(start + next.caret)
+        // Through the textarea's own editing, so ⌘Z undoes it and onInput syncs the state.
+        el.setSelectionRange(edit.from, edit.to)
+        const native = edit.insert ? document.execCommand("insertText", false, edit.insert) : edit.from === edit.to || document.execCommand("delete")
+        if (!native) {
+          const next = el.value.slice(0, edit.from) + edit.insert + el.value.slice(edit.to)
+          setText(next)
+          persist(next)
+          return placeCaret(edit.sel[0])
         }
+        // Same tick, so the next keystroke already lands where the edit put the caret.
+        el.setSelectionRange(...edit.sel)
+        setCaret(edit.sel[0])
       },
     })
 
