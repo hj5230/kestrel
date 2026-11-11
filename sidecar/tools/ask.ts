@@ -42,6 +42,7 @@ export function createAskUserTool(ctx: ToolContext): KestrelTool {
       "Use it for unclear or two-way requirements, a choice between approaches, and a plan or proposal that needs a go-ahead before something large or hard to undo " +
       "(summarise the plan in your message, then offer options such as 'Go ahead' and 'Change something'). " +
       "Don't use it for things you can find out yourself, small choices you can just make and mention, or permission for ordinary tool calls; the permission system handles those. " +
+      "For each question decide whether its options are alternatives (single choice) or can be combined (set multiple: true). " +
       "Put the option you recommend first and set recommended on it. Each question also offers a free-text 'Other', so don't add one. " +
       "Keep the questions few and the options short; put the trade-offs in each option's description.",
     parameters: Type.Object({
@@ -57,7 +58,13 @@ export function createAskUserTool(ctx: ToolContext): KestrelTool {
             }),
             { minItems: 2, maxItems: 8 },
           ),
-          multiple: Type.Optional(Type.Boolean({ description: "Allow selecting several options" })),
+          multiple: Type.Optional(
+            Type.Boolean({
+              description:
+                "Decide this for every question. true: the options can be combined and the user may pick several (which features to include, which files to touch). " +
+                "false or omitted: they are alternatives and exactly one is picked.",
+            }),
+          ),
         }),
         { minItems: 1, maxItems: 5 },
       ),
