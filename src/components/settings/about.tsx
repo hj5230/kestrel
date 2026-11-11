@@ -1,4 +1,4 @@
-// Settings > About: version, data location and the tools Kestrel found on this Mac.
+// Settings > About: version and updates, data location and the tools Kestrel found on this Mac.
 import { FolderOpenIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Panel, Row, Section } from "@/components/settings/layout"
@@ -6,6 +6,7 @@ import { rpc } from "@/lib/api"
 import { t } from "@/lib/i18n"
 import { appInfo } from "@/lib/store"
 import { isMobileApp } from "@/lib/platform"
+import { Updates } from "./updates"
 
 export function About() {
   const info = appInfo.value
@@ -19,6 +20,8 @@ export function About() {
     ["ripgrep", info.ripgrep ? t("settings.rgFound") : t("settings.rgMissing")],
   ]
   return (
+    <>
+    <Updates />
     <Section title={t("settings.aboutTitle")} desc={t("settings.aboutDesc")}>
       <Panel>
         {rows.map(([k, v]) => (
@@ -34,5 +37,6 @@ export function About() {
         </div>
       )}
     </Section>
+    </>
   )
 }

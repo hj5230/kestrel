@@ -3,11 +3,14 @@ import preact from "@preact/preset-vite";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 import process from "node:process";
+import pkg from "./package.json" with { type: "json" };
 
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig(() => ({
   plugins: [preact(), tailwindcss()],
+  // The version this front end was built as. On the phone it is the app's own version, not the Mac's.
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),

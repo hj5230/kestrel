@@ -9,10 +9,12 @@ import { isMobileApp } from "@/lib/platform"
 import { cn } from "@/lib/utils"
 import { t } from "@/lib/i18n"
 import { MacSwitcher } from "./mac-switcher"
+import { UpdateButton } from "./update-button"
 
 export function SidebarStatus() {
   return (
     <SidebarFooter className="pb-[max(0.5rem,var(--inset-bottom))]">
+      <UpdateButton />
       <div className="flex items-center gap-1.5 px-1.5 text-xs">
         <span className={cn("size-1.5 shrink-0 rounded-full", connected.value ? "bg-success" : "bg-destructive")} />
         {isMobileApp && pairedMac.value ? (

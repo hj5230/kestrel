@@ -6,6 +6,7 @@ import { t } from "../i18n"
 import { onPairedMacChanged } from "../pairing"
 import { isMobileApp, isTauri } from "../platform"
 import { feedback } from "../feedback"
+import { loadUpdateStatus, updateStatus } from "../update"
 import { route, sessions, settings, mcpServers, memoryRev, connected, remoteStatus, pairedMac, pairedMacs, deviceRevoked, unseen, setUnseen, markSeen, details, loadDetail, patchDetail, refreshSessions, refreshProviders, upsertSession } from "../store"
 
 export async function notify(title: string, body: string) {
@@ -36,6 +37,7 @@ export function handleEvents() {
     const was = connected.value
     connected.value = c
     if (c && !was) {
+      void loadUpdateStatus()
       refreshSessions().catch(() => {})
       for (const [id, sig] of details) if (sig.value) loadDetail(id).catch(() => {})
     }
@@ -134,6 +136,9 @@ export function handleEvents() {
         break
       case "remote_status":
         remoteStatus.value = e.status
+        break
+      case "update_status":
+        updateStatus.value = e.status
         break
     }
   })
