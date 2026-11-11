@@ -29,7 +29,8 @@
     .island-kestrel.is-out, .island-kestrel.is-back, .island-kestrel.is-out > svg { animation: none; }
     .island-kestrel.is-back { visibility: hidden; }
 }
-@keyframes breathe { 0%, 100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.15); } }
+/* Working dot: it breathes in brightness only; a changing size reads as pulsing. */
+@keyframes breathe { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
 @utility animate-breathe { animation: breathe 1.8s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .animate-breathe { animation: none; } }
 .text-shimmer {

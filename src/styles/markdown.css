@@ -48,8 +48,16 @@
 .markdown pre code { display: block; padding: 0.8em 1em; overflow-x: auto; }
 .markdown table { border-collapse: collapse; display: block; overflow-x: auto; font-size: 0.92em; }
 .markdown th, .markdown td { border: 1px solid var(--border); padding: 0.4em 0.75em; text-align: left; }
+/* `anywhere` (on .markdown) also shrinks a cell's minimum width to one character, so the table layout squeezed
+   short columns into a letter-wide stack. `break-word` wraps the same overflow without that effect. */
+.markdown th, .markdown td { overflow-wrap: break-word; }
+/* The first column is usually a short key or name; the layout still squeezes it, so it never wraps. A table
+   too wide for the reply scrolls sideways instead. */
+.markdown th:first-child, .markdown td:first-child { white-space: nowrap; }
 .markdown th { background: var(--muted); font-weight: 600; }
 .markdown img { max-width: 100%; border-radius: var(--radius); }
+/* In a user bubble (already muted) inline code needs its own tint to stand out. */
+.markdown-bubble :not(pre) > code { background: color-mix(in oklch, var(--foreground) 9%, transparent); }
 
 .hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-doctag, .hljs-type { color: var(--hl-keyword); }
 .hljs-string, .hljs-regexp, .hljs-addition, .hljs-template-tag { color: var(--hl-string); }
@@ -67,5 +75,17 @@
 .md-source .md-heading { color: var(--foreground); -webkit-text-stroke: 0.35px currentColor; }
 .md-source .md-strong { -webkit-text-stroke: 0.35px currentColor; }
 .md-source .md-em { color: color-mix(in oklch, var(--foreground) 80%, var(--primary)); }
-.md-source .md-code, .md-source .md-codeblock { color: var(--hl-string); background: color-mix(in oklch, var(--muted) 70%, transparent); border-radius: 3px; }
+/* Same look as inline code in messages: the text's own color on a muted tint. */
+.md-source .md-code { background: var(--muted); border-radius: 3px; }
+/* A fenced block is one framed box, like a code block in a message. The frame must not move text: the side
+   margin and padding cancel out, and the top and bottom of the frame are a shadow, which takes no space. */
+.md-source .md-codeblock {
+    display: block;
+    margin-inline: -8px;
+    padding-inline: 8px;
+    border-radius: 8px;
+    background: var(--code-bg);
+    box-shadow: 0 0 0 3px var(--code-bg), 0 0 0 4px var(--border);
+}
+.md-source .md-codeline { color: var(--foreground); }
 .md-source .md-link { color: var(--primary); }
