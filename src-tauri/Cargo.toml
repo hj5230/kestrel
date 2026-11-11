@@ -1,6 +1,6 @@
 [package]
 name = "kestrel"
-version = "0.1.0-beta.3"
+version = "0.1.0-beta.6"
 description = "Kestrel — local agent harness"
 authors = ["zhaoshangqi"]
 edition = "2021"
