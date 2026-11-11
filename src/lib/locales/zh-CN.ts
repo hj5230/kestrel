@@ -160,6 +160,7 @@ export const zhCN: Record<MessageKey, string> = {
   "update.download": "下载",
   "update.available": "有可用更新",
   "update.pill": "重启以更新",
+  "update.failedPill": "{version} 更新失败 · 重试",
   "approval.allow": "允许",
   "approval.always": "始终允许 {rule}",
   "approval.editRule": "编辑规则",

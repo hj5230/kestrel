@@ -20,7 +20,7 @@ export function About() {
     ["ripgrep", info.ripgrep ? t("settings.rgFound") : t("settings.rgMissing")],
   ]
   return (
-    <>
+    <div className="grid gap-8">
     <Updates />
     <Section title={t("settings.aboutTitle")} desc={t("settings.aboutDesc")}>
       <Panel>
@@ -37,6 +37,6 @@ export function About() {
         </div>
       )}
     </Section>
-    </>
+    </div>
   )
 }

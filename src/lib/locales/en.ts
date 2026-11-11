@@ -158,6 +158,7 @@ export const en = {
   "update.download": "Download",
   "update.available": "Update available",
   "update.pill": "Restart to update",
+  "update.failedPill": "Update {version} failed · retry",
   "approval.allow": "Allow",
   "approval.always": "Always allow {rule}",
   "approval.editRule": "Edit rule",
