@@ -4,7 +4,7 @@ import type { ApprovalNote } from "../../shared/protocol";
 import { parseShell, type SimpleCommand } from "../shell";
 import { realPath, GIT_DIR, Paths } from "./paths";
 import type { PermissionContext } from "../permissions";
-import { MULTI_WORD, RUN_WORD, isBroadEntry, segmentMatches, riskyArgs } from "./rules";
+import { MULTI_WORD, RUN_WORD, RUNS_OTHER_CODE, isBroadEntry, segmentMatches, riskyArgs } from "./rules";
 
 export type Level = 0 | 1 | 2; // allow, unknown, force a person
 
@@ -200,6 +200,8 @@ export function suggestBashPrefix(cmd: string): string | null {
   if (MULTI_WORD.has(words[0]) && words[1] && !words[1].startsWith("-")) {
     prefix = RUN_WORD.has(words[1]) && words[2] && !words[2].startsWith("-") ? words.slice(0, 3).join(" ") : words.slice(0, 2).join(" ");
   } else prefix = words[0];
-  // A prefix that would let any command through is no use as a rule.
-  return isBroadEntry(prefix) ? null : prefix;
+  if (!isBroadEntry(prefix)) return prefix;
+  // A prefix that would let any command through is no use as a rule; the exact command line can be,
+  // unless it runs code that lives elsewhere.
+  return RUNS_OTHER_CODE.has(words[0]) ? null : "=" + words.join(" ");
 }

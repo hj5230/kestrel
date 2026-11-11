@@ -13,18 +13,17 @@ import type { SessionRunner } from "./session-runner";
 import { approvals, pendingQuestions } from "./pending";
 import { saveQuestion } from "../db/questions";
 
-/** What the reviewer reads: the user's words and the agent's tool calls, nothing else. */
+/** What the reviewer reads: the user's words, what the user approved by hand, and the agent's tool calls. */
 export function reviewTranscript(runner: SessionRunner): string {
   const own = runner.agent.state.messages;
-  if (!runner.parent) return buildTranscript(partsFromMessages(own));
+  const approved = runner.root().gate.approved.map((text) => ({ role: "approved" as const, text }));
+  if (!runner.parent) return buildTranscript([...approved, ...partsFromMessages(own)]);
   const rootParts = partsFromMessages(runner.root().agent.state.messages).filter((p) => p.role !== "tool_call");
-  return buildTranscript([...rootParts, ...partsFromMessages(own, { firstUserIsTask: true })]);
+  return buildTranscript([...approved, ...rootParts, ...partsFromMessages(own, { firstUserIsTask: true })]);
 }
 
-/** Auto mode: the reviewer decides. Returns a block result, or null to let the call run; falls back to asking a person. */
+/** Auto mode: the reviewer decides. Returns null to let the call run; anything it would block, or can't judge, goes to a person. */
 export async function autoReview(runner: SessionRunner, tool: KestrelTool, args: unknown, perm: PermissionResult, signal?: AbortSignal): Promise<{ block: true; reason: string } | PermissionResult | null> {
-  const gate = runner.root().gate;
-  if (gate.paused) return { ...perm, action: "ask", note: { code: "review_paused" } };
   try {
     const settings = store.getSettings();
     const picked = parseModelSetting(settings.autoModel);
@@ -35,25 +34,8 @@ export async function autoReview(runner: SessionRunner, tool: KestrelTool, args:
       signal,
       onUsage: (u) => picked && recordSideUsage(runner.id, "review", picked, u),
     });
-    if (!r.block) {
-      gate.consecutive = 0;
-      return null;
-    }
-    gate.consecutive++;
-    gate.total++;
-    if (gate.consecutive < 3 && gate.total < 20) {
-      return {
-        block: true,
-        reason:
-          `Auto review blocked this action: ${r.reason} ` +
-          "Treat this as a boundary, not an obstacle: do not retry it, reword it, split it into smaller steps or run it another way. " +
-          "Pick a clearly safer approach that still serves the user's request, or ask the user how to proceed.",
-      };
-    }
-    // Too many blocks: stop and hand this one to a person. Approving it resumes auto mode.
-    gate.paused = true;
-    gate.consecutive = 0;
-    if (gate.total >= 20) gate.total = 0;
+    if (!r.block) return null;
+    // The reviewer is a second opinion, not the last word: the user sees its reason and decides.
     return { ...perm, action: "ask", note: { code: "review_blocked", detail: r.reason } };
   } catch (e: any) {
     if (signal?.aborted) return { block: true, reason: "Operation aborted by the user." };
@@ -155,8 +137,9 @@ export async function beforeToolCall(runner: SessionRunner, ctx: { toolCall: any
       reason: `The user denied this tool call.${decision.reason ? ` User's note: ${decision.reason}` : ""} Do not retry the same call; adjust your approach or ask the user how to proceed.`,
     };
   }
-  // A person approved something: auto mode picks up again.
-  runner.root().gate = { ...runner.root().gate, paused: false, consecutive: 0 };
+  // The reviewer reads what the user approved by hand: the same kind of action again is authorized.
+  const gate = runner.root().gate;
+  gate.approved = [...gate.approved, describeAction(tool, ctx.args, s.cwd).split("\n").slice(1).join("\n").slice(0, 600)].slice(-20);
   const pattern = (decision.pattern ?? perm.suggestion ?? "").trim();
   // A rule that lets any command through (`bash`, `rm`, `python3`, …) is never saved.
   if (decision.decision === "allow_always" && pattern && !(perm.kind === "bash" && isBroadEntry(pattern))) {

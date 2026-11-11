@@ -119,12 +119,13 @@ describe("auto mode, end to end", () => {
     expect(rows[0]).toEqual({ model: "reviewer", input: 1 });
   }, 60000);
 
-  test("a blocked action comes back to the agent as a result and does not run", async () => {
-    const { asked, results } = await session(["git push --force origin main"]);
-    expect(asked).toEqual([]);
+  test("an action the reviewer would block goes to the user with its reason, and does not run unless approved", async () => {
+    const { asked, results } = await session(["git push --force origin main"], "deny");
+    expect(asked.length).toBe(1);
+    expect(asked[0].note?.code).toBe("review_blocked");
+    expect(asked[0].note?.detail).toContain("Nobody asked");
     expect(results[0].error).toBe(true);
-    expect(results[0].text).toContain("Auto review blocked this action: Nobody asked to rewrite history.");
-    expect(results[0].text).toContain("do not retry it");
+    expect(results[0].text).toContain("The user denied this tool call.");
   }, 60000);
 
   test("the reviewer only ever sees the user's words and the tool call", async () => {
@@ -136,19 +137,11 @@ describe("auto mode, end to end", () => {
     expect(seen).not.toContain("finished");
   }, 60000);
 
-  test("three blocks in a row hand the third to a person, with the reason", async () => {
-    const { asked, results } = await session(["git push --force a", "git push --force b", "git push --force c", "git push --force d"], "deny");
-    expect(results.map((r) => r.error)).toEqual([true, true, true, true]);
-    expect(asked.length).toBe(2); // the third, then the fourth (auto mode is paused until something is approved)
-    expect(asked[0].note?.code).toBe("review_blocked");
-    expect(asked[0].note?.detail).toContain("Nobody asked");
-    expect(asked[1].note?.code).toBe("review_paused");
-  }, 60000);
-
-  test("approving the escalated action resumes auto mode", async () => {
-    const { asked } = await session(["git push --force a", "git push --force b", "git push --force c", "true"], "allow_once");
-    expect(asked.length).toBe(1);
-    expect(asked[0].note?.code).toBe("review_blocked");
+  test("every flagged action is the user's call, and the reviewer then sees what was approved", async () => {
+    reviewerSaw.length = 0;
+    const { asked } = await session(["git push --force a", "git push --force b"], "allow_once");
+    expect(asked.map((a) => a.note?.code)).toEqual(["review_blocked", "review_blocked"]);
+    expect(reviewerSaw.some((seen) => seen.includes("[the user approved this action by hand] bash: git push --force a"))).toBe(true);
   }, 60000);
 
   test("when the reviewer cannot be reached, a person is asked", async () => {

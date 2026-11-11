@@ -21,9 +21,8 @@ export type ApprovalNoteCode =
   | "sensitive_read" // reading credentials
   | "critical_delete" // deleting or moving `/`, the home folder or a folder directly under it
   | "outside_project" // editing a file outside the working folder
-  | "review_blocked" // the auto-review model said no and the agent kept pushing
-  | "review_error" // the auto-review model could not be reached
-  | "review_paused"; // too many blocks in a row: auto mode paused until you approve something
+  | "review_blocked" // the auto-review model would block it; the user decides
+  | "review_error"; // the auto-review model could not be reached
 
 
 export interface ApprovalNote {

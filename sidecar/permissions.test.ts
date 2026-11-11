@@ -277,9 +277,14 @@ describe("always-allow suggestions", () => {
   });
 
   test("never suggest a rule that lets anything through", () => {
-    for (const cmd of ["bash script.sh", "sudo ls", "rm -rf build", "curl https://x.test", "python3", "git", "xargs ls"]) {
+    for (const cmd of ["bash script.sh", "sudo ls", "python3 -c 1", "python3", "xargs ls"]) {
       expect(suggestBashPrefix(cmd)).toBeNull();
     }
+    // Broad but self-contained commands are offered as that exact line.
+    expect(suggestBashPrefix("rm -rf build")).toBe("=rm -rf build");
+    expect(suggestBashPrefix("curl https://x.test")).toBe("=curl https://x.test");
+    expect(suggestBashPrefix("git")).toBe("=git");
+    expect(isBroadEntry("=rm -rf build")).toBe(false);
     expect(isBroadEntry("python3")).toBe(true);
     expect(isBroadEntry("npm run")).toBe(true);
     expect(isBroadEntry("bun run")).toBe(true);

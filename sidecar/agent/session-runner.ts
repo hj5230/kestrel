@@ -112,7 +112,8 @@ export class SessionRunner {
   }
 
   /** Auto-review bookkeeping, shared by the session and its subagents. */
-  gate = { consecutive: 0, total: 0, paused: false };
+  /** Actions the user approved by hand in this session, newest last, for the auto reviewer. */
+  gate: { approved: string[] } = { approved: [] };
 
   root(): SessionRunner {
     return this.parent ? this.parent.root() : this;

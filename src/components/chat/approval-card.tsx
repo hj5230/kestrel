@@ -1,5 +1,5 @@
 import { useState } from "preact/hooks"
-import { ShieldAlertIcon, ShieldQuestionIcon } from "lucide-react"
+import { PencilIcon, ShieldAlertIcon, ShieldQuestionIcon } from "lucide-react"
 import { toast } from "sonner"
 import type { ApprovalDecision, ApprovalNote, ApprovalRequest } from "@shared/protocol"
 import { Button } from "@/components/ui/button"
@@ -26,6 +26,12 @@ function title(req: ApprovalRequest) {
   return (req.subagent ? t("approval.subagent") : "") + base
 }
 
+/** A rule as the button shows it: `=` (exact command) is notation, not part of the command. */
+const ruleLabel = (rule: string) => {
+  const r = rule.replace(/^=\s*/, "")
+  return r.length > 40 ? r.slice(0, 39) + "…" : r
+}
+
 const NOTES: Record<ApprovalNote["code"], MessageKey> = {
   protected_path: "approval.note.protected_path",
   sensitive_read: "approval.note.sensitive_read",
@@ -33,7 +39,6 @@ const NOTES: Record<ApprovalNote["code"], MessageKey> = {
   outside_project: "approval.note.outside_project",
   review_blocked: "approval.note.review_blocked",
   review_error: "approval.note.review_error",
-  review_paused: "approval.note.review_paused",
 }
 
 export function ApprovalCard({ req }: { req: ApprovalRequest }) {
@@ -80,10 +85,16 @@ export function ApprovalCard({ req }: { req: ApprovalRequest }) {
           {t("approval.allow")}
         </Button>
         {req.whitelistSuggestion && (
+          // One click remembers the suggested rule; the pencil lets the user widen or narrow it first.
+          <Button size="sm" variant="secondary" disabled={busy} className="max-w-full min-w-0" onClick={() => respond("allow_always", { pattern: req.whitelistSuggestion! })}>
+            <span className="truncate">{t("approval.always", { rule: ruleLabel(req.whitelistSuggestion) })}</span>
+          </Button>
+        )}
+        {req.whitelistSuggestion && (
           <Popover>
             <PopoverTrigger asChild>
-              <Button size="sm" variant="secondary" disabled={busy}>
-                {t("approval.whitelist")}
+              <Button size="icon-sm" variant="ghost" disabled={busy} aria-label={t("approval.editRule")}>
+                <PencilIcon />
               </Button>
             </PopoverTrigger>
             <PopoverContent align="start" className="w-80">
@@ -95,7 +106,7 @@ export function ApprovalCard({ req }: { req: ApprovalRequest }) {
                 }}
               >
                 <div className="text-sm font-medium">{t("approval.whitelistTitle")}</div>
-                <div className="text-xs text-muted-foreground">{t(req.kind === "bash" ? "approval.whitelistDescBash" : "approval.whitelistDescTool")}</div>
+                <div className="text-xs text-muted-foreground">{t(req.kind !== "bash" ? "approval.whitelistDescTool" : pattern.trim().startsWith("=") ? "approval.whitelistDescExact" : "approval.whitelistDescBash")}</div>
                 <Input autoFocus className="font-mono text-xs" value={pattern} onInput={(e) => setPattern(e.currentTarget.value)} />
                 <div className="flex justify-end">
                   <Button size="sm" type="submit" disabled={!pattern.trim()}>

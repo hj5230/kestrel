@@ -20,11 +20,24 @@ export const PACKAGE_MANAGERS = new Set(["npm", "pnpm", "yarn", "bun", "cargo", 
 
 export const RUNNER_WORDS = new Set(["run", "exec", "x", "dlx", "script"]);
 
+/**
+ * Broad commands that are still worth remembering one exact command line of (`=rm -rf dist`). Shells,
+ * interpreters and wrappers are not: the same line can run a script whose content changes.
+ */
+export const RUNS_OTHER_CODE = new Set([
+  "bash", "sh", "zsh", "fish", "dash", "ksh", "csh", "tcsh", "env", "sudo", "su", "doas", "xargs", "eval", "exec", "source", ".", "command", "builtin", "nohup", "time",
+  "python", "python3", "node", "deno", "bun", "ruby", "perl", "php", "lua", "osascript", "awk", "gawk", "npx", "bunx", "pnpx", "uvx",
+]);
+
+/** `=cmd args` allows that command line only, never with anything added. */
+export const isExactEntry = (e: string) => e.trim().startsWith("=");
+
 export function normalizeEntry(e: string): string {
   return e.trim().replace(/(:\*|\s\*)$/, "").trim();
 }
 
 export function isBroadEntry(entry: string): boolean {
+  if (isExactEntry(entry)) return false;
   const words = normalizeEntry(entry).split(/\s+/).filter(Boolean);
   if (words.length === 1) return BROAD_WORDS.has(words[0]);
   if (words.length === 2) return PACKAGE_MANAGERS.has(words[0]) && RUNNER_WORDS.has(words[1]);
@@ -32,6 +45,7 @@ export function isBroadEntry(entry: string): boolean {
 }
 
 export function segmentMatches(segment: string, entry: string): boolean {
+  if (isExactEntry(entry)) return segment === entry.trim().slice(1).trim();
   const e = normalizeEntry(entry);
   if (!e) return false;
   return segment === e || segment.startsWith(e + " ");
