@@ -2,7 +2,7 @@ import { jsonSchema, streamText, type LanguageModel, type ToolSet } from "ai";
 import { calculateCost, createAssistantMessageEventStream, type AssistantMessage, type Context, type Model, type SimpleStreamOptions, type StopReason, type ToolCall } from "@mariozechner/pi-ai";
 import type { ProviderKind } from "../../shared/protocol";
 import { reasoningRequest } from "./reasoning";
-import { emptyUsage, estimateUsage, encodeMeta, toModelMessages, errorText } from "./vercel-messages";
+import { emptyUsage, estimateUsage, encodeMeta, toModelMessages, errorText, TEXT_ONLY_TOOL_RESULTS } from "./vercel-messages";
 export { toModelMessages } from "./vercel-messages";
 
 export type ModelResolver = (model: Model<any>) => {
@@ -47,7 +47,7 @@ export function createVercelStreamFn(resolve: ModelResolver) {
         const result = streamText({
           model: resolved.model,
           system: context.systemPrompt,
-          messages: toModelMessages(context.messages, model),
+          messages: toModelMessages(context.messages, model, { imagesInToolResults: !TEXT_ONLY_TOOL_RESULTS.has(resolved.kind ?? "openai-compatible") }),
           tools: Object.keys(tools).length ? tools : undefined,
           maxOutputTokens: options?.maxTokens,
           temperature: options?.temperature,

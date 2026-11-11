@@ -44,13 +44,37 @@ export function decodeMeta(sig: string | undefined): Record<string, any> | undef
   }
 }
 
-export function toModelMessages(messages: Message[], target: Model<any>): ModelMessage[] {
+export interface MessageOptions {
+  /**
+   * Whether the provider's adapter sends images inside a tool result as images. The OpenAI-compatible
+   * adapter doesn't: it JSON-encodes the whole result, so a screenshot reaches the model as megabytes of
+   * base64 text and overflows the context. For those, images move to a user message after the results.
+   */
+  imagesInToolResults?: boolean;
+}
+
+/** Providers whose AI SDK adapter turns image parts of a tool result into text. */
+export const TEXT_ONLY_TOOL_RESULTS = new Set(["openai-compatible", "openrouter", "ollama"]);
+
+const IMAGE_OMITTED = "[image omitted: this model does not accept images]";
+
+export function toModelMessages(messages: Message[], target: Model<any>, opts: MessageOptions = {}): ModelMessage[] {
   const out: ModelMessage[] = [];
   const answered = new Set<string>();
   for (const m of messages) if (m.role === "toolResult") answered.add(m.toolCallId);
+  const vision = target.input.includes("image");
+  const inline = opts.imagesInToolResults ?? true;
+  // Images taken out of tool results, sent once the run of results is over.
+  let hoisted: { type: "image"; image: string; mediaType: string }[] = [];
+  const flush = () => {
+    if (!hoisted.length) return;
+    out.push({ role: "user", content: [{ type: "text", text: "Images returned by the tool calls above, in order:" }, ...hoisted] });
+    hoisted = [];
+  };
 
   for (let i = 0; i < messages.length; i++) {
     const m = messages[i];
+    if (m.role !== "toolResult") flush();
     if (m.role === "user") {
       if (typeof m.content === "string") {
         out.push({ role: "user", content: m.content });
@@ -60,7 +84,9 @@ export function toModelMessages(messages: Message[], target: Model<any>): ModelM
           content: m.content.map((c) =>
             c.type === "text"
               ? { type: "text" as const, text: c.text }
-              : { type: "image" as const, image: c.data, mediaType: c.mimeType },
+              : vision
+                ? { type: "image" as const, image: c.data, mediaType: c.mimeType }
+                : { type: "text" as const, text: IMAGE_OMITTED },
           ),
         });
       }
@@ -100,11 +126,13 @@ export function toModelMessages(messages: Message[], target: Model<any>): ModelM
         });
       }
     } else if (m.role === "toolResult") {
-      const hasImage = m.content.some((c) => c.type === "image");
-      const text = m.content
-        .filter((c) => c.type === "text")
-        .map((c: any) => c.text)
-        .join("\n");
+      const images = m.content.filter((c) => c.type === "image");
+      const hasImage = vision && inline && images.length > 0;
+      if (vision && !inline) for (const c of images as any[]) hoisted.push({ type: "image", image: c.data, mediaType: c.mimeType });
+      const text = [
+        ...m.content.filter((c) => c.type === "text").map((c: any) => c.text),
+        ...(images.length && !hasImage ? [vision ? `[${images.length} image(s) attached in the next message]` : IMAGE_OMITTED] : []),
+      ].join("\n");
       const output = hasImage
         ? {
             type: "content" as const,
@@ -123,6 +151,7 @@ export function toModelMessages(messages: Message[], target: Model<any>): ModelM
       else out.push({ role: "tool", content: [part] });
     }
   }
+  flush();
   return out;
 }
 
