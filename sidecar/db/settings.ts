@@ -47,6 +47,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   transcriptView: "compact",
   remoteEnabled: false,
   remotePort: 47830,
+  updateAutoCheck: true,
+  updateChannel: "beta",
 };
 
 /** A saved allowlist is the user's own and stays as it is, except that entries added to the defaults later are

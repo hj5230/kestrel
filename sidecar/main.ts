@@ -1,4 +1,6 @@
 import { startMergeJobs } from "./merge-jobs";
+import { initUpdater } from "./update/updater";
+import { version } from "../package.json";
 import os from "node:os";
 import path from "node:path";
 import { loadCatalogCache, lookupFacts, refreshCatalog } from "./catalog";
@@ -41,6 +43,7 @@ const server = startServer({ port, token, dataDir, dev });
 console.log(`KESTREL_READY ${JSON.stringify({ port: server.port, token })}`);
 initRemote(dataDir);
 startMergeJobs();
+initUpdater({ dataDir, version, dev });
 
 // The catalog is large and the network copy can be a day old. Refresh after the app is up, then
 // fill any model fields that are still at the generic default.

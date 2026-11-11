@@ -140,4 +140,8 @@ export interface AppSettings {
   transcriptView: TranscriptView;
   remoteEnabled: boolean;
   remotePort: number;
+  /** Look for a new version at launch and every few hours, and download it in the background. */
+  updateAutoCheck: boolean;
+  /** beta: every published build; stable: only releases without a pre-release tag. */
+  updateChannel: "beta" | "stable";
 }

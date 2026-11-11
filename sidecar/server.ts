@@ -13,13 +13,14 @@ import { modelHandlers } from "./rpc/models";
 import { sessionHandlers } from "./rpc/sessions";
 import { extensionHandlers } from "./rpc/extensions";
 import { fileHandlers } from "./rpc/files";
+import { updateHandlers } from "./rpc/update";
 import type { Caller, Handler } from "./rpc/types";
 
 export type { Caller } from "./rpc/types";
 
 import { version as VERSION } from "../package.json";
 
-const handlers: Record<string, Handler> = { ...appHandlers, ...modelHandlers, ...sessionHandlers, ...extensionHandlers, ...fileHandlers };
+const handlers: Record<string, Handler> = { ...appHandlers, ...modelHandlers, ...sessionHandlers, ...extensionHandlers, ...fileHandlers, ...updateHandlers };
 
 export interface SocketData {
   caller: Caller;
@@ -33,7 +34,8 @@ export function registerHandlers(extra: Record<string, Handler>) {
 // A paired phone gets the full agent API, but must not be able to pair or revoke devices.
 // files.describe turns an arbitrary path into a file's name and size, so it stays on the desktop:
 // a paired phone uploads through /upload instead, and must not be able to probe the Mac's files.
-const localOnly = (method: string) => method.startsWith("remote.") || method === "files.describe" || method === "files.import";
+// Updating the Mac's app is the Mac's decision too.
+const localOnly = (method: string) => method.startsWith("remote.") || method === "files.describe" || method === "files.import" || method === "update.check";
 
 async function dispatch(body: any, caller: Caller, headers: Record<string, string>): Promise<Response> {
   const method = String(body?.method ?? "");

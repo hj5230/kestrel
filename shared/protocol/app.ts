@@ -3,6 +3,7 @@ import type { AssistantMsg, StoredMessage } from "./messages";
 import type { ApprovalRequest, QuestionRequest } from "./requests";
 import type { RunPhase, SessionInfo, CompactionInfo, QueuedMessage } from "./sessions";
 import type { McpServerStatus } from "./settings";
+import type { UpdateStatus } from "./update";
 
 export interface RemoteDevice {
   id: string;
@@ -89,7 +90,8 @@ export type ServerEvent =
   | { type: "models_updated" }
   | { type: "notice"; sessionId?: string; level: "info" | "warn" | "error"; text: string }
   | { type: "run_finished"; sessionId: string; title: string; ok: boolean }
-  | { type: "remote_status"; status: RemoteStatus };
+  | { type: "remote_status"; status: RemoteStatus }
+  | { type: "update_status"; status: UpdateStatus };
 
 export interface HistorySourceStatus {
   id: string;
