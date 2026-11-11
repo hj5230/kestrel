@@ -63,6 +63,8 @@ export const zhCN: Record<MessageKey, string> = {
   "merge.descWhole": "Kestrel 会总结「{from}」，作为一条备注加到「{into}」，智能体会在你下一条消息时读到它。之后「{from}」会被归档，可在“已归档”中恢复。",
   "merge.search": "搜索会话",
   "merge.into": "合并到",
+  "merge.intoTitle": "合并到「{title}」",
+  "merge.fromTitle": "来自「{title}」",
   "merge.none": "没有其他会话",
   "merge.focus": "希望总结侧重什么（可选）",
   "merge.action": "合并",

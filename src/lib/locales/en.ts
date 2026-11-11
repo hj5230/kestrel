@@ -61,6 +61,8 @@ export const en = {
   "merge.descWhole": "Kestrel summarizes “{from}” and adds it to “{into}” as a note the agent reads with your next message. “{from}” is then archived; you can restore it from Archived.",
   "merge.search": "Search sessions",
   "merge.into": "Merge into",
+  "merge.intoTitle": "into “{title}”",
+  "merge.fromTitle": "from “{title}”",
   "merge.none": "No other sessions",
   "merge.focus": "What to focus on (optional)",
   "merge.action": "Merge",
