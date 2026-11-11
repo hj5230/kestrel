@@ -116,6 +116,22 @@ export function Composer(props: ComposerProps) {
       atStart: (ta.current?.selectionStart ?? 0) === 0,
       sendKey,
       submit,
+      selection: [ta.current?.selectionStart ?? 0, ta.current?.selectionEnd ?? 0],
+      edit: (next) => {
+        const el = ta.current
+        if (!el) return
+        const start = el.selectionStart
+        // insertText goes through the textarea's own editing, so ⌘Z undoes it and onInput syncs the state.
+        if (document.execCommand("insertText", false, next.insert)) {
+          // Same tick, so the next keystroke already lands inside the block.
+          el.setSelectionRange(start + next.caret, start + next.caret)
+          setCaret(start + next.caret)
+        } else {
+          setText(next.text)
+          persist(next.text)
+          placeCaret(start + next.caret)
+        }
+      },
     })
 
   const canSend = (text.trim().length > 0 || att.images.length > 0 || att.files.length > 0) && !disabled && att.converting === 0
