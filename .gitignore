@@ -10,3 +10,5 @@ src-tauri/binaries/
 .claude/launch.json
 .claude/mock-model.ts
 .claude/logo-options/
+.claude/settings.local.json
+.claude/.cc-writes
