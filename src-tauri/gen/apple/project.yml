@@ -57,7 +57,7 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         CFBundleShortVersionString: 0.1.0
-        CFBundleVersion: "6"
+        CFBundleVersion: "7"
     entitlements:
       path: kestrel_iOS/kestrel_iOS.entitlements
     scheme:
