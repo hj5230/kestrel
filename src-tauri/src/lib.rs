@@ -2,6 +2,8 @@
 // Mac. Each platform module installs its own plugins, state and commands.
 #[cfg(desktop)]
 mod desktop;
+#[cfg(desktop)]
+mod update;
 #[cfg(mobile)]
 mod keyboard;
 #[cfg(mobile)]

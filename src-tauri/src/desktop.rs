@@ -133,7 +133,7 @@ pub fn setup(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_shell::init())
         .manage(Backend::default())
-        .invoke_handler(tauri::generate_handler![backend_info])
+        .invoke_handler(tauri::generate_handler![backend_info, crate::update::install_update])
         .setup(|app| {
             spawn_backend(app.handle())?;
             Ok(())
