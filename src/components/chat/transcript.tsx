@@ -61,6 +61,7 @@ export function Transcript({
   const inlinePhase = lastRow?.k === "group" ? phase : undefined
   const standalonePhase = lastRow?.k !== "group" && !(lastRow?.k === "text" && lastRow.streaming) ? phase : undefined
 
+  const plan = [...rows].reverse().find((r) => r.k === "plan")
   const win = useRowWindow(rows.length)
   const rendered: preact.JSX.Element[] = []
   rows.forEach((row, i) => {
@@ -105,8 +106,8 @@ export function Transcript({
         else el = <ProcessGroup steps={[{ k: "tool", key: row.key, block: row.block, msg: d.streaming ?? ({} as AssistantMsg), streaming: !result }]} rt={rt} waiting={false} expandable={view !== "answer"} />
         break
       }
+      // Plans are not repeated per update: only the newest one is shown, at the end (below).
       case "plan":
-        el = <InlinePlan todos={row.block.arguments?.todos} latest={!rows.slice(i + 1).some((r) => r.k === "plan")} />
         break
       case "aborted":
         el = <div className="flex items-center gap-1.5 py-1 text-xs text-muted-foreground"><SquareIcon className="size-2.5 fill-current opacity-60" />{t("msg.stopped")}</div>
@@ -141,6 +142,11 @@ export function Transcript({
       {d.questions.filter((q) => !rows.some((r) => r.k === "ask" && r.block.id === q.toolCallId)).map((q) => (
         <div key={q.id} className="mt-3"><QuestionCard req={q} readOnly={readOnly} /></div>
       ))}
+      {plan?.k === "plan" && (
+        <div className={cn(rendered.length && "mt-3")}>
+          <InlinePlan todos={plan.block.arguments?.todos} latest={running} />
+        </div>
+      )}
       {standalonePhase && (
         <div className={cn("flex min-w-0 items-center gap-2 px-2 py-1 text-[13px] text-muted-foreground pointer-coarse:min-h-10", rendered.length && "mt-6")}>
           <KestrelMark />
