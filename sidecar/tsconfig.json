@@ -12,5 +12,5 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true
   },
-  "include": [".", "../shared"]
+  "include": [".", "../shared", "../src/components/chat/composer/*.test.ts"]
 }

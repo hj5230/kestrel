@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit && tsc --noEmit -p sidecar",
     "check": "npm run typecheck && bun scripts/check-size.ts",
-    "test": "bun test sidecar",
+    "test": "bun test sidecar src",
     "sidecar": "bun run sidecar/main.ts --dev",
     "build:sidecar": "bash scripts/build-sidecar.sh",
     "ios:sim": "tauri ios build --target aarch64-sim --debug",

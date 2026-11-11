@@ -68,24 +68,31 @@
 .hljs-meta, .hljs-selector-class, .hljs-selector-id, .hljs-tag { color: var(--hl-meta); }
 .hljs-deletion { color: var(--destructive); }
 
-/* Composer Markdown highlighting. Only paint changes here: anything that changes glyph widths (weight,
-   size, italics) would push the visible text out of line with the transparent textarea above it. */
+/* Composer Markdown highlighting (composer/source.ts). The copy lies under a transparent textarea and must
+   lay out exactly like it, so only paint changes here: colors, backgrounds, strokes and inset shadows. Weight,
+   size, italics, margins, padding or borders would move the text away from the caret. Each source line is
+   one .md-line block; decorations for a whole line (a code block's frame, a quote's bar) are drawn on it.
+   The side bleed (negative margin, equal padding) widens the background without moving the text. */
 .md-source { color: var(--foreground); }
 .md-source .md-mark { color: var(--muted-foreground); opacity: 0.75; }
-.md-source .md-heading { color: var(--foreground); -webkit-text-stroke: 0.35px currentColor; }
+.md-source .md-info { color: var(--muted-foreground); }
+.md-source .md-h { -webkit-text-stroke: 0.35px currentColor; }
+.md-source .md-h .md-mark { -webkit-text-stroke: 0; }
 .md-source .md-strong { -webkit-text-stroke: 0.35px currentColor; }
 .md-source .md-em { color: color-mix(in oklch, var(--foreground) 80%, var(--primary)); }
+.md-source .md-del { text-decoration: line-through; text-decoration-color: color-mix(in oklch, var(--foreground) 45%, transparent); color: var(--muted-foreground); }
+.md-source .md-done { color: var(--success); opacity: 1; }
+.md-source .md-link { color: var(--primary); }
 /* Same look as inline code in messages: the text's own color on a muted tint. */
 .md-source .md-code { background: var(--muted); border-radius: 3px; }
-/* A fenced block is one framed box, like a code block in a message. The frame must not move text: the side
-   margin and padding cancel out, and the top and bottom of the frame are a shadow, which takes no space. */
+.md-source .md-quote { box-shadow: inset 2px 0 0 var(--border); margin-inline-start: -8px; padding-inline-start: 8px; }
+.md-source .md-rule .md-mark { opacity: 0.5; }
+/* A fenced block, fences included, is one framed box like a code block in a message. It wraps the block's
+   line blocks and has no vertical box model, so it is exactly their height; the frame is an inset shadow. */
 .md-source .md-codeblock {
-    display: block;
     margin-inline: -8px;
     padding-inline: 8px;
     border-radius: 8px;
     background: var(--code-bg);
-    box-shadow: 0 0 0 3px var(--code-bg), 0 0 0 4px var(--border);
+    box-shadow: inset 0 0 0 1px var(--border);
 }
-.md-source .md-codeline { color: var(--foreground); }
-.md-source .md-link { color: var(--primary); }
