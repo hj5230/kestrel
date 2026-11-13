@@ -4,6 +4,8 @@ mod log;
 #[cfg(desktop)]
 mod desktop;
 #[cfg(desktop)]
+mod migrate;
+#[cfg(desktop)]
 mod update;
 #[cfg(mobile)]
 mod keyboard;

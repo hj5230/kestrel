@@ -160,6 +160,7 @@ pub fn setup(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
         ])
         .setup(|app| {
             crate::log::init(app.path().app_log_dir()?);
+            crate::migrate::run(app.handle());
             spawn_backend(app.handle())?;
             Ok(())
         })

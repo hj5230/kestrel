@@ -35,7 +35,7 @@ use pairing::*;
 use rpc::*;
 use store::*;
 
-const KEYCHAIN_SERVICE: &str = "com.zhaoshangqi.kestrel.remote";
+const KEYCHAIN_SERVICE: &str = "site.hj5230.kestrel.remote";
 const EVENT: &str = "remote://event";
 const STATUS: &str = "remote://status";
 const PROFILE: &str = "remote://profile";
