@@ -30,7 +30,7 @@ Write a message as a fixed phrase ("connection failed") and put the variable par
 
 ## Files, rotation, retention
 
-Folder: `~/Library/Logs/com.zhaoshangqi.kestrel/` (development builds log to the same place with the dev app's own identifier).
+Folder: `~/Library/Logs/site.hj5230.kestrel/` (`app_log_dir()` follows the bundle identifier, `site.hj5230.kestrel`; a sidecar started by hand logs to stderr instead).
 
 Files are `<tier>-<source>-<YYYY-MM-DD>[.<n>].log`.
 

@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Kestrel",
-  "version": "0.1.0-beta.10",
-  "identifier": "com.zhaoshangqi.kestrel",
+  "version": "0.1.0-beta.11",
+  "identifier": "site.hj5230.kestrel",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1430",
@@ -44,7 +44,7 @@
     ],
     "macOS": {
       "minimumSystemVersion": "11.0",
-      "bundleVersion": "10"
+      "bundleVersion": "11"
     }
   }
 }

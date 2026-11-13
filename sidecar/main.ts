@@ -25,7 +25,7 @@ function arg(name: string): string | undefined {
 }
 
 const dev = process.argv.includes("--dev");
-const dataDir = arg("data-dir") ?? path.join(os.homedir(), "Library", "Application Support", "com.zhaoshangqi.kestrel");
+const dataDir = arg("data-dir") ?? path.join(os.homedir(), "Library", "Application Support", "site.hj5230.kestrel");
 const port = Number(arg("port") ?? (dev ? 47821 : 0));
 const token = arg("token") ?? (dev ? "dev" : crypto.randomUUID());
 

@@ -1,6 +1,6 @@
 name: kestrel
 options:
-  bundleIdPrefix: com.zhaoshangqi.kestrel
+  bundleIdPrefix: site.hj5230.kestrel
   deploymentTarget:
     iOS: 16.0
 fileGroups: [../../src]
@@ -11,7 +11,7 @@ settingGroups:
   app:
     base:
       PRODUCT_NAME: Kestrel
-      PRODUCT_BUNDLE_IDENTIFIER: com.zhaoshangqi.kestrel
+      PRODUCT_BUNDLE_IDENTIFIER: site.hj5230.kestrel
 targetTemplates:
   app:
     type: application
@@ -57,7 +57,7 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         CFBundleShortVersionString: 0.1.0
-        CFBundleVersion: "10"
+        CFBundleVersion: "11"
     entitlements:
       path: kestrel_iOS/kestrel_iOS.entitlements
     scheme:

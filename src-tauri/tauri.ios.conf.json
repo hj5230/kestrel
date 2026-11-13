@@ -7,7 +7,7 @@
     "externalBin": [],
     "iOS": {
       "minimumSystemVersion": "16.0",
-      "bundleVersion": "10"
+      "bundleVersion": "11"
     }
   }
 }

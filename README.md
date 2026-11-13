@@ -15,7 +15,7 @@ Tauri (Rust)                  sidecar (Bun, single binary kestrel-agent)        
 
 - The agent loop is `@mariozechner/pi-agent-core`. Model calls go through a custom `streamFn` on the Vercel AI SDK v7 (`ai` + `@ai-sdk/*`); pi's model catalogue only fills in context windows and prices.
 - Providers: Anthropic, OpenAI, Google, DeepSeek, OpenRouter, Amazon Q, Ollama and any OpenAI-compatible service.
-- Storage: `~/Library/Application Support/com.zhaoshangqi.kestrel/kestrel.db` (`kestrel-dev.db` in development); log at `~/Library/Logs/com.zhaoshangqi.kestrel/agent.log`.
+- Storage: `~/Library/Application Support/site.hj5230.kestrel/kestrel.db` (`kestrel-dev.db` in development); log at `~/Library/Logs/site.hj5230.kestrel/agent.log`.
 - Mobile: the iOS app drives the agent on a paired Mac; see [Mobile](#mobile-ios).
 
 ## Features
