@@ -8,6 +8,7 @@ import { connectionGeneration } from "./connection-generation"
 import { getPairedMac, listMacs, type PairedMac } from "./pairing"
 import { isMobileApp } from "./platform"
 import { handleEvents } from "./store/events"
+import { logger, setLogVerbosity } from "./log"
 export { adoptPairedMac, switchMac, forgetPairedMac, unpairMac } from "./store/macs"
 
 export type Route =
@@ -139,6 +140,7 @@ export async function refreshProviders() {
 
 export async function updateSettings(patch: Partial<AppSettings>) {
   settings.value = await rpc<AppSettings>("settings.update", patch)
+  if ("logLevel" in patch) setLogVerbosity(settings.value.logLevel)
   setLang(settings.value.language)
   applyTheme()
 }
@@ -206,6 +208,8 @@ export async function boot() {
     if (!connectionGeneration.current(generation)) return
     appInfo.value = info
     settings.value = s
+    setLogVerbosity(s.logLevel)
+    logger("boot").info("loaded", { version: info.version, dev: info.dev, platform: info.platform })
     setLang(s.language)
     applyTheme()
     await Promise.all([refreshSessions(), refreshProviders()])
@@ -217,6 +221,7 @@ export async function boot() {
   } catch (e: any) {
     if (!connectionGeneration.current(generation)) return
     const msg = e?.message ?? String(e)
+    logger("boot").error("start-up failed", { error: e })
     if (isMobileApp && msg === "unauthorized") deviceRevoked.value = true
     else bootError.value = msg
   }

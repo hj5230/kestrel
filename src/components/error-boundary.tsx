@@ -2,12 +2,13 @@ import { Component, type ComponentChildren } from "preact"
 import { RotateCcwIcon, TriangleAlertIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { t } from "@/lib/i18n"
+import { logger } from "@/lib/log"
 
 export class ErrorBoundary extends Component<{ children: ComponentChildren; resetKey?: unknown; compact?: boolean }, { error: Error | null }> {
   state = { error: null as Error | null }
 
-  componentDidCatch(error: Error) {
-    console.error(error)
+  componentDidCatch(error: Error, info?: { componentStack?: string }) {
+    logger("ui").error("a screen failed to render", { error, componentStack: info?.componentStack?.slice(0, 1500), compact: !!this.props.compact })
     this.setState({ error })
   }
 

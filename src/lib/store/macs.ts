@@ -2,6 +2,7 @@
 import { toast } from "sonner"
 import { forgetMac, selectMac, type PairedMac } from "../pairing"
 import { pairedMac, pairedMacs, addingMac, deviceRevoked, boot, resetForMacChange } from "../store"
+import { logger } from "../log"
 
 /** Mobile: start using a freshly paired Mac. */
 export function adoptPairedMac(mac: PairedMac) {
@@ -31,6 +32,7 @@ export async function switchMac(deviceId: string) {
     addingMac.value = false
     void boot()
   } catch (e: any) {
+    logger("pairing").warn("switching Mac failed", { error: e })
     toast.error(String(e?.message ?? e))
   } finally { switching = false }
 }
@@ -38,7 +40,7 @@ export async function switchMac(deviceId: string) {
 /** Mobile: forget one paired Mac. If it was the one in use, the phone moves to another, or to the pairing screen. */
 export async function forgetPairedMac(deviceId: string) {
   const wasActive = pairedMac.value?.deviceId === deviceId
-  const left = await forgetMac(deviceId).catch(() => null)
+  const left = await forgetMac(deviceId).catch((e) => (logger("pairing").warn("forgetting a Mac failed", { error: e }), null))
   if (!left) return
   pairedMacs.value = left.macs
   if (!wasActive) return

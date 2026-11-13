@@ -4,6 +4,7 @@ import { computed, signal } from "@preact/signals"
 import type { UpdateStatus } from "@shared/protocol"
 import { compareVersions, releasePage } from "@shared/version"
 import { rpc } from "./api"
+import { logger } from "./log"
 import { isDesktopApp, isMobileApp } from "./platform"
 import { sessions } from "./store"
 
@@ -12,7 +13,9 @@ export const updateStatus = signal<UpdateStatus | null>(null)
 export async function loadUpdateStatus() {
   try {
     updateStatus.value = await rpc<UpdateStatus>("update.status")
-  } catch {}
+  } catch (e) {
+    logger("update").debug("update status unavailable", { error: e })
+  }
 }
 
 export const checkForUpdate = async () => (updateStatus.value = await rpc<UpdateStatus>("update.check"))

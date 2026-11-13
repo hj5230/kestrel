@@ -5,6 +5,7 @@ import { devicePreview, isMobileApp } from "./lib/platform"
 import { trackVisualViewport } from "./lib/viewport"
 import { routeExternalLinks } from "./lib/links"
 import { initFeedback } from "./lib/feedback"
+import { initLog } from "./lib/log"
 import "./index.css"
 
 if (isMobileApp) {
@@ -20,6 +21,7 @@ try {
 
 if (devicePreview) void import("./lib/device-preview").then((m) => m.startDevicePreview())
 
+initLog()
 routeExternalLinks()
 initFeedback()
 boot()

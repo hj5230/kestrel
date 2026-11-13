@@ -2,6 +2,7 @@
 // work (pinned TLS) and keeps the device token in the Keychain; this module is the UI's handle.
 import { invoke } from "@tauri-apps/api/core"
 import { t, type MessageKey } from "./i18n"
+import { logger } from "./log"
 
 export interface PairedMac {
   serverName: string
@@ -57,12 +58,16 @@ export async function scanPairingCode(): Promise<string | null> {
   const scanner = await import("@tauri-apps/plugin-barcode-scanner")
   let perm = await scanner.checkPermissions()
   if (perm !== "granted") perm = await scanner.requestPermissions()
-  if (perm !== "granted") throw new Error("camera_denied")
+  if (perm !== "granted") {
+    logger("pairing").warn("camera permission denied")
+    throw new Error("camera_denied")
+  }
   try {
     const res = await scanner.scan({ formats: [scanner.Format.QRCode], windowed: false })
     return res.content || null
   } catch (e) {
     if (/cancel/i.test(String(e))) return null
+    logger("pairing").warn("scanning failed", { error: e })
     throw e
   }
 }

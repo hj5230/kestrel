@@ -3,6 +3,9 @@
 import type { ServerEvent } from "@shared/protocol"
 import { connectionGeneration } from "./connection-generation"
 import { REVOKED_CLOSE_CODE, transport } from "./api"
+import { logger } from "./log"
+
+const log = logger("events")
 
 export type Listener = (e: ServerEvent) => void
 
@@ -43,6 +46,8 @@ export function onRevoked(fn: () => void) {
 export function setLive(next: boolean) {
   if (live === next) return
   live = next
+  if (next) log.info("event stream connected", { afterRetries: retry })
+  else log.warn("event stream lost")
   statusListeners.forEach((fn) => fn(next))
 }
 
@@ -66,7 +71,9 @@ export async function open() {
         if (!connectionGeneration.current(generation)) return
         close = null
         setLive(false)
+        log.warn("event stream closed", { code })
         if (code === REVOKED_CLOSE_CODE) {
+          log.error("this device was revoked by the Mac")
           stopped = true
           revokedListeners.forEach((fn) => fn())
           return
@@ -80,6 +87,7 @@ export async function open() {
     setLive(true)
   } catch (e) {
     if (!connectionGeneration.current(generation)) return
+    log.warn("event stream could not open", { error: e, retry })
     if (String(e).includes("unauthorized")) {
       stopped = true
       revokedListeners.forEach((fn) => fn())

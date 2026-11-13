@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { ConfirmDeleteDialog, MergeDialog, RenameDialog } from "@/components/session-dialogs"
 import { rpc, stageAttachments, type StagedFile } from "@/lib/api"
+import { logger } from "@/lib/log"
 import { detailSignal, enabledModels, findModel, loadDetail, settings } from "@/lib/store"
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom"
 import { t } from "@/lib/i18n"
@@ -67,6 +68,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
       return
     }
     await rpc("chat.send", { sessionId: s.id, text, images: imgs, files: uploaded })
+    logger("chat").debug("message sent", { sessionId: s.id, chars: text.length, images: imgs.length, files: uploaded.length })
   }
 
   return (

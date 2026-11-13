@@ -60,6 +60,7 @@ const ENTRIES: Entry[] = [
   { tab: "mobile", label: "mobile.devices" },
   { tab: "mobile", label: "tailscale.title", desc: "tailscale.desc", also: "vpn remote 远程" },
   { tab: "connection", label: "connection.title" },
+  { tab: "about", label: "log.title", desc: "log.desc", also: "log debug verbose 日志 排查" },
   { tab: "about", label: "settings.aboutTitle", desc: "settings.aboutDesc", also: "version data 版本 数据" },
 ]
 

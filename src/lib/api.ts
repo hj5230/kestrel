@@ -3,6 +3,7 @@
 import type { FileAttachment, ServerEvent } from "@shared/protocol"
 import { isMobileApp, isTauri } from "./platform"
 import { connectionGeneration } from "./connection-generation"
+import { logger } from "./log"
 export { onServerEvent, onConnection, onRevoked, connectEvents, disconnectEvents } from "./events"
 
 export { isTauri }
@@ -145,10 +146,26 @@ function nativeTransport(): Transport {
 
 export const transport = isMobileApp ? nativeTransport() : httpTransport()
 
+const log = logger("rpc")
+const SLOW_RPC_MS = 3000
+
 export async function rpc<T = any>(method: string, params: unknown = {}): Promise<T> {
   const generation = connectionGeneration.capture()
-  const result = await transport.rpc(method, params)
-  if (!connectionGeneration.current(generation)) throw new RpcError("Connection changed")
+  const t0 = performance.now()
+  let result: unknown
+  try {
+    result = await transport.rpc(method, params)
+  } catch (e) {
+    log.warn("call failed", { method, ms: Math.round(performance.now() - t0), error: e })
+    throw e
+  }
+  const ms = Math.round(performance.now() - t0)
+  if (ms >= SLOW_RPC_MS) log.warn("slow call", { method, ms })
+  else log.debug("call", { method, ms })
+  if (!connectionGeneration.current(generation)) {
+    log.info("answer dropped: the connection changed", { method })
+    throw new RpcError("Connection changed")
+  }
   return result as T
 }
 
@@ -163,7 +180,12 @@ export interface StagedFile {
 /** Sends a file to the desktop's per-session upload folder over HTTP. */
 export async function uploadFile(sessionId: string, file: File): Promise<FileAttachment> {
   if (!transport.upload) throw new RpcError("File upload is not available on this device")
-  return transport.upload(sessionId, file)
+  try {
+    return await transport.upload(sessionId, file)
+  } catch (e) {
+    log.warn("upload failed", { size: file.size, type: file.type, error: e })
+    throw e
+  }
 }
 
 /** The phone picked a file locally; the shell reads it and posts it to the paired Mac. */

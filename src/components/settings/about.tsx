@@ -7,6 +7,7 @@ import { t } from "@/lib/i18n"
 import { appInfo } from "@/lib/store"
 import { isMobileApp } from "@/lib/platform"
 import { Updates } from "./updates"
+import { Logs } from "./logs"
 
 export function About() {
   const info = appInfo.value
@@ -22,6 +23,7 @@ export function About() {
   return (
     <div className="grid gap-8">
     <Updates />
+    <Logs />
     <Section title={t("settings.aboutTitle")} desc={t("settings.aboutDesc")}>
       <Panel>
         {rows.map(([k, v]) => (
