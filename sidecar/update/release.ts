@@ -4,10 +4,12 @@
 import { createHash, createPublicKey, verify } from "node:crypto";
 import type { ReleaseManifest, ReleasePointer } from "../../shared/protocol";
 import { proxiedFetch } from "../providers";
+import { logger } from "../log";
 import { RELEASE_PUBLIC_KEY } from "./key";
 import { compareVersions } from "../../shared/version";
 export { compareVersions } from "../../shared/version";
 
+const log = logger("update");
 export const RELEASES_REPO = "hj5230/kestrel-releases";
 
 /** Mirrors in order of preference. A tag is immutable, so any mirror serving it serves the same bytes. */
@@ -38,6 +40,7 @@ export async function fetchRelease(ref: string, file: string, signal?: AbortSign
       return new Uint8Array(await res.arrayBuffer());
     } catch (e) {
       if (signal?.aborted) throw e;
+      log.warn("mirror failed, trying the next", { file, mirror: new URL(url(ref, file)).host, error: e });
       last = e;
     }
   }
@@ -72,6 +75,7 @@ export function verifyManifest(bytes: Uint8Array, signatureBase64: string, key =
 export async function fetchManifest(version: string, signal?: AbortSignal): Promise<ReleaseManifest> {
   const ref = tagOf(version);
   const [bytes, sig] = await Promise.all([fetchRelease(ref, "manifest.json", signal), fetchRelease(ref, "manifest.sig", signal)]);
+  if (!verifyManifest(bytes, new TextDecoder().decode(sig))) log.error("release signature is not valid", { version });
   if (!verifyManifest(bytes, new TextDecoder().decode(sig))) throw new Error("the release signature is not valid");
   const manifest = JSON.parse(new TextDecoder().decode(bytes)) as ReleaseManifest;
   if (manifest.version !== version) throw new Error("the release does not match its version");

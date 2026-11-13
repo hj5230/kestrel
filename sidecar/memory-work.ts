@@ -1,5 +1,7 @@
 // Model warmup and indexing survive an individual caller's cancellation, but settings changes revoke all work.
 // Sharing these operations prevents concurrent requests from repeatedly loading or indexing the same model.
+import { logger } from "./log";
+
 export class SharedMemoryWork {
   private tasks = new Map<string, { promise: Promise<void>; controller: AbortController }>();
 
@@ -17,7 +19,7 @@ export class SharedMemoryWork {
         if (this.tasks.get(key)?.promise === promise) this.tasks.delete(key);
       });
       // The shared task may finish after its last caller stops waiting.
-      void promise.catch(() => {});
+      void promise.catch((e) => { if (!controller.signal.aborted) logger("memory").debug("shared memory task failed", { key, error: e }); });
       work = { promise, controller };
       this.tasks.set(key, work);
     }

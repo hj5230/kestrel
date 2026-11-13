@@ -7,12 +7,14 @@ import { getModels, getProviders, type Model } from "@mariozechner/pi-ai";
 import type { LanguageModel } from "ai";
 import type { ModelConfig, ProviderConfig, ProviderKind, RemoteModel } from "../shared/protocol";
 import * as store from "./db";
-import { getShellEnv } from "./env";
 import { lookupFacts } from "./catalog";
 import { sortEfforts } from "../shared/effort";
 import { st } from "./i18n";
 import { AmazonQClient, amazonQEfforts, AMAZON_Q_BASE_URL } from "./llm/amazon-q-api";
 import { AmazonQLanguageModel } from "./llm/amazon-q";
+
+import { proxiedFetch } from "./net";
+export { proxiedFetch, proxyFor } from "./net";
 
 export const PROVIDER_PRESETS: Record<ProviderKind, { name: string; baseUrl: string; needsKey: boolean }> = {
   anthropic: { name: "Anthropic", baseUrl: "https://api.anthropic.com/v1", needsKey: true },
@@ -24,50 +26,6 @@ export const PROVIDER_PRESETS: Record<ProviderKind, { name: string; baseUrl: str
   "amazon-q": { name: "Amazon Q", baseUrl: AMAZON_Q_BASE_URL, needsKey: true },
   ollama: { name: "Ollama", baseUrl: "http://127.0.0.1:11434/v1", needsKey: false },
 };
-
-function isLocalHost(host: string) {
-  return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]" || host.endsWith(".localhost");
-}
-
-function noProxyMatch(host: string, noProxy: string) {
-  return noProxy
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean)
-    .some((rule) => rule === "*" || host === rule.replace(/^\./, "") || host.endsWith(rule.startsWith(".") ? rule : "." + rule));
-}
-
-export function proxyFor(url: string): string | undefined {
-  const settings = store.getSettings();
-  if (settings.proxyMode === "none") return undefined;
-  let host = "";
-  try {
-    host = new URL(url).hostname.toLowerCase();
-  } catch {
-    return undefined;
-  }
-  if (isLocalHost(host)) return undefined;
-  if (settings.proxyMode === "custom") return settings.proxyUrl || undefined;
-  const env = getShellEnv();
-  const noProxy = env.NO_PROXY || env.no_proxy || "";
-  if (noProxy && noProxyMatch(host, noProxy)) return undefined;
-  const isHttps = url.startsWith("https:");
-  return (
-    (isHttps ? env.HTTPS_PROXY || env.https_proxy : env.HTTP_PROXY || env.http_proxy) ||
-    env.ALL_PROXY ||
-    env.all_proxy ||
-    undefined
-  );
-}
-
-export const proxiedFetch: typeof fetch = Object.assign(
-  (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    const proxy = proxyFor(url);
-    return fetch(input as any, { ...(init as any), proxy } as any);
-  },
-  { preconnect: fetch.preconnect },
-) as typeof fetch;
 
 const amazonQClients = new Map<string, { sig: string; client: AmazonQClient }>();
 function amazonQClient(p: ProviderConfig): AmazonQClient {

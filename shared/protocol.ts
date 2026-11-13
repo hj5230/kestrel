@@ -6,3 +6,4 @@ export * from "./protocol/requests";
 export * from "./protocol/settings";
 export * from "./protocol/app";
 export * from "./protocol/update";
+export * from "./protocol/log";

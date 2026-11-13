@@ -4,6 +4,7 @@ import type { SkillInfo, SlashCommandInfo } from "../shared/protocol";
 import * as store from "./db";
 import { collapseHome, expandHome } from "./env";
 import { st } from "./i18n";
+import { logger } from "./log";
 
 export function parseFrontmatter(src: string): { attrs: Record<string, string>; body: string } {
   const m = src.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
@@ -58,6 +59,8 @@ export function discoverSkills(cwd: string, includeDisabled = false): SkillInfo[
         try {
           src = fs.readFileSync(file, "utf8");
         } catch {
+          // A folder without a SKILL.md is just a folder; anything else (permissions) is worth a trace.
+          if (fs.existsSync(file)) logger("skills").warn("a skill file could not be read", { file });
           continue;
         }
         const { attrs } = parseFrontmatter(src);

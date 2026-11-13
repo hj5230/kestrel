@@ -19,6 +19,9 @@ import * as events from "./events";
 import * as turn from "./turn";
 import { approvals, pendingQuestions } from "./pending";
 import { fileAttachmentMarkdown } from "./text";
+import { logger } from "../log";
+
+const log = logger("agent");
 
 export class SessionRunner {
   // The runner is spread over agent/ by concern (setup, turn, context, gate, events, subagents); those modules read
@@ -134,6 +137,7 @@ export class SessionRunner {
     // display is only for showing a slash command instead of its expansion. The attachment block stays in the
     // text, so the transcript and the export both show the file instead of hiding it behind the typed text.
     if (expanded) msg.display = text;
+    log.info("message sent", { sessionId: this.id, busy: this.busy, mode, chars: text.length, images: images.length, files: files.length, slash: !!expanded });
     if (this.busy) {
       const qmode = mode === "followUp" ? "followUp" : "steer";
       if (qmode === "followUp" || this.compacting) this.agent.followUp(msg);
@@ -142,11 +146,11 @@ export class SessionRunner {
       this.emitQueue();
       return;
     }
-    turn.start(this, () => this.agent.prompt(msg)).catch(() => {});
+    turn.start(this, () => this.agent.prompt(msg)).catch((e) => log.debug("run rejected", { sessionId: this.id, error: e }));
   }
 
   async sendAndWait(text: string): Promise<void> {
-    await turn.start(this, () => this.agent.prompt(text)).catch(() => {});
+    await turn.start(this, () => this.agent.prompt(text)).catch((e) => log.debug("run rejected", { sessionId: this.id, error: e }));
   }
 
   cancelQueued(id: string) {
@@ -162,6 +166,7 @@ export class SessionRunner {
   }
 
   abort() {
+    log.info("stop requested", { sessionId: this.id, queued: this.queued.length, tools: Object.keys(this.runningTools).length });
     this.stopRequested = true;
     for (const a of approvals.values()) if (a.owner === this) a.resolve({ decision: "deny", reason: "aborted" });
     for (const q of pendingQuestions.values()) if (q.owner === this) q.resolve(null);
@@ -199,13 +204,15 @@ export class SessionRunner {
       this.loadCompaction();
       emit({ type: "messages_reset", sessionId: this.id });
     }
-    turn.start(this, () => this.agent.continue()).catch(() => {});
+    log.info("retry", { sessionId: this.id });
+    turn.start(this, () => this.agent.continue()).catch((e) => log.debug("run rejected", { sessionId: this.id, error: e }));
   }
 
   async editAndResend(seq: number, text: string, images: ImageContent[] = [], files: FileAttachment[] = []) {
     if (this.busy) throw new Error(st("sessionBusy"));
     const msgs = this.agent.state.messages;
     if (seq < 0 || seq >= msgs.length || (msgs[seq] as any).role !== "user") throw new Error(st("onlyUserEdit"));
+    log.info("edit and resend", { sessionId: this.id, seq, dropped: msgs.length - seq });
     store.truncateMessages(this.id, seq);
     this.agent.state.messages = msgs.slice(0, seq);
     this.loadCompaction();

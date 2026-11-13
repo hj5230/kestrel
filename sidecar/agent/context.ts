@@ -14,6 +14,7 @@ import { estimateContextTokens, estimateMessageTokens, estimateTextTokens, findC
 import { buildSystemPrompt, collectInstructions } from "./prompt";
 import type { SessionRunner } from "./session-runner";
 import * as setup from "./setup";
+import { logger } from "../log";
 
 /** Where the context window goes, estimated with the same token heuristic auto-compaction uses. */
 export function contextBreakdown(runner: SessionRunner): ContextBreakdown {
@@ -61,6 +62,7 @@ export async function transformContext(runner: SessionRunner, messages: AgentMes
         : estimateContextTokens(messages, null, 0, estimateTextTokens(runner.agent.state.systemPrompt));
       if (est > model.contextWindow * settings.compactThreshold) {
         await compact(runner, { auto: true, messages, signal }).catch((e) => {
+          logger("agent").warn("auto compaction failed", { sessionId: runner.id, error: e });
           emit({ type: "notice", sessionId: runner.rootId, level: "warn", text: st("autoCompactFailed", { msg: e?.message ?? String(e) }) });
         });
       }
@@ -92,6 +94,8 @@ export async function compact(runner: SessionRunner, opts: { auto: boolean; mess
   // Summaries can run on a cheaper model chosen in Settings; its window decides how much history it is given.
   const side = sideModel(settings.compactModel, s);
   runner.compacting = true;
+  const startedAt = Date.now();
+  logger("agent").info("compaction started", { sessionId: runner.id, auto: opts.auto, model: side.modelId, messages: cut - start });
   emit({ type: "compacting", sessionId: runner.id, active: true });
   try {
     const tokensBefore = estimateContextTokens(messages.slice(start), runner.compaction?.summary ?? null);
@@ -117,5 +121,6 @@ export async function compact(runner: SessionRunner, opts: { auto: boolean; mess
   } finally {
     runner.compacting = false;
     emit({ type: "compacting", sessionId: runner.id, active: false });
+    logger("agent").info("compaction finished", { sessionId: runner.id, auto: opts.auto, ms: Date.now() - startedAt });
   }
 }

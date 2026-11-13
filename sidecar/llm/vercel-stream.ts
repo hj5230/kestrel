@@ -2,6 +2,7 @@ import { jsonSchema, streamText, type LanguageModel, type ToolSet } from "ai";
 import { calculateCost, createAssistantMessageEventStream, type AssistantMessage, type Context, type Model, type SimpleStreamOptions, type StopReason, type ToolCall } from "@mariozechner/pi-ai";
 import type { ProviderKind } from "../../shared/protocol";
 import { reasoningRequest } from "./reasoning";
+import { logger } from "../log";
 import { emptyUsage, estimateUsage, encodeMeta, toModelMessages, errorText, TEXT_ONLY_TOOL_RESULTS } from "./vercel-messages";
 export { toModelMessages } from "./vercel-messages";
 
@@ -54,7 +55,7 @@ export function createVercelStreamFn(resolve: ModelResolver) {
           abortSignal: options?.signal,
           headers: { ...resolved.headers, ...options?.headers },
           maxRetries: options?.maxRetries ?? 2,
-          onError: () => {},
+          onError: ({ error }: { error: unknown }) => logger("llm").debug("stream error part", { model: model.id, error }),
           reasoning: asked?.reasoning,
           providerOptions: {
             ...resolved.providerOptions, ...asked?.providerOptions,
@@ -158,6 +159,7 @@ export function createVercelStreamFn(resolve: ModelResolver) {
                 try {
                   input = JSON.parse(input || "{}");
                 } catch {
+                  logger("llm").warn("tool call arguments were not valid JSON", { model: model.id, tool: part.toolName, chars: input.length });
                   input = {};
                 }
               }
@@ -203,6 +205,7 @@ export function createVercelStreamFn(resolve: ModelResolver) {
           output.errorMessage = "Aborted";
           stream.push({ type: "error", reason: "aborted", error: output });
         } else if (failure) {
+          logger("llm").warn("model request failed", { provider: resolved.kind, model: model.id, error: failure, tokensIn: output.usage.input });
           output.stopReason = "error";
           output.errorMessage = failure;
           stream.push({ type: "error", reason: "error", error: output });
@@ -216,6 +219,7 @@ export function createVercelStreamFn(resolve: ModelResolver) {
         const aborted = options?.signal?.aborted;
         output.stopReason = aborted ? "aborted" : "error";
         output.errorMessage = aborted ? "Aborted" : errorText(err);
+        if (!aborted) logger("llm").error("model stream crashed", { model: model.id, error: err });
         stream.push({ type: "error", reason: aborted ? "aborted" : "error", error: output });
         stream.end(output);
       }

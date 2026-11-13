@@ -49,6 +49,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   remotePort: 47830,
   updateAutoCheck: true,
   updateChannel: "beta",
+  logLevel: "normal",
 };
 
 /** A saved allowlist is the user's own and stays as it is, except that entries added to the defaults later are

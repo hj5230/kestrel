@@ -6,6 +6,9 @@ import { peekRunner } from "./agent/runner";
 import { emit } from "./hub";
 import { st } from "./i18n";
 import { prepareMerge } from "./merge";
+import { logger } from "./log";
+
+const log = logger("merge");
 
 import type { MergeJob } from "../shared/protocol";
 export type { MergeJob } from "../shared/protocol";
@@ -50,6 +53,7 @@ export function queueMerge(sourceId: string, targetId: string, instructions?: st
   const id = crypto.randomUUID();
   const now = Date.now();
   store.db.run("INSERT INTO merge_jobs (id, source_id, target_id, state, instructions, created_at, updated_at) VALUES (?, ?, ?, 'queued', ?, ?, ?)", [id, sourceId, targetId, instructions ?? null, now, now]);
+  log.info("merge queued", { jobId: id, sourceId, targetId });
   void drainMergeJobs();
   return { id, sourceId, targetId, state: "queued", error: null, createdAt: now };
 }
@@ -80,6 +84,7 @@ async function run(job: MergeJob) {
     store.updateSession(job.sourceId, { archived: true, mergedInto: job.targetId }, true);
     store.db.run("UPDATE merge_jobs SET state = 'succeeded', updated_at = ? WHERE id = ?", [Date.now(), job.id]);
   })();
+  log.info("merge delivered", { jobId: job.id, sourceId: job.sourceId, targetId: job.targetId });
   peekRunner(job.targetId)?.reloadFromDb();
   if (stored) emit({ type: "message_appended", sessionId: job.targetId, stored });
   for (const id of [job.sourceId, job.targetId]) emit({ type: "session_updated", session: store.getSession(id)! });
@@ -92,13 +97,15 @@ export async function drainMergeJobs() {
     if (listMergeJobs().some((x) => x.targetId === job.targetId && active.has(x.id))) continue;
     active.add(job.id);
     void run(job).catch((e) => {
+      log.error("merge failed", { jobId: job.id, sourceId: job.sourceId, targetId: job.targetId, error: e });
       store.db.run("UPDATE merge_jobs SET state = 'failed', error = ?, updated_at = ? WHERE id = ?", [e?.message ?? String(e), Date.now(), job.id]);
     }).finally(() => active.delete(job.id));
   }
 }
 
 export function startMergeJobs() {
-  store.db.run("UPDATE merge_jobs SET state = 'failed', error = ? WHERE state = 'running'", [st("mergeInterrupted")]);
+  const interrupted = store.db.run("UPDATE merge_jobs SET state = 'failed', error = ? WHERE state = 'running'", [st("mergeInterrupted")]);
+  if (interrupted.changes) log.warn("merges interrupted by the last shutdown", { count: interrupted.changes });
   if (timer) clearInterval(timer);
   timer = setInterval(() => void drainMergeJobs(), 1000);
   timer.unref();

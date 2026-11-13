@@ -8,6 +8,9 @@ import path from "node:path";
 import { expandHome, which } from "./env";
 import * as store from "./db";
 import { st } from "./i18n";
+import { logger } from "./log";
+
+const log = logger("media");
 
 const MAX_BYTES = 3.75 * 1024 * 1024;
 const MAX_SOURCE_BYTES = 64 * 1024 * 1024;
@@ -55,7 +58,8 @@ export async function mediaStatus(): Promise<{ path: string | null; configured: 
   try {
     const r = await run(bin, ["-hide_banner", "-version"], 5000);
     return { path: bin, configured, version: /ffmpeg version (\S+)/.exec(r.stdout)?.[1] ?? null };
-  } catch {
+  } catch (e) {
+    log.warn("ffmpeg did not answer", { bin, error: e });
     return { path: null, configured, version: null };
   }
 }

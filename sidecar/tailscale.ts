@@ -7,6 +7,9 @@ import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import type { TailscaleStatus } from "../shared/protocol";
 import { which } from "./env";
+import { logger } from "./log";
+
+const log = logger("tailscale");
 
 const APP_BUNDLE = "/Applications/Tailscale.app";
 const APP_CLI = `${APP_BUNDLE}/Contents/MacOS/Tailscale`;
@@ -35,6 +38,7 @@ function readStatus(): TailscaleStatus {
     s = JSON.parse(r.stdout);
   } catch {
     // Installed, but the daemon / app is not running (or not answering).
+    log.debug("tailscale is not answering", { exit: r.status, signal: r.signal });
     return { ...base, state: "not_running" };
   }
   const backend = String(s.BackendState ?? "");

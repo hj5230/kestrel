@@ -14,13 +14,20 @@ import { sessionHandlers } from "./rpc/sessions";
 import { extensionHandlers } from "./rpc/extensions";
 import { fileHandlers } from "./rpc/files";
 import { updateHandlers } from "./rpc/update";
+import { logHandlers } from "./rpc/log";
+import { logger } from "./log";
 import type { Caller, Handler } from "./rpc/types";
 
 export type { Caller } from "./rpc/types";
 
 import { version as VERSION } from "../package.json";
 
-const handlers: Record<string, Handler> = { ...appHandlers, ...modelHandlers, ...sessionHandlers, ...extensionHandlers, ...fileHandlers, ...updateHandlers };
+const handlers: Record<string, Handler> = { ...appHandlers, ...modelHandlers, ...sessionHandlers, ...extensionHandlers, ...fileHandlers, ...updateHandlers, ...logHandlers };
+
+const log = logger("rpc");
+// Log writes are the log itself and the stream is chatty; neither is worth a record per call.
+const QUIET = new Set(["log.write", "app.info", "settings.get", "remote.status", "update.status"]);
+const SLOW_MS = 1500;
 
 export interface SocketData {
   caller: Caller;
@@ -41,12 +48,18 @@ async function dispatch(body: any, caller: Caller, headers: Record<string, strin
   const method = String(body?.method ?? "");
   const h = handlers[method];
   if (!h || (caller.remote && localOnly(method))) {
+    log.warn("rpc rejected", { method, remote: caller.remote, deviceId: caller.deviceId, known: !!h });
     return Response.json({ error: `unknown method ${method}` }, { status: 404, headers });
   }
+  const t0 = performance.now();
   try {
     const result = await h(body.params ?? {}, caller);
+    const ms = Math.round(performance.now() - t0);
+    if (ms >= SLOW_MS) log.warn("slow rpc", { method, ms, remote: caller.remote });
+    else if (!QUIET.has(method)) log.debug("rpc", { method, ms, remote: caller.remote });
     return Response.json({ result: result ?? null }, { headers });
   } catch (e: any) {
+    log.warn("rpc failed", { method, ms: Math.round(performance.now() - t0), remote: caller.remote, deviceId: caller.deviceId, error: e });
     return Response.json({ error: e?.message ?? String(e) }, { headers });
   }
 }
@@ -72,7 +85,9 @@ async function upload(req: Request, headers: Record<string, string>): Promise<Re
     });
     return Response.json(result, { headers });
   } catch (e: any) {
+    if (e instanceof UploadError) log.warn("upload refused", { sessionId, name: file.name, status: e.status, reason: e.message });
     if (e instanceof UploadError) return Response.json({ error: e.message }, { status: e.status, headers });
+    log.error("upload failed", { sessionId, name: file.name, error: e });
     return Response.json({ error: e?.message ?? String(e) }, { status: 500, headers });
   }
 }
@@ -105,11 +120,13 @@ export async function handleApi(
 
 export const socketHandlers: WebSocketHandler<SocketData> = {
   open(ws) {
+    log.info("event stream opened", { remote: ws.data.caller.remote, deviceId: ws.data.caller.deviceId });
     ws.data.unsub = subscribe((e) => ws.send(JSON.stringify(e)));
     ws.send(JSON.stringify({ type: "mcp_status", servers: mcpStatuses() }));
   },
   message() {},
-  close(ws) {
+  close(ws, code) {
+    log.info("event stream closed", { remote: ws.data.caller.remote, deviceId: ws.data.caller.deviceId, code });
     ws.data.unsub?.();
   },
 };
@@ -141,7 +158,10 @@ export function startServer(opts: { port: number; token: string; dataDir: string
       if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(req) });
       const url = new URL(req.url);
       const token = req.headers.get("x-kestrel-token") ?? url.searchParams.get("token");
-      if (token !== opts.token) return new Response("unauthorized", { status: 401, headers: cors(req) });
+      if (token !== opts.token) {
+        log.warn("loopback request with a wrong token", { path: url.pathname });
+        return new Response("unauthorized", { status: 401, headers: cors(req) });
+      }
       return handleApi(req, server, { remote: false }, cors(req));
     },
     websocket: socketHandlers,

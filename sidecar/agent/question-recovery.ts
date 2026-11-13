@@ -7,6 +7,7 @@ import { formatAnswers } from "../tools/ask";
 import { emit } from "../hub";
 import { getRunner } from "./runner";
 import { start } from "./turn";
+import { logger } from "../log";
 
 export function questionResult(q: SavedQuestion, answers: QuestionAnswer[] | null): ToolResultMsg {
   return {
@@ -57,5 +58,5 @@ export async function answerRecovered(q: SavedQuestion, answers: QuestionAnswer[
   const runner = getRunner(rootId);
   runner.reloadFromDb();
   // Start returns immediately to the RPC caller; the normal lifecycle publishes subsequent progress.
-  void start(runner, () => runner.agent.continue()).catch(() => {});
+  void start(runner, () => runner.agent.continue()).catch((e) => logger("agent").warn("could not resume after a question", { sessionId: runner.id, error: e }));
 }

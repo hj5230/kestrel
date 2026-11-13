@@ -3,6 +3,9 @@ import { Type } from "typebox";
 import type { BashDetails } from "../../shared/protocol";
 import { getShellEnv, SHELL } from "../env";
 import { text, defineTool, type KestrelTool, type ToolContext } from "./types";
+import { logger } from "../log";
+
+const log = logger("bash");
 
 const MAX_OUTPUT = 30_000;
 
@@ -77,6 +80,7 @@ export function createBashTool(ctx: ToolContext): KestrelTool {
     async execute(_id, params, signal, onUpdate) {
       const cwd = ctx.cwd();
       const started = Date.now();
+      log.debug("command started", { sessionId: ctx.sessionId, cwd, background: !!params.run_in_background, command: params.command.slice(0, 500) });
       const child = spawn(SHELL, ["-c", params.command], {
         cwd,
         env: shellEnv(),
@@ -110,8 +114,10 @@ export function createBashTool(ctx: ToolContext): KestrelTool {
         child.on("close", (code) => {
           sh.exitCode = code;
           sh.done = true;
+          log.info("background command exited", { sessionId: ctx.sessionId, shell: id, code, ms: Date.now() - started });
         });
         child.on("error", (e) => {
+          log.warn("background command could not run", { sessionId: ctx.sessionId, shell: id, error: e });
           sh.output += `\n${e.message}`;
           sh.done = true;
         });
@@ -148,6 +154,7 @@ export function createBashTool(ctx: ToolContext): KestrelTool {
       const exitCode: number | null = await new Promise((resolve) => {
         child.on("close", (code) => resolve(code));
         child.on("error", (e) => {
+          log.warn("command could not run", { sessionId: ctx.sessionId, cwd, error: e });
           output += e.message;
           resolve(127);
         });
@@ -157,6 +164,8 @@ export function createBashTool(ctx: ToolContext): KestrelTool {
       if (signal?.aborted) throw new Error("Command aborted by user");
 
       const durationMs = Date.now() - started;
+      if (timedOut) log.warn("command timed out and was killed", { sessionId: ctx.sessionId, timeoutMs, command: params.command.slice(0, 200) });
+      else log.debug("command finished", { sessionId: ctx.sessionId, exitCode, ms: durationMs, bytes: output.length });
       const clipped = clip(output.trimEnd());
       const details: BashDetails = { command: params.command, output: clipped, exitCode, durationMs, timedOut };
       let body = clipped || "(no output)";

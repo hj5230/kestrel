@@ -15,6 +15,9 @@ import { removeSessionUploads } from "../uploads";
 import type { Handler } from "./types";
 import { appInfo } from "../app-info";
 import { assertNoRecoveredQuestions, cancelRecoveredQuestions } from "../agent/pending";
+import { logger } from "../log";
+
+const log = logger("session");
 
 export const sessionHandlers: Record<string, Handler> = {
   "sessions.list": ({ archived } = {}) => store.listSessions({ archived }),
@@ -34,6 +37,7 @@ export const sessionHandlers: Record<string, Handler> = {
     const clean: Partial<SessionInfo> = {};
     for (const k of allowed) if (k in patch) (clean as any)[k] = (patch as any)[k];
     store.updateSession(id, clean);
+    log.info("session updated", { sessionId: id, keys: Object.keys(clean) });
     const s = store.getSession(id)!;
     emit({ type: "session_updated", session: s });
     return s;
@@ -42,6 +46,7 @@ export const sessionHandlers: Record<string, Handler> = {
     assertNotMerging(id);
     dropRunner(id);
     const deleted = store.deleteSession(id);
+    log.info("session deleted", { sessionId: id, removed: deleted.length });
     for (const sessionId of deleted) removeSessionUploads(appInfo().dataDir, sessionId);
     emit({ type: "session_deleted", id });
     return true;

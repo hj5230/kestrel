@@ -3,6 +3,7 @@ import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import type { MemoryEntry, MemoryEvidence, MemorySummary, MemoryType } from "../../shared/protocol";
+import { logger } from "../log";
 import { MEMORY_TYPES, LIMITS, hashMemory, TRASH, memoryDir, slug, findSecret, scan, summary, type Located } from "../memory";
 
 export interface MemoryInput {
@@ -59,6 +60,7 @@ export function trash(l: Located) {
   const dir = path.join(memoryDir(), TRASH);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   fs.renameSync(l.file, path.join(dir, `${Date.now()}-${l.entry.topic}-${l.entry.name}.md`));
+  logger("memory").info("a note was moved to the trash", { topic: l.entry.topic, name: l.entry.name });
   dropEmptyTopicDir(l.file);
   const old = fs.readdirSync(dir).sort();
   for (const f of old.slice(0, Math.max(0, old.length - LIMITS.trash))) fs.rmSync(path.join(dir, f), { force: true });

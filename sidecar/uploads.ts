@@ -8,6 +8,9 @@ import type { FileAttachment } from "../shared/protocol";
 import { FILE_ATTACHMENT_MAX_BYTES } from "../shared/protocol";
 import * as store from "./db";
 import { st } from "./i18n";
+import { logger } from "./log";
+
+const log = logger("upload");
 
 const SESSION_ID_RE = /^[A-Za-z0-9_-]{6,64}$/;
 const CONTROL_CHARS_RE = /[\u0000-\u001f\u007f]/g;
@@ -178,12 +181,15 @@ export async function storeUpload(params: {
   if (!params.stream) throw new UploadError(st("uploadMissingFile"), 400);
   if (params.sizeHint && params.sizeHint > FILE_ATTACHMENT_MAX_BYTES) throw new UploadError(st("uploadTooLarge"), 413);
   const dir = prepareUploadDir(params.dataDir, params.sessionId);
+  const t0 = Date.now();
   const sanitized = sanitizeUploadName(params.fileName);
   const target = uniquePath(dir, sanitized);
   let size = 0;
   try {
     size = await writeLimited(params.stream, target.filePath, FILE_ATTACHMENT_MAX_BYTES);
+    log.info("file stored", { sessionId: params.sessionId, bytes: size, ms: Date.now() - t0, type: params.mimeType });
   } catch (e) {
+    log.warn("file could not be stored", { sessionId: params.sessionId, bytes: size, error: e });
     fs.rmSync(target.filePath, { force: true });
     throw e;
   }
@@ -201,7 +207,8 @@ export function importLocalFile(dataDir: string, sessionId: string, source: stri
   let info: fs.Stats;
   try {
     info = fs.statSync(abs);
-  } catch {
+  } catch (e) {
+    log.warn("picked file is unreadable", { error: e });
     throw new UploadError(st("uploadInvalidPath"), 400);
   }
   if (!info.isFile()) throw new UploadError(st("uploadNotFile"), 400);

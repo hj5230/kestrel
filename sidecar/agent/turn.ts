@@ -9,9 +9,13 @@ import type { SessionRunner } from "./session-runner";
 import * as setup from "./setup";
 import * as context from "./context";
 import { appendStopMarker } from "./stop-marker";
+import { logger } from "../log";
+
+const log = logger("agent");
 
 export async function run(runner: SessionRunner, fn: () => Promise<void>): Promise<void> {
   runner.stopRequested = false;
+  const t0 = Date.now();
   const startSeq = store.loadMessages(runner.id).length;
   await shellEnvReady();
   if (runner.stopRequested) {
@@ -21,6 +25,7 @@ export async function run(runner: SessionRunner, fn: () => Promise<void>): Promi
   try {
     setup.prepare(runner);
   } catch (e: any) {
+    log.warn("run could not start", { sessionId: runner.id, error: e });
     store.updateSession(runner.id, { status: "error", lastError: e.message });
     runner.emitSession();
     emit({ type: "notice", sessionId: runner.rootId, level: "error", text: e.message });
@@ -29,6 +34,8 @@ export async function run(runner: SessionRunner, fn: () => Promise<void>): Promi
   store.updateSession(runner.id, { status: "running", lastError: null }, true);
   runner.emitSession();
   runner.setPhase("preparing");
+  const info = runner.info();
+  log.info("run started", { sessionId: runner.id, kind: info.kind, provider: info.providerId, model: info.modelId, thinking: info.thinking, permissionMode: info.permissionMode, messages: startSeq });
   let ok = true;
   try {
     await fn();
@@ -40,6 +47,7 @@ export async function run(runner: SessionRunner, fn: () => Promise<void>): Promi
       isContextOverflow(last, runner.agent.state.model.contextWindow)
     ) {
       runner.overflowRetried = true;
+      log.warn("context overflow, compacting and retrying", { sessionId: runner.id, contextWindow: runner.agent.state.model.contextWindow });
       runner.dropTrailingFailure();
       emit({ type: "notice", sessionId: runner.rootId, level: "info", text: st("overflowRetry") });
       await context.compact(runner, { auto: true, full: false });
@@ -48,12 +56,14 @@ export async function run(runner: SessionRunner, fn: () => Promise<void>): Promi
     const final = runner.agent.state.messages[runner.agent.state.messages.length - 1] as any;
     if (final?.role === "assistant" && final.stopReason === "error") {
       ok = false;
+      log.error("run ended with a model error", { sessionId: runner.id, model: info.modelId, error: final.errorMessage ?? "Unknown error" });
       store.updateSession(runner.id, { status: "error", lastError: final.errorMessage ?? "Unknown error" });
     } else {
       store.updateSession(runner.id, { status: "idle", lastError: null });
     }
   } catch (e: any) {
     ok = false;
+    log.error("run failed", { sessionId: runner.id, model: info.modelId, error: e });
     store.updateSession(runner.id, { status: "error", lastError: e?.message ?? String(e) });
   } finally {
     if (runner.stopRequested) {
@@ -62,6 +72,7 @@ export async function run(runner: SessionRunner, fn: () => Promise<void>): Promi
       store.updateSession(runner.id, { status: "idle", lastError: null });
       ok = true;
     }
+    log.info("run finished", { sessionId: runner.id, ok, stopped: runner.stopRequested, ms: Date.now() - t0, queuedLeft: runner.queued.length });
     runner.overflowRetried = false;
     runner.streaming = null;
     runner.setPhase(null);

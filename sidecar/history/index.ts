@@ -7,6 +7,9 @@ import fs from "node:fs";
 import { collapseHome } from "../env";
 import type { HistoryStatus } from "../../shared/protocol";
 import { SOURCES, T_FIRST, type HistoryEvent, type HistorySource, type HistorySourceId } from "./sources";
+import { logger } from "../log";
+
+const log = logger("history");
 export { searchHistory, isHistoryKey, readHistory, type HistoryHit } from "./search";
 
 const VERSION = 1;
@@ -203,12 +206,15 @@ async function runSync() {
     for (const r of d.query("SELECT path FROM files WHERE source = ?").all(src.id) as { path: string }[]) if (!seen.has(r.path)) dropFile(r.path);
   }
   progress = { done: 0, total: work.length };
+  const syncStart = Date.now();
+  log.debug("history sync started", { files: work.length, sources: enabled });
   let last = Date.now();
   for (const w of work) {
     try {
       indexFile(w.src, w.file, w.stat);
-    } catch {
+    } catch (e) {
       // an unreadable or half-written file is retried on the next pass
+      log.debug("history file skipped", { source: w.src.id, file: w.file, error: e });
     }
     progress.done++;
     if (Date.now() - last > 50) {
@@ -222,6 +228,7 @@ async function runSync() {
     for (const [id, name] of src.titles()) d.run("UPDATE sessions SET title = ?, title_rank = 2 WHERE key = ? AND title_rank <= 2", [name, `${src.id}:${id}`]);
   }
   lastSync = Date.now();
+  log.info("history sync finished", { files: work.length, ms: Date.now() - syncStart });
 }
 
 /** Brings the index up to date. One pass at a time; callers share it. */
@@ -255,6 +262,7 @@ export function historyStatus(): HistoryStatus {
 /** Throws the index away and reads everything again. */
 export function rebuildHistory(): Promise<void> {
   if (!db) return Promise.resolve();
+  log.info("history rebuild requested");
   for (const s of SOURCES) purge(s.id);
   return syncHistory();
 }

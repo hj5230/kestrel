@@ -10,6 +10,9 @@ import { emit } from "./hub";
 import { st } from "./i18n";
 import { proxiedFetch } from "./providers";
 import type { KestrelTool } from "./tools/types";
+import { logger } from "./log";
+
+const log = logger("mcp");
 
 interface Conn {
   config: McpServerConfig;
@@ -46,6 +49,8 @@ async function connect(cfg: McpServerConfig) {
   const conn: Conn = { config: cfg, client: null, state: "connecting", error: null, tools: [] };
   conns.set(cfg.id, conn);
   broadcast();
+  const t0 = Date.now();
+  log.info("connecting", { server: cfg.name, transport: cfg.transport });
   try {
     const client = new Client({ name: "kestrel", version: VERSION }, { capabilities: {} });
     let transport;
@@ -86,8 +91,10 @@ async function connect(cfg: McpServerConfig) {
     conn.client = client;
     conn.tools = tools;
     conn.state = "connected";
+    log.info("connected", { server: cfg.name, tools: tools.length, ms: Date.now() - t0 });
     client.onclose = () => {
       if (conns.get(cfg.id) === conn && conn.state === "connected") {
+        log.warn("connection closed by the server", { server: cfg.name });
         conn.state = "error";
         conn.error = st("mcpClosed");
         conn.client = null;
@@ -97,6 +104,7 @@ async function connect(cfg: McpServerConfig) {
   } catch (e: any) {
     conn.state = "error";
     conn.error = e?.message ?? String(e);
+    log.warn("connection failed", { server: cfg.name, transport: cfg.transport, ms: Date.now() - t0, error: e });
   }
   broadcast();
 }
@@ -160,6 +168,7 @@ export function mcpTools(): KestrelTool[] {
           }
           if (!content.length && res.structuredContent) content.push({ type: "text", text: JSON.stringify(res.structuredContent, null, 2) });
           if (!content.length) content.push({ type: "text", text: "(empty result)" });
+          if (res.isError) log.warn("tool returned an error", { server: conn.config.name, tool: t.name });
           if (res.isError) throw new Error(content.map((c) => (c.type === "text" ? c.text : "")).join("\n"));
           return { content, details: { server: conn.config.name, tool: t.name } };
         },

@@ -9,6 +9,9 @@ import { memoryConfigured } from "./memory-config";
 import { st } from "./i18n";
 import { SharedMemoryWork } from "./memory-work";
 import { embedTexts, rerankTexts, memoryChunks, embedChunks, memoryDocument } from "./memory/models";
+import { logger } from "./log";
+
+const log = logger("memory");
 export { embedTexts, rerankTexts, memoryChunks, memoryDocument } from "./memory/models";
 export { discloseMemory } from "./memory/disclose";
 
@@ -117,7 +120,14 @@ export async function prepareMemory(s: AppSettings, signal?: AbortSignal) {
       verified = memoryConfigKey(s);
       verifiedAt = Date.now();
       error = null;
-    } catch (e) { if (!sharedSignal.aborted) error = e instanceof Error ? e.message : String(e); throw e; }
+      log.info("memory is ready");
+    } catch (e) {
+      if (!sharedSignal.aborted) {
+        error = e instanceof Error ? e.message : String(e);
+        log.warn("memory could not be prepared", { error: e });
+      }
+      throw e;
+    }
   }, signal);
 }
 

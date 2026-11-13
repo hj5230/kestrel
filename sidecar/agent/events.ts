@@ -12,6 +12,9 @@ import { memoryEpoch } from "../memory";
 import type { SessionRunner } from "./session-runner";
 import { visibleBlock, usageCost } from "./text";
 import { finishQuestionTool } from "../db/questions";
+import { logger } from "../log";
+
+const log = logger("agent");
 
 export function flushStream(runner: SessionRunner) {
   runner.streamTimer = null;
@@ -54,6 +57,8 @@ export function onEvent(runner: SessionRunner, e: any) {
         const u = usageCost(msg.usage);
         const ctxTokens = (msg.usage?.input ?? 0) + (msg.usage?.cacheRead ?? 0) + (msg.usage?.cacheWrite ?? 0) + (msg.usage?.output ?? 0);
         const s = runner.info();
+        log.debug("assistant message", { sessionId: runner.id, model: msg.model, stop: (msg as any).stopReason, input: u.input, output: u.output, cacheRead: u.cacheRead });
+        if ((msg as any).stopReason === "error") log.warn("assistant message ended in error", { sessionId: runner.id, model: msg.model, error: (msg as any).errorMessage });
         if (u.input || u.output || u.cacheRead || u.cacheWrite) {
           store.recordUsage({ sessionId: runner.id, providerId: s.providerId, modelId: msg.model, ...u, purpose: s.kind === "subagent" ? "subagent" : "chat" });
           store.addSessionUsage(runner.id, u, ctxTokens > 0 ? ctxTokens : null);
@@ -76,6 +81,7 @@ export function onEvent(runner: SessionRunner, e: any) {
     case "tool_execution_start":
       runner.toolStarted.set(e.toolCallId, Date.now());
       runner.runningTools[e.toolCallId] = { toolName: e.toolName, args: e.args, partial: null, startedAt: Date.now() };
+      log.debug("tool started", { sessionId: runner.id, tool: e.toolName, toolCallId: e.toolCallId, args: e.args });
       emit({ type: "tool_start", sessionId: runner.id, toolCallId: e.toolCallId, toolName: e.toolName, args: e.args });
       break;
     case "tool_execution_update": {
@@ -93,7 +99,10 @@ export function onEvent(runner: SessionRunner, e: any) {
       runner.toolStarted.delete(e.toolCallId);
       runner.toolEmitAt.delete(e.toolCallId);
       delete runner.runningTools[e.toolCallId];
-      store.recordToolEvent(runner.id, e.toolName, !!e.isError, Date.now() - started);
+      const ms = Date.now() - started;
+      if (e.isError) log.warn("tool failed", { sessionId: runner.id, tool: e.toolName, ms, toolCallId: e.toolCallId });
+      else log.debug("tool finished", { sessionId: runner.id, tool: e.toolName, ms });
+      store.recordToolEvent(runner.id, e.toolName, !!e.isError, ms);
       emit({ type: "tool_end", sessionId: runner.id, toolCallId: e.toolCallId });
       break;
     }
@@ -133,7 +142,10 @@ export function maybeTitle(runner: SessionRunner, s: SessionInfo) {
       recordSideUsage(runner.id, "title", side, usageOf(r.usage));
       return clampTitle(r.text, fallback);
     })
-    .catch(() => fallback)
+    .catch((e) => {
+      log.warn("title generation failed, using the first words", { sessionId: runner.id, error: e });
+      return fallback;
+    })
     .then((title) => {
       const cur = store.getSession(runner.id);
       if (cur && !cur.title) {

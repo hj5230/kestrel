@@ -16,6 +16,9 @@ import { handleApi, registerHandlers, socketHandlers, type Caller, type SocketDa
 import { setSleepDisabled, sleepDisabled } from "./power";
 import { DOWNLOAD_URL, openTailscaleApp, tailscaleConnect, tailscaleStatus } from "./tailscale";
 import { certPaths, ensureCertificate, fingerprint, candidateHosts, serverName } from "./remote/identity";
+import { logger } from "./log";
+
+const log = logger("remote");
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 const MAX_PAIR_ATTEMPTS = 5;
@@ -74,7 +77,10 @@ function authenticate(req: Request) {
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : new URL(req.url).searchParams.get("token");
   if (!token) return null;
   const device = store.deviceByTokenHash(hashToken(token));
-  if (!device) return null;
+  if (!device) {
+    log.warn("a request carried an unknown device token", { path: new URL(req.url).pathname });
+    return null;
+  }
   // last_seen is informational; don't write on every RPC.
   if (Date.now() - (lastTouched.get(device.id) ?? 0) > 60_000) {
     lastTouched.set(device.id, Date.now());
@@ -92,10 +98,17 @@ function sameCode(a: string, b: string) {
 async function redeemPairing(req: Request): Promise<Response> {
   const body = (await req.json().catch(() => null)) as { code?: string; name?: string } | null;
   const offer = pairing;
-  if (!offer || offer.expiresAt <= Date.now()) return Response.json({ error: "pairing_expired" }, { status: 410 });
+  if (!offer || offer.expiresAt <= Date.now()) {
+    log.warn("pairing attempted without a valid offer");
+    return Response.json({ error: "pairing_expired" }, { status: 410 });
+  }
   if (!body?.code || !sameCode(body.code, offer.code)) {
     // A pairing code is only shown in a QR code; repeated misses mean someone is guessing.
-    if (++offer.failures >= MAX_PAIR_ATTEMPTS) cancelPairing();
+    log.warn("wrong pairing code", { failures: offer.failures + 1 });
+    if (++offer.failures >= MAX_PAIR_ATTEMPTS) {
+      log.error("too many wrong pairing codes, the offer was cancelled");
+      cancelPairing();
+    }
     return Response.json({ error: "pairing_invalid" }, { status: 403 });
   }
   cancelPairing(false);
@@ -103,6 +116,7 @@ async function redeemPairing(req: Request): Promise<Response> {
   const id = randomUUID();
   const name = (body.name ?? "").trim().slice(0, 80) || "iPhone";
   store.addDevice(id, name, hashToken(token));
+  log.info("device paired", { deviceId: id, name });
   broadcast();
   return Response.json({ deviceId: id, token, serverName: serverName() });
 }
@@ -114,6 +128,7 @@ function track(ws: ServerWebSocket<SocketData>, open: boolean) {
   const set = sockets.get(id) ?? new Set();
   if (open) set.add(ws);
   else set.delete(ws);
+  log.debug(open ? "device connected" : "device disconnected", { deviceId: id, sockets: set.size });
   if (set.size) sockets.set(id, set);
   else sockets.delete(id);
   broadcast();
@@ -149,9 +164,11 @@ function start() {
       },
     });
     listenError = null;
+    log.info("listening for phones", { port: s.remotePort });
   } catch (e: any) {
     server = null;
     listenError = e?.code === "EADDRINUSE" ? `port ${s.remotePort} is already in use` : (e?.message ?? String(e));
+    log.error("could not listen for phones", { port: s.remotePort, error: e });
   }
 }
 
@@ -171,6 +188,7 @@ function cancelPairing(notify = true) {
 }
 
 function dropDevice(id: string) {
+  log.info("device removed", { deviceId: id });
   store.deleteDevice(id);
   for (const ws of sockets.get(id) ?? []) ws.close(4401, "device revoked");
   sockets.delete(id);
@@ -195,6 +213,7 @@ registerHandlers({
       patch.remotePort = port;
     }
     const next = store.saveSettings(patch);
+    log.info("remote access configured", { enabled: next.remoteEnabled, port: next.remotePort });
     if (next.remoteEnabled) start();
     else stop();
     broadcast();
@@ -203,6 +222,7 @@ registerHandlers({
   "remote.pairingStart": () => {
     if (!server) throw new Error("remote access is not running");
     cancelPairing(false);
+    log.info("pairing offer created", { ttlMs: PAIRING_TTL_MS });
     pairing = { code: randomBytes(16).toString("base64url"), expiresAt: Date.now() + PAIRING_TTL_MS, failures: 0 };
     pairingTimer = setTimeout(() => cancelPairing(), PAIRING_TTL_MS);
     broadcast();
@@ -249,6 +269,7 @@ registerHandlers({
     return true;
   },
   "remote.resetCertificate": () => {
+    log.warn("certificate reset, every paired device must pair again");
     // A new certificate breaks every existing pin, so paired devices go with it.
     for (const d of store.listDevices()) dropDevice(d.id);
     fs.rmSync(certPaths().dir, { recursive: true, force: true });

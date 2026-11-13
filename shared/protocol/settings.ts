@@ -1,5 +1,6 @@
 // App settings and the extensions they configure: MCP servers, skills, slash commands and memory.
 import type { ThinkingLevel, PermissionMode, Language, TranscriptView } from "./models";
+import type { LogVerbosity } from "./log";
 
 export interface McpServerConfig {
   id: string;
@@ -144,4 +145,6 @@ export interface AppSettings {
   updateAutoCheck: boolean;
   /** beta: every published build; stable: only releases without a pre-release tag. */
   updateChannel: "beta" | "stable";
+  /** normal: info and above; verbose: also debug. Warnings and errors are always logged and kept longer. */
+  logLevel: LogVerbosity;
 }

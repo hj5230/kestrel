@@ -3,6 +3,9 @@ import { Database } from "bun:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 import { MIGRATIONS } from "./migrations";
+import { logger } from "../log";
+
+const log = logger("db");
 
 export let db: Database;
 export let dbPath = "";
@@ -32,6 +35,7 @@ export function connect(dataDir: string, dev: boolean) {
   MIGRATIONS.forEach((sql, i) => {
     const v = i + 1;
     if (done.has(v)) return;
+    log.info("applying migration", { version: v });
     db.transaction(() => {
       db.run(sql);
       db.run("INSERT INTO _migrations (version, applied_at) VALUES (?, ?)", [v, Date.now()]);
@@ -40,7 +44,9 @@ export function connect(dataDir: string, dev: boolean) {
   try {
     fs.chmodSync(dbPath, 0o600);
   } catch {}
-  db.run("UPDATE sessions SET status = 'idle' WHERE status IN ('running', 'waiting')");
+  const stuck = db.run("UPDATE sessions SET status = 'idle' WHERE status IN ('running', 'waiting')");
+  if (stuck.changes) log.warn("sessions were still running at the last shutdown", { count: stuck.changes });
+  log.info("database opened", { path: dbPath, migrations: MIGRATIONS.length, applied: done.size });
 }
 
 export const json = <T>(s: string | null | undefined, fallback: T): T => {

@@ -14,6 +14,7 @@ import type { AppSettings } from "../shared/protocol";
 import { languageModel } from "./providers";
 import { parseModelSetting, usageOf, type Usage } from "./side-model";
 import type { KestrelTool } from "./tools/types";
+import { logger } from "./log";
 
 export interface ReviewResult {
   block: boolean;
@@ -172,12 +173,16 @@ export async function reviewWith(model: LanguageModel, opts: ReviewOptions): Pro
   const first = await generateText({ model, system, prompt: input + STAGE1, temperature: 0, maxOutputTokens: 64, maxRetries: 1, abortSignal: within(25000) });
   opts.onUsage?.(usageOf(first.usage));
   if (/^\W*ALLOW\b/i.test(first.text.trim())) return { block: false, reason: "", stage: 1 };
+  logger("review").debug("first look flagged the action, looking again");
 
   // Flagged (or unreadable): look again with room to think.
   const second = await generateText({ model, system, prompt: input + STAGE2, temperature: 0, maxOutputTokens: 1200, maxRetries: 1, abortSignal: within(60000) });
   opts.onUsage?.(usageOf(second.usage));
   const verdicts = [...second.text.matchAll(/VERDICT:\s*\**\s*(ALLOW|BLOCK)/gi)];
-  if (!verdicts.length) throw new Error("the review model gave no verdict");
+  if (!verdicts.length) {
+    logger("review").warn("the review model gave no verdict", { chars: second.text.length });
+    throw new Error("the review model gave no verdict");
+  }
   const block = verdicts[verdicts.length - 1][1].toUpperCase() === "BLOCK";
   const reason = /REASON:\s*(.+)/i.exec(second.text)?.[1]?.trim().replace(/\*+$/, "") ?? "";
   return { block, reason: reason || (block ? "the action goes beyond what the user asked for" : ""), stage: 2 };

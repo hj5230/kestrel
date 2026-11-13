@@ -12,6 +12,9 @@ import type { KestrelTool } from "../tools/types";
 import type { SessionRunner } from "./session-runner";
 import { approvals, pendingQuestions } from "./pending";
 import { saveQuestion } from "../db/questions";
+import { logger } from "../log";
+
+const log = logger("permission");
 
 /** What the reviewer reads: the user's words, what the user approved by hand, and the agent's tool calls. */
 export function reviewTranscript(runner: SessionRunner): string {
@@ -34,11 +37,16 @@ export async function autoReview(runner: SessionRunner, tool: KestrelTool, args:
       signal,
       onUsage: (u) => picked && recordSideUsage(runner.id, "review", picked, u),
     });
-    if (!r.block) return null;
+    if (!r.block) {
+      log.debug("auto review allowed", { sessionId: runner.id, tool: tool.name });
+      return null;
+    }
+    log.info("auto review blocked a call", { sessionId: runner.id, tool: tool.name, reason: r.reason });
     // The reviewer is a second opinion, not the last word: the user sees its reason and decides.
     return { ...perm, action: "ask", note: { code: "review_blocked", detail: r.reason } };
   } catch (e: any) {
     if (signal?.aborted) return { block: true, reason: "Operation aborted by the user." };
+    log.warn("auto review failed, asking the user", { sessionId: runner.id, tool: tool.name, error: e });
     return { ...perm, action: "ask", note: { code: "review_error", detail: String(e?.message ?? e).slice(0, 200) } };
   }
 }
@@ -96,7 +104,10 @@ export async function beforeToolCall(runner: SessionRunner, ctx: { toolCall: any
     perm = out;
   }
   if (perm.action === "allow") return undefined;
-  if (perm.action === "deny") return { block: true, reason: perm.reason };
+  if (perm.action === "deny") {
+    log.info("tool call denied by rule", { sessionId: runner.id, tool: tool.name, reason: perm.reason });
+    return { block: true, reason: perm.reason };
+  }
 
   const request: ApprovalRequest = {
     id: newId("ap_"),
@@ -127,6 +138,7 @@ export async function beforeToolCall(runner: SessionRunner, ctx: { toolCall: any
     emit({ type: "approval_request", request });
   });
   approvals.delete(request.id);
+  log.info("approval answered", { sessionId: runner.id, tool: tool.name, decision: decision.decision, ms: Date.now() - request.createdAt, mode: s.permissionMode });
   emit({ type: "approval_resolved", sessionId: runner.rootId, id: request.id });
   syncWaiting(runner);
 
@@ -145,7 +157,10 @@ export async function beforeToolCall(runner: SessionRunner, ctx: { toolCall: any
   if (decision.decision === "allow_always" && pattern && !(perm.kind === "bash" && isBroadEntry(pattern))) {
     const settings = store.getSettings();
     const key = perm.kind === "bash" ? "bashWhitelist" : "toolWhitelist";
-    if (!settings[key].includes(pattern)) store.saveSettings({ [key]: [...settings[key], pattern] });
+    if (!settings[key].includes(pattern)) {
+      store.saveSettings({ [key]: [...settings[key], pattern] });
+      log.info("allow rule saved", { kind: perm.kind, pattern });
+    }
   }
   return undefined;
 }

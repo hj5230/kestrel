@@ -6,6 +6,9 @@ import path from "node:path";
 import { sortEfforts } from "../shared/effort";
 import type { ProviderKind } from "../shared/protocol";
 import { readCodexRows, codexRow, type CodexRow } from "./catalog/codex";
+import { logger } from "./log";
+
+const log = logger("catalog");
 export { readCodexRows } from "./catalog/codex";
 export { planBackfill, locksFor } from "./catalog/backfill";
 
@@ -218,10 +221,12 @@ export async function refreshCatalog(dataDir: string, fetchImpl: typeof fetch = 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const catalog = await res.json();
     installCatalog(catalog);
+    log.info("model catalog refreshed", { fetchedBefore: fetchedAt ? new Date(fetchedAt).toISOString() : null });
     fs.mkdirSync(dataDir, { recursive: true });
     fs.writeFileSync(file, JSON.stringify({ fetchedAt: Date.now(), catalog }));
     return true;
-  } catch {
+  } catch (e) {
+    log.warn("model catalog download failed, using the saved copy", { loaded, error: e });
     if (!loaded) loadCatalogCache(dataDir);
     return false;
   }

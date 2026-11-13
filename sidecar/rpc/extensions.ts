@@ -10,6 +10,7 @@ import { memoryConfigKey, testMemoryModels, memoryStatus, prepareMemory, resetMe
 import { memoryJobCounts, retryMemoryJobs } from "../memory-jobs";
 import { deleteMemory, getMemory, listMemories, writeMemory, type MemoryInput } from "../memory";
 import { newId } from "../sessions";
+import { logger } from "../log";
 import { discoverSkills, listSlashCommands } from "../skills";
 import type { Handler } from "./types";
 
@@ -81,7 +82,7 @@ export const extensionHandlers: Record<string, Handler> = {
     const { entry } = writeMemory(input, { from, expectedRevision: revision });
     emit({ type: "memory_changed" });
     const s = store.getSettings();
-    if (s.memoryEnabled && memoryConfigured(s)) void prepareMemory(s).catch(() => {});
+    if (s.memoryEnabled && memoryConfigured(s)) void prepareMemory(s).catch((e) => logger("memory").warn("could not be prepared", e));
     return entry;
   },
   "memory.delete": ({ id }: { id: string }) => {

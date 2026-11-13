@@ -5,6 +5,9 @@ import * as store from "./db";
 import { expandHome } from "./env";
 import { dateLocale, st } from "./i18n";
 import { sessionUploadDir } from "./uploads";
+import { logger } from "./log";
+
+const log = logger("session");
 
 export function newId(prefix = ""): string {
   return prefix + crypto.randomUUID().replace(/-/g, "").slice(0, 16);
@@ -53,6 +56,7 @@ export function createSession(input: Partial<SessionInfo> = {}): SessionInfo {
     mergedInto: null,
   };
   store.insertSession(info);
+  log.info("session created", { sessionId: info.id, kind: info.kind, parentId: info.parentId, provider: info.providerId, model: info.modelId, cwd: info.cwd });
   return store.getSession(info.id)!;
 }
 
@@ -83,6 +87,7 @@ export function forkSession(sourceId: string, uptoSeq: number, dataDir?: string)
     }
   }
   store.updateSession(info.id, { todos: src.todos }, true);
+  log.info("session forked", { sessionId: info.id, sourceId, uptoSeq });
   return store.getSession(info.id)!;
 }
 

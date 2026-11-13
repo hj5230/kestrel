@@ -11,6 +11,9 @@ import { st } from "./i18n";
 import { recordSideUsage, usageOf } from "./side-model";
 import { parseMemoryExtraction } from "./memory-extraction";
 import type { ChatMessage } from "../shared/protocol";
+import { logger } from "./log";
+
+const log = logger("memory");
 
 interface Job { id: string; session_id: string; seq: number; message: string; epoch: string; attempts: number; plan: string | null }
 interface Planned { input: MemoryInput; id?: string; revision?: string }
@@ -58,10 +61,12 @@ export async function drainMemoryJobs() {
       store.db.run("UPDATE memory_jobs SET state = 'running', attempts = attempts + 1 WHERE id = ?", [job.id]);
       try {
         await extract(job);
+        log.debug("memory job done", { jobId: job.id, sessionId: job.session_id, attempt: job.attempts + 1 });
         store.db.run("UPDATE memory_jobs SET state = 'done', error = NULL, message = '', plan = NULL WHERE id = ?", [job.id]);
       } catch (e) {
         const reason = e instanceof Error ? e.message : String(e);
         const failed = job.attempts + 1 >= 3;
+        log.warn(failed ? "memory job gave up" : "memory job failed, will retry", { jobId: job.id, sessionId: job.session_id, attempt: job.attempts + 1, error: e });
         store.db.run("UPDATE memory_jobs SET state = ?, error = ?, next_at = ? WHERE id = ?", [failed ? "failed" : "pending", reason.slice(0, 1000), Date.now() + 30000 * (job.attempts + 1), job.id]);
         emit({ type: "notice", sessionId: job.session_id, level: "warn", text: st("memoryJobFailed", { reason }) });
       }

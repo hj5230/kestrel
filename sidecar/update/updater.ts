@@ -7,8 +7,10 @@ import path from "node:path";
 import type { ReleaseManifest, UpdateStatus } from "../../shared/protocol";
 import * as store from "../db";
 import { emit } from "../hub";
+import { logger } from "../log";
 import { compareVersions, fetchManifest, fetchPointer, fetchRelease, sha256, tagOf } from "./release";
 
+const log = logger("update");
 const EVERY_MS = 6 * 60 * 60 * 1000;
 let dir = "";
 let status: UpdateStatus = { current: "0.0.0", state: "idle", latest: null, progress: null, error: null, checkedAt: null, stagedPath: null };
@@ -26,9 +28,10 @@ export const updateStatus = () => status;
 export function initUpdater(opts: { dataDir: string; version: string; dev: boolean }) {
   dir = path.join(opts.dataDir, "updates");
   status = { ...status, current: opts.version, state: opts.dev ? "disabled" : "idle" };
+  log.info("updater ready", { current: opts.version, enabled: !opts.dev, channel: store.getSettings().updateChannel, auto: store.getSettings().updateAutoCheck });
   if (opts.dev) return;
   const tick = () => {
-    if (store.getSettings().updateAutoCheck) void checkForUpdate().catch(() => {});
+    if (store.getSettings().updateAutoCheck) void checkForUpdate().catch((e) => log.warn("scheduled check failed", e));
   };
   setTimeout(tick, 30_000).unref();
   timer = setInterval(tick, EVERY_MS);
@@ -48,22 +51,27 @@ export function checkForUpdate(): Promise<UpdateStatus> {
 
 async function run(): Promise<UpdateStatus> {
   set({ state: "checking", error: null });
+  const t0 = Date.now();
   try {
     const pointer = await fetchPointer();
     const channel = store.getSettings().updateChannel;
+    log.info("checked for updates", { current: status.current, channel, beta: pointer.beta, stable: pointer.stable, ms: Date.now() - t0 });
     const candidates = [pointer.stable, channel === "beta" ? pointer.beta : null].filter((v): v is string => !!v);
     const target = candidates.sort(compareVersions).pop();
     if (!target || compareVersions(target, status.current) <= 0) {
       set({ state: "idle", latest: null, progress: null, checkedAt: Date.now(), stagedPath: null });
       return status;
     }
+    log.info("new version found", { current: status.current, target });
     const manifest = await fetchManifest(target);
     set({
       latest: { version: manifest.version, date: manifest.date, notes: manifest.notes, page: manifest.page, ios: manifest.ios && { version: manifest.version, size: manifest.ios.size } },
       checkedAt: Date.now(),
     });
     set({ state: "ready", stagedPath: await stage(manifest), progress: null });
+    log.info("update ready to install", { version: manifest.version, ms: Date.now() - t0 });
   } catch (e: any) {
+    log.error("update failed", { current: status.current, error: e, ms: Date.now() - t0 });
     set({ state: "error", error: String(e?.message ?? e).slice(0, 300), progress: null, checkedAt: Date.now() });
   }
   return status;
@@ -89,6 +97,8 @@ async function stage(m: ReleaseManifest): Promise<string> {
     const have = fs.existsSync(file) && fs.statSync(file).size === chunk.size && sha256(fs.readFileSync(file)) === chunk.sha256;
     if (!have) {
       const data = await fetchRelease(ref, chunk.path, undefined, 5 * 60_000);
+      log.debug("chunk downloaded", { path: chunk.path, size: data.length });
+      if (data.length !== chunk.size || sha256(data) !== chunk.sha256) log.error("downloaded chunk does not match its hash", { path: chunk.path, expected: chunk.size, got: data.length });
       if (data.length !== chunk.size || sha256(data) !== chunk.sha256) throw new Error(`${chunk.path} is damaged; it will be downloaded again`);
       fs.writeFileSync(file, data);
     }

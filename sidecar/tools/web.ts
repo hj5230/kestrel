@@ -2,6 +2,7 @@
 import { Type } from "typebox";
 import { proxiedFetch } from "../providers";
 import { defineTool, text, type KestrelTool, type ToolContext } from "./types";
+import { logger } from "../log";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
 
@@ -122,6 +123,7 @@ export function createWebSearchTool(ctx: Pick<ToolContext, "settings">): Kestrel
         signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000),
       });
       const raw = await res.text();
+      if (!res.ok) logger("web").warn("search failed", { status: res.status });
       if (!res.ok) throw tavilyError(res.status, raw);
       let data: any;
       try {
