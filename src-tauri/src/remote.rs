@@ -79,6 +79,7 @@ struct ConnStatus {
 pub fn setup<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
     builder
         .setup(|app| {
+            crate::log::init(app.path().app_log_dir()?);
             edge_to_edge(app);
             crate::keyboard::install(app);
             Ok(())
@@ -100,6 +101,10 @@ pub fn setup<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
             remote_upload,
             remote_events_connect,
             remote_events_disconnect,
-            haptic
+            haptic,
+            crate::log::commands::log_write,
+            crate::log::commands::log_info,
+            crate::log::commands::log_query,
+            crate::log::commands::log_set_verbose
         ])
 }

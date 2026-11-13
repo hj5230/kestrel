@@ -36,8 +36,15 @@ fn staged_bundle(app: &tauri::AppHandle, staged: &str) -> Result<PathBuf, String
 
 #[tauri::command]
 pub fn install_update(app: tauri::AppHandle, staged: String) -> Result<(), String> {
-    let new = staged_bundle(&app, &staged)?;
-    let current = running_bundle()?;
+    let new = staged_bundle(&app, &staged).map_err(|e| {
+        crate::log::error("update", "the staged update was refused", serde_json::json!({ "error": e }));
+        e
+    })?;
+    let current = running_bundle().map_err(|e| {
+        crate::log::error("update", "cannot tell which app is running", serde_json::json!({ "error": e }));
+        e
+    })?;
+    crate::log::info("update", "installing a staged update and restarting", serde_json::json!({ "from": current.to_string_lossy(), "to": new.to_string_lossy() }));
     Command::new("/bin/sh")
         .arg("-c")
         .arg(SWAP)
@@ -51,7 +58,10 @@ pub fn install_update(app: tauri::AppHandle, staged: String) -> Result<(), Strin
         // Its own process group, so it outlives this app.
         .process_group(0)
         .spawn()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            crate::log::error("update", "the swap helper could not start", serde_json::json!({ "error": e.to_string() }));
+            e.to_string()
+        })?;
     app.exit(0);
     Ok(())
 }

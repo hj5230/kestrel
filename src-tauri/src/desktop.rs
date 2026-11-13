@@ -1,5 +1,4 @@
 use serde::Serialize;
-use std::io::Write;
 use std::sync::Mutex;
 use tauri::{Manager, RunEvent, Runtime};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
@@ -36,8 +35,8 @@ fn parse_ready(line: &str) -> Option<BackendInfo> {
 fn spawn_backend(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let data_dir = app.path().app_data_dir()?;
     std::fs::create_dir_all(&data_dir)?;
+    // The log was opened in setup(); the sidecar is told where it lives only so a hand-run copy can find its own.
     let log_dir = app.path().app_log_dir()?;
-    std::fs::create_dir_all(&log_dir)?;
     let token = uuid::Uuid::new_v4().simple().to_string();
     let data_arg = data_dir.to_string_lossy().to_string();
     let mut args = vec![
@@ -48,6 +47,7 @@ fn spawn_backend(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error
         "--token".to_string(),
         token,
         "--watch-stdin".to_string(),
+        "--log-stdout".to_string(),
     ];
 
     let shell = app.shell();
@@ -61,13 +61,18 @@ fn spawn_backend(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error
         shell.sidecar("kestrel-agent")?.args(args)
     };
 
-    let (mut rx, child) = command.spawn()?;
+    let (mut rx, child) = command.spawn().map_err(|e| {
+        crate::log::error("shell", "the sidecar could not be started", serde_json::json!({ "error": e.to_string() }));
+        e
+    })?;
+    let pid = child.pid();
     *app.state::<Backend>().child.lock().unwrap() = Some(child);
 
     let handle = app.clone();
-    let log_path = log_dir.join("agent.log");
+    let _ = log_dir;
+    crate::log::info("shell", "sidecar started", serde_json::json!({ "pid": pid }));
     tauri::async_runtime::spawn(async move {
-        let mut log = std::fs::OpenOptions::new().create(true).append(true).open(&log_path).ok();
+        let started = std::time::Instant::now();
         while let Some(event) = rx.recv().await {
             match event {
                 CommandEvent::Stdout(bytes) => {
@@ -75,19 +80,26 @@ fn spawn_backend(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error
                     for line in text.lines() {
                         if let Some(info) = parse_ready(line) {
                             *handle.state::<Backend>().info.lock().unwrap() = Some(info);
-                        } else if let Some(f) = log.as_mut() {
-                            let _ = writeln!(f, "{line}");
+                            crate::log::info("shell", "sidecar is ready", serde_json::json!({ "port": handle.state::<Backend>().info.lock().unwrap().as_ref().map(|i| i.port), "ms": started.elapsed().as_millis() as u64 }));
+                        } else if !crate::log::ingest_sidecar_line(line) {
+                            // Anything that is not a record is raw output (a library's print, a runtime message).
+                            crate::log::info("sidecar-stdout", line, serde_json::Value::Null);
                         }
                     }
                 }
                 CommandEvent::Stderr(bytes) => {
-                    if let Some(f) = log.as_mut() {
-                        let _ = f.write_all(&bytes);
+                    for line in String::from_utf8_lossy(&bytes).lines().filter(|l| !l.trim().is_empty()) {
+                        crate::log::warn("sidecar-stderr", line, serde_json::Value::Null);
                     }
                 }
+                CommandEvent::Error(e) => crate::log::error("shell", "the sidecar reported an error", serde_json::json!({ "error": e })),
                 CommandEvent::Terminated(status) => {
-                    if let Some(f) = log.as_mut() {
-                        let _ = writeln!(f, "agent exited: {:?}", status.code);
+                    let expected = *handle.state::<Backend>().shutting_down.lock().unwrap();
+                    let fields = serde_json::json!({ "code": status.code, "signal": status.signal, "uptimeMs": started.elapsed().as_millis() as u64, "expected": expected });
+                    if expected {
+                        crate::log::info("shell", "sidecar exited", fields);
+                    } else {
+                        crate::log::error("shell", "sidecar exited unexpectedly", fields);
                     }
                     let state = handle.state::<Backend>();
                     *state.info.lock().unwrap() = None;
@@ -103,13 +115,16 @@ fn spawn_backend(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error
                         restarts.len() <= 5
                     };
                     if allowed {
+                        crate::log::warn("shell", "restarting the sidecar", serde_json::Value::Null);
                         let h = handle.clone();
                         tauri::async_runtime::spawn(async move {
                             std::thread::sleep(std::time::Duration::from_millis(800));
                             if let Err(e) = spawn_backend(&h) {
-                                eprintln!("failed to restart agent: {e}");
+                                crate::log::error("shell", "the sidecar could not be restarted", serde_json::json!({ "error": e.to_string() }));
                             }
                         });
+                    } else {
+                        crate::log::error("shell", "the sidecar keeps crashing; not restarting it", serde_json::Value::Null);
                     }
                     break;
                 }
@@ -133,8 +148,18 @@ pub fn setup(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_shell::init())
         .manage(Backend::default())
-        .invoke_handler(tauri::generate_handler![backend_info, crate::update::install_update])
+        .invoke_handler(tauri::generate_handler![
+            backend_info,
+            crate::update::install_update,
+            crate::log::commands::log_write,
+            crate::log::commands::log_info,
+            crate::log::commands::log_query,
+            crate::log::commands::log_set_verbose,
+            crate::log::commands::log_export,
+            crate::log::commands::log_reveal
+        ])
         .setup(|app| {
+            crate::log::init(app.path().app_log_dir()?);
             spawn_backend(app.handle())?;
             Ok(())
         })
@@ -144,6 +169,7 @@ pub fn on_event<R: Runtime>(app: &tauri::AppHandle<R>, event: &RunEvent) {
     if let RunEvent::Exit = event {
         let state = app.state::<Backend>();
         *state.shutting_down.lock().unwrap() = true;
+        crate::log::info("shell", "app exiting", serde_json::Value::Null);
         let child = state.child.lock().unwrap().take();
         if let Some(child) = child {
             let _ = child.kill();

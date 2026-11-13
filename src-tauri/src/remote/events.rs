@@ -32,13 +32,19 @@ pub async fn remote_events_connect<R: Runtime>(app: AppHandle<R>, state: State<'
             }
         }
     };
+    let t0 = Instant::now();
     let ws = match open(h.clone()).await {
         Ok(ws) => ws,
-        Err(_) => {
+        Err(first) => {
+            crate::log::warn("events", "event stream did not open, trying the other addresses", json!({ "error": first }));
             h = host(&state, &conn, true).await?;
-            open(h.clone()).await?
+            open(h.clone()).await.map_err(|e| {
+                crate::log::warn("events", "event stream could not open", json!({ "error": e }));
+                e
+            })?
         }
     };
+    crate::log::info("events", "event stream open", json!({ "ms": t0.elapsed().as_millis() as u64 }));
 
     if *state.stream_id.lock().unwrap() != stream_id { return Err("Connection changed".into()); }
     let _ = app.emit(STATUS, ConnStatus { stream_id: stream_id.clone(), connected: true, code: None });
@@ -51,6 +57,7 @@ pub async fn remote_events_connect<R: Runtime>(app: AppHandle<R>, state: State<'
         let mut ping = tokio::time::interval(PING_EVERY);
         let mut last_seen = Instant::now();
         let mut code = None;
+        let mut why = "closed by the Mac";
         loop {
             tokio::select! {
                 msg = rx.next() => match msg {
@@ -63,16 +70,21 @@ pub async fn remote_events_connect<R: Runtime>(app: AppHandle<R>, state: State<'
                         break;
                     }
                     Some(Ok(_)) => last_seen = Instant::now(),
-                    Some(Err(_)) | None => break,
+                    Some(Err(_)) | None => {
+                        why = "connection dropped";
+                        break;
+                    }
                 },
                 _ = ping.tick() => {
                     // iOS silently kills sockets of suspended apps; a missing pong is how we notice.
                     if last_seen.elapsed() > DEAD_AFTER || tx.send(Message::Ping(Vec::new().into())).await.is_err() {
+                        why = "no sign of life from the Mac";
                         break;
                     }
                 }
             }
         }
+        crate::log::warn("events", "event stream ended", json!({ "why": why, "code": code }));
         let _ = tx.send(Message::Close(None)).await;
         let _ = handle.emit(STATUS, ConnStatus { stream_id: stream_id.clone(), connected: false, code: code.filter(|c| *c != u16::from(CloseCode::Normal)) });
     });

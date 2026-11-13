@@ -44,7 +44,11 @@ pub async fn remote_upload<R: Runtime>(app: AppHandle<R>, state: State<'_, Remot
     if meta.len() > MAX_UPLOAD {
         return Err("File is too large (max 100 MB)".into());
     }
-    let bytes = tokio::fs::read(&path).await.map_err(|e| e.to_string())?;
+    let bytes = tokio::fs::read(&path).await.map_err(|e| {
+        crate::log::warn("upload", "the picked file could not be read", json!({ "error": e.to_string() }));
+        e.to_string()
+    })?;
+    crate::log::info("upload", "sending a file to the Mac", json!({ "bytes": bytes.len() }));
     let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("file").to_string();
     let conn = current(&app, &state)?;
     let send = |host: String| {
@@ -57,7 +61,8 @@ pub async fn remote_upload<R: Runtime>(app: AppHandle<R>, state: State<'_, Remot
     let h = host(&state, &conn, false).await?;
     match send(h).await {
         Ok(v) => Ok(v),
-        Err(RpcFailure::Connect(_)) => {
+        Err(RpcFailure::Connect(first)) => {
+            crate::log::warn("upload", "the Mac did not answer, trying its other addresses", json!({ "error": first }));
             let h = host(&state, &conn, true).await?;
             send(h).await.map_err(|e| match e {
                 RpcFailure::Connect(m) | RpcFailure::Other(m) => m,
@@ -94,16 +99,30 @@ pub async fn remote_rpc<R: Runtime>(
     method: String,
     params: Value,
 ) -> Result<Value, String> {
-    let conn = current(&app, &state)?;
-    let h = host(&state, &conn, false).await?;
-    match post_rpc(&conn, &h, &method, &params).await {
-        Ok(v) => Ok(v),
-        Err(RpcFailure::Connect(_)) => {
-            let h = host(&state, &conn, true).await?;
-            post_rpc(&conn, &h, &method, &params).await.map_err(|e| match e {
-                RpcFailure::Connect(m) | RpcFailure::Other(m) => m,
-            })
+    let t0 = Instant::now();
+    let out = async {
+        let conn = current(&app, &state)?;
+        let h = host(&state, &conn, false).await?;
+        match post_rpc(&conn, &h, &method, &params).await {
+            Ok(v) => Ok(v),
+            Err(RpcFailure::Connect(first)) => {
+                crate::log::warn("net", "the Mac did not answer, trying its other addresses", json!({ "method": method, "error": first }));
+                let h = host(&state, &conn, true).await?;
+                post_rpc(&conn, &h, &method, &params).await.map_err(|e| match e {
+                    RpcFailure::Connect(m) | RpcFailure::Other(m) => m,
+                })
+            }
+            Err(RpcFailure::Other(m)) => Err(m),
         }
-        Err(RpcFailure::Other(m)) => Err(m),
     }
+    .await;
+    let ms = t0.elapsed().as_millis() as u64;
+    match &out {
+        // A refused call is the Mac's answer, not a network fault; the sidecar logs why.
+        Err(e) if e == "unauthorized" => crate::log::error("net", "the Mac rejected this phone's token", json!({ "method": method })),
+        Err(e) => crate::log::warn("net", "call failed", json!({ "method": method, "ms": ms, "error": e })),
+        Ok(_) if ms >= 3000 => crate::log::warn("net", "slow call", json!({ "method": method, "ms": ms })),
+        Ok(_) => crate::log::debug("net", "call", json!({ "method": method, "ms": ms })),
+    }
+    out
 }

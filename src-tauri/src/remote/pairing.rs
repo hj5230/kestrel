@@ -50,7 +50,11 @@ pub async fn remote_pair<R: Runtime>(
     link: String,
     device_name: String,
 ) -> Result<Profile, String> {
-    let link = parse_link(&link)?;
+    let link = parse_link(&link).map_err(|e| {
+        crate::log::warn("pairing", "the pairing link is not valid", json!({ "error": e }));
+        e
+    })?;
+    crate::log::info("pairing", "pairing started", json!({ "hosts": link.hosts.len(), "port": link.port }));
     let tls = pinned_tls::client_config(&link.fingerprint)?;
     let client = http_client(&tls)?;
     let found = probe(&client, &link.hosts, link.port).await?;
@@ -63,9 +67,18 @@ pub async fn remote_pair<R: Runtime>(
         .map_err(|e| format!("unreachable: {e}"))?;
     match res.status().as_u16() {
         200 => {}
-        410 => return Err("pairing_expired".into()),
-        403 => return Err("pairing_invalid".into()),
-        s => return Err(format!("pairing failed (HTTP {s})")),
+        410 => {
+            crate::log::warn("pairing", "the pairing code expired", Value::Null);
+            return Err("pairing_expired".into());
+        }
+        403 => {
+            crate::log::warn("pairing", "the Mac refused the pairing code", Value::Null);
+            return Err("pairing_invalid".into());
+        }
+        s => {
+            crate::log::warn("pairing", "pairing failed", json!({ "status": s }));
+            return Err(format!("pairing failed (HTTP {s})"));
+        }
     }
     let paired: PairResponse = res.json().await.map_err(|e| e.to_string())?;
 
@@ -81,6 +94,7 @@ pub async fn remote_pair<R: Runtime>(
     keychain_set(&profile.device_id, &paired.token)?;
     // Other Macs stay paired. Only an entry for this same Mac (same certificate) is replaced.
     let replaced = update_store(&app, &state, |s| s.upsert(profile.clone()))?;
+    let replaced_before = replaced.is_some();
     if let Some(old) = replaced {
         // Pairing the same Mac again would leave this phone listed twice there, so drop the old pairing on both ends.
         if let Some(old_token) = keychain_get(&old.device_id) {
@@ -90,6 +104,7 @@ pub async fn remote_pair<R: Runtime>(
     }
     *state.conn.lock().unwrap() = Some(Conn { profile: profile.clone(), token: paired.token.into(), tls, client });
     *state.host.lock().unwrap() = Some(found);
+    crate::log::info("pairing", "paired", json!({ "replacedExisting": replaced_before, "server": profile.server_name }));
     Ok(profile)
 }
 

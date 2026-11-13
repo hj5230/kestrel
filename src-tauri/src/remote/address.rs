@@ -48,7 +48,17 @@ pub(super) async fn probe(client: &reqwest::Client, hosts: &[String], port: u16)
         let req = client.get(url).timeout(PROBE_TIMEOUT).send();
         async move { req.await.map(|_| host.clone()).map_err(|e| format!("{host}: {}", describe(&e))) }.boxed()
     });
-    select_ok(attempts).await.map(|(host, _)| host).map_err(|last| format!("unreachable: {last}"))
+    let t0 = Instant::now();
+    match select_ok(attempts).await {
+        Ok((host, _)) => {
+            crate::log::debug("net", "address answered", json!({ "host": host, "ms": t0.elapsed().as_millis() as u64 }));
+            Ok(host)
+        }
+        Err(last) => {
+            crate::log::warn("net", "no address answered", json!({ "tried": hosts.len(), "ms": t0.elapsed().as_millis() as u64, "last": last }));
+            Err(format!("unreachable: {last}"))
+        }
+    }
 }
 
 pub(super) async fn host(state: &Remote, conn: &Conn, refresh: bool) -> Result<String, String> {
@@ -57,6 +67,7 @@ pub(super) async fn host(state: &Remote, conn: &Conn, refresh: bool) -> Result<S
             return Ok(h);
         }
     }
+    crate::log::info("net", "looking for the Mac's address", json!({ "refresh": refresh, "candidates": conn.profile.hosts.len() }));
     let found = probe(&conn.client, &conn.profile.hosts, conn.profile.port).await;
     *state.host.lock().unwrap() = found.clone().ok();
     found
@@ -83,6 +94,7 @@ pub(super) async fn refresh_hosts<R: Runtime>(app: AppHandle<R>, conn: Conn, hos
     if hosts == conn.profile.hosts {
         return;
     }
+    crate::log::info("net", "the Mac has new addresses", json!({ "before": conn.profile.hosts.len(), "after": hosts.len() }));
     let state = app.state::<Remote>();
     // The phone may have switched to another Mac while the request was in flight; the update goes to the
     // Mac that answered either way, and the active connection only picks it up if it is still that one.
